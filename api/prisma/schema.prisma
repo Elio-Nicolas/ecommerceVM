@@ -5,7 +5,11 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-enum ProductStatus {\n  DRAFT\n  ACTIVE\n  ARCHIVED\n}
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
 model AdminUser {
   id String @id @default(uuid())
   email String @unique
