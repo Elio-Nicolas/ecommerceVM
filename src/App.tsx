@@ -4,6 +4,13 @@ import { fetchCategories, fetchProducts } from './catalog-api'
 
 type CartLine = { product: Product; quantity: number }
 
+const CART_STORAGE_KEY = 'ecommercevm:cart:v1'
+
+function getProductSlugFromPath() {
+  const match = window.location.pathname.match(/^\\/producto\\/([^/]+)\\/?$/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 function SearchIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 5 5" /></svg>
 }
@@ -22,7 +29,21 @@ export default function App() {
   const [category, setCategory] = useState('Todos')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('featured')
-  const [cart, setCart] = useState<CartLine[]>([])
+  const [cart, setCart] = useState<CartLine[]>(() => {
+    try {
+      const saved = localStorage.getItem(CART_STORAGE_KEY)
+      if (!saved) return []
+      const parsed = JSON.parse(saved) as CartLine[]
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter((line) =>
+        line && line.product && typeof line.product.id === 'string' &&
+        Number.isInteger(line.quantity) && line.quantity > 0 &&
+        typeof line.product.price === 'number',
+      )
+    } catch {
+      return []
+    }
+  })
   const [cartOpen, setCartOpen] = useState(false)
   const [selected, setSelected] = useState<Product | null>(null)
 
@@ -32,7 +53,17 @@ export default function App() {
       .then(([items, categoryNames]) => {
         if (!active) return
         setProducts(items)
+        setCart((current) => current.flatMap((line) => {
+          const latest = items.find((item) => item.id === line.product.id)
+          if (!latest || latest.stock <= 0) return []
+          return [{ product: latest, quantity: Math.min(line.quantity, latest.stock) }]
+        }))
         setCategories(['Todos', ...categoryNames])
+        const requestedSlug = getProductSlugFromPath()
+        if (requestedSlug) {
+          const requestedProduct = items.find((item) => item.slug === requestedSlug)
+          if (requestedProduct) setSelected(requestedProduct)
+        }
         setCatalogError('')
       })
       .catch(() => {
@@ -43,6 +74,23 @@ export default function App() {
       })
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart))
+    } catch {
+      // Si el almacenamiento del navegador está bloqueado, el carrito sigue funcionando en memoria.
+    }
+  }, [cart])
+
+  useEffect(() => {
+    const syncProductRoute = () => {
+      const slug = getProductSlugFromPath()
+      setSelected(slug ? products.find((item) => item.slug === slug) ?? null : null)
+    }
+    window.addEventListener('popstate', syncProductRoute)
+    return () => window.removeEventListener('popstate', syncProductRoute)
+  }, [products])
 
   const visibleProducts = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('es')
@@ -60,20 +108,36 @@ export default function App() {
   const cartCount = cart.reduce((total, line) => total + line.quantity, 0)
   const cartTotal = cart.reduce((total, line) => total + line.product.price * line.quantity, 0)
 
+  function openProduct(product: Product) {
+    window.history.pushState({}, '', `/producto/${encodeURIComponent(product.slug)}`)
+    setSelected(product)
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
+
+  function closeProduct() {
+    window.history.pushState({}, '', '/')
+    setSelected(null)
+  }
+
   function addToCart(product: Product) {
+    if (product.stock <= 0) return
     setCart((current) => {
       const existing = current.find((line) => line.product.id === product.id)
-      return existing
-        ? current.map((line) => line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line)
-        : [...current, { product, quantity: 1 }]
+      if (existing) {
+        return current.map((line) => line.product.id === product.id
+          ? { ...line, product, quantity: Math.min(line.quantity + 1, product.stock) }
+          : line)
+      }
+      return [...current, { product, quantity: 1 }]
     })
-    setSelected(null)
     setCartOpen(true)
   }
 
   function changeQuantity(id: string, delta: number) {
     setCart((current) => current
-      .map((line) => line.product.id === id ? { ...line, quantity: line.quantity + delta } : line)
+      .map((line) => line.product.id === id
+        ? { ...line, quantity: Math.max(0, Math.min(line.quantity + delta, line.product.stock)) }
+        : line)
       .filter((line) => line.quantity > 0))
   }
 
@@ -139,16 +203,17 @@ export default function App() {
             <div className="product-grid">
               {visibleProducts.map((product) => (
                 <article className="product-card" key={product.id}>
-                  <button className="product-image" onClick={() => setSelected(product)} aria-label={`Ver ${product.name}`}>
+                  <button className="product-image" onClick={() => openProduct(product)} aria-label={`Ver ${product.name}`}>
                     <img src={product.image} alt={product.name} loading="lazy" />
                     {product.badge && <span className="product-badge">{product.badge}</span>}
                     <span className="quick-view">Vista rápida <ArrowIcon /></span>
                   </button>
                   <div className="product-info">
                     <span className="product-category">{product.category}</span>
-                    <button className="product-name" onClick={() => setSelected(product)}>{product.name}</button>
+                    <button className="product-name" onClick={() => openProduct(product)}>{product.name}</button>
                     <div className="price-row"><strong>{formatPrice(product.price)}</strong>{product.oldPrice && <del>{formatPrice(product.oldPrice)}</del>}</div>
-                    <button className="add-button" onClick={() => addToCart(product)}>Agregar al carrito <span>+</span></button>
+                    <button className="add-button" onClick={() => addToCart(product)} disabled={product.stock <= 0}>{product.stock > 0 ? 'Agregar al carrito' : 'Sin stock'} <span>{product.stock > 0 ? '+' : '—'}</span></button>
+                    <small className="product-stock">{product.stock > 0 ? `${product.stock} disponibles` : 'Agotado'}</small>
                   </div>
                 </article>
               ))}
@@ -183,11 +248,24 @@ export default function App() {
         </aside>
       </div>}
 
-      {selected && <div className="overlay detail-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null) }}>
-        <section className="detail-panel">
-          <button className="close-button detail-close" onClick={() => setSelected(null)} aria-label="Cerrar detalle">×</button>
-          <div className="detail-image"><img src={selected.image} alt={selected.name} /></div>
-          <div className="detail-copy"><span className="product-category">{selected.category}</span><h2>{selected.name}</h2><strong className="detail-price">{formatPrice(selected.price)}</strong><p>{selected.description}</p><ul>{selected.specs.map((spec) => <li key={spec}>{spec}</li>)}</ul><button className="primary-button" onClick={() => addToCart(selected)}>Agregar al carrito <ArrowIcon /></button><small>Producto de muestra. Precio editable.</small></div>
+      {selected && <div className="product-page-overlay">
+        <section className="product-page">
+          <button className="product-back-link" onClick={closeProduct}>← Volver al catálogo</button>
+          <div className="product-page-grid">
+            <div className="product-page-image">{selected.image ? <img src={selected.image} alt={selected.name} /> : <div className="product-image-placeholder">Imagen no disponible</div>}</div>
+            <div className="product-page-copy">
+              <span className="product-category">{selected.category}</span>
+              <h1>{selected.name}</h1>
+              <strong className="product-page-price">{formatPrice(selected.price)}</strong>
+              <p>{selected.description}</p>
+              <div className={selected.stock > 0 ? 'product-availability available' : 'product-availability unavailable'}>
+                {selected.stock > 0 ? `Disponible · ${selected.stock} unidades en stock` : 'Producto sin stock'}
+              </div>
+              {selected.specs.length > 0 && <><h2>Características</h2><ul>{selected.specs.map((spec) => <li key={spec}>{spec}</li>)}</ul></>}
+              <button className="primary-button product-page-add" disabled={selected.stock <= 0} onClick={() => addToCart(selected)}>{selected.stock > 0 ? 'Agregar al carrito' : 'Sin stock'} <ArrowIcon /></button>
+              <small>El envío se calculará en una próxima etapa. Los pagos todavía no están habilitados.</small>
+            </div>
+          </div>
         </section>
       </div>}
     </div>
