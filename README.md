@@ -4,59 +4,99 @@ Tienda online independiente orientada al público general de Argentina. La marca
 
 ## Estado actual
 
-**Etapa 1 — Base de storefront:** implementada en esta rama.
-
+**Etapa 1 — Storefront:** implementada.
 - Catálogo responsive con categorías, búsqueda y ordenamiento.
-- Fichas rápidas de producto con descripción y características.
-- Carrito funcional en memoria durante la navegación, con edición de cantidades y eliminación.
-- Precios de demostración en pesos argentinos.
-- Checkout y pagos todavía deshabilitados: no hay integración real ni se simula una compra.
-- Productos e imágenes de muestra, editables desde `src/products.ts`.
+- Fichas rápidas de producto y carrito en memoria.
+- Precios y productos demostrativos; no representan stock ni ofertas reales.
+- Checkout y pagos deshabilitados.
 
-## Stack
+**Etapa 2 — Backend y persistencia:** base inicial implementada en la rama `feature/backend-foundation`.
+- API REST con Node.js, Express y TypeScript.
+- PostgreSQL 16 aislado para desarrollo local.
+- Prisma ORM y modelos iniciales de categorías y productos.
+- Endpoints de salud, categorías y catálogo con búsqueda, filtros y paginación.
+- El frontend todavía utiliza el catálogo local; la conexión se realizará en el siguiente bloque.
 
-- React 19
-- TypeScript
-- Vite 6
-- CSS responsive propio
+## Puertos locales
+
+| Servicio | Puerto |
+|---|---:|
+| Frontend React + Vite | 5287 |
+| API Node + Express | 7381 |
+| PostgreSQL | 5547 |
 
 ## Requisitos
 
 - Node.js 20.19+ o 22.12+
 - npm
+- Docker Desktop con Docker Compose
 
-## Desarrollo local
+## Frontend
 
-```bash
+Desde la raíz del repositorio:
+
+```powershell
 npm install
 npm run dev
 ```
 
-## Validación de producción
+Vite está configurado para usar el puerto 5287 y fallar si está ocupado.
 
-```bash
-npm run build
-npm run preview
+## Backend y base de datos
+
+1. Iniciar PostgreSQL desde la raíz:
+
+```powershell
+docker compose up -d ecommercevm-postgres
 ```
+
+2. Preparar el backend:
+
+```powershell
+cd api
+Copy-Item .env.example .env
+npm install
+npm run prisma:generate
+npm run prisma:migrate -- --name init
+npm run dev
+```
+
+La API queda en `http://localhost:7381`. La base de datos escucha en el puerto 5547.
+
+## Endpoints iniciales
+
+- `GET /api/v1`
+- `GET /api/v1/health`
+- `GET /api/v1/categories`
+- `GET /api/v1/products`
+- `GET /api/v1/products/:slug`
+
+El catálogo admite búsqueda por texto, filtro por categoría, orden y paginación.
 
 ## Estructura
 
 ```
-src/
-  App.tsx       # storefront, catálogo, detalle y carrito
-  products.ts   # catálogo demostrativo y formato ARS
-  index.css     # sistema visual responsive
-  main.tsx      # punto de entrada
+src/                  # storefront React
+api/
+  prisma/schema.prisma
+  src/
+    config/
+    lib/
+    middleware/
+    routes/
+    app.ts
+    server.ts
+docker-compose.yml    # PostgreSQL local
 ```
 
 ## Próximas etapas
 
-1. Definir identidad comercial, nombre y dominio.
-2. Validar catálogo real, proveedores, precios, stock y logística nacional.
-3. Diseñar backend, persistencia, administración y gestión de pedidos.
-4. Integrar checkout real. Para Mercado Pago, evaluar el flujo vigente de Checkout Pro vía Orders API y verificar pagos desde backend; no confiar en el retorno del navegador como confirmación de pago.
+1. Conectar el frontend con la API y trasladar los productos demostrativos a PostgreSQL.
+2. Definir identidad comercial y validar proveedores, catálogo real, precios, stock y logística nacional.
+3. Incorporar administración de productos, inventario y pedidos.
+4. Implementar checkout y pagos reales; verificar pagos siempre desde el backend.
 5. Incorporar políticas comerciales, privacidad, cambios, devoluciones, garantías y atención.
 
-## Nota sobre datos
+## Seguridad
 
-Los productos, precios y fotografías actuales son demostrativos. No representan stock, disponibilidad ni ofertas reales.
+Las credenciales del Compose son exclusivamente para desarrollo local. No reutilizarlas en producción. No subir archivos `.env` ni secretos al repositorio.
