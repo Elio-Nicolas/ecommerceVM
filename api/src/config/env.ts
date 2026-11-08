@@ -7,5 +7,8 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(12).optional(),
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+  SUPABASE_BUCKET: z.string().min(1).default('product-images'),
 })
 export const env = envSchema.parse(process.env)
