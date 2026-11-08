@@ -7,7 +7,6 @@ type ApiProduct = {
   name: string
   slug: string
   stock: number
-  slug: string
   description: string
   priceArs: number
   compareAtArs: number | null
