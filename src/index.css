@@ -152,3 +152,44 @@
  .product-page-copy h1{font-size:32px}
  .product-page-add{width:100%}
 }
+
+
+/* PR #9: gestión de pedidos */
+.order-stats{margin-bottom:22px}
+.order-table{min-width:920px}
+.order-table td:first-child strong{font-size:10px;color:#273440}
+.order-phone{display:block;color:#929ba4;font-size:9px;margin-top:4px}
+.order-status.pending{background:#fff5e6;color:#9a641d}
+.order-status.confirmed{background:#eaf2fb;color:#38628c}
+.order-status.preparing{background:#f0edfb;color:#69529a}
+.order-status.shipped{background:#eaf4f7;color:#397487}
+.order-status.delivered{background:#edf7f0;color:#32734a}
+.order-status.cancelled{background:#f9ecea;color:#a34b3f}
+.order-detail-button{border:0;background:none;color:#bd4937;font-size:9px;font-weight:700}
+.order-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.order-pagination>div{display:flex;align-items:center;gap:12px}
+.order-pagination button{border:1px solid #dfe4e8;background:#fff;padding:7px 10px;color:#5f6b76;font-size:9px}
+.order-pagination button:disabled{opacity:.4;cursor:not-allowed}
+.order-detail-card{background:#fff;border:1px solid #e7eaee;padding:24px;margin-top:20px}
+.order-detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding:18px 0;border-bottom:1px solid #edf0f2}
+.order-detail-grid>div{display:flex;flex-direction:column;gap:7px;min-width:0}
+.order-detail-grid span{font-size:8px;letter-spacing:.12em;color:#9aa2aa;font-weight:700}
+.order-detail-grid strong{font-size:11px;color:#273440;overflow-wrap:anywhere}
+.order-detail-grid small{font-size:10px;color:#7f8993;overflow-wrap:anywhere}
+.order-items-list,.order-history{padding:18px 0;border-bottom:1px solid #edf0f2}
+.order-items-list h3,.order-history h3{font:700 12px Manrope;margin:0 0 12px}
+.order-items-list>div,.order-history>div{display:flex;justify-content:space-between;gap:14px;padding:9px 0;font-size:10px;color:#52606c}
+.order-items-list>div>span,.order-history>div>span{display:flex;flex-direction:column;gap:5px}
+.order-items-list small,.order-history small{font-size:9px;color:#929ba4}
+.order-items-list>div>strong{white-space:nowrap;color:#273440}
+.order-history time{font-size:9px;color:#929ba4;white-space:nowrap}
+.order-totals{display:flex;align-items:center;gap:12px;padding:16px 0;border-bottom:1px solid #edf0f2;font-size:11px}
+.order-totals strong{color:#273440}
+.order-totals small{margin-left:auto;color:#929ba4;font-size:9px}
+.order-update-status{padding-top:18px;display:flex;flex-direction:column;gap:12px}
+.order-update-status label{display:flex;flex-direction:column;gap:7px;font-size:9px;font-weight:700;color:#53606c}
+.order-update-status input{height:38px;border:1px solid #dfe4e8;padding:0 11px;font:10px Manrope}
+.order-update-status>div{display:flex;gap:9px;flex-wrap:wrap}
+.order-cancel-button{min-height:42px;border:1px solid #e6c7c1;border-radius:3px;padding:0 16px;background:#fff7f5;color:#a43d30;font-size:10px;font-weight:700}
+.order-update-status button:disabled{opacity:.6;cursor:wait}
+@media(max-width:620px){.order-detail-card{padding:16px}.order-detail-grid{grid-template-columns:1fr}.order-totals{align-items:flex-start;flex-wrap:wrap}.order-totals small{width:100%;margin:0}.order-pagination{align-items:flex-start;flex-direction:column}.order-pagination>div{width:100%;justify-content:space-between}}
