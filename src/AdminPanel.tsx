@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { formatPrice } from './products'
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
@@ -66,6 +66,7 @@ export default function AdminPanel() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [editing, setEditing] = useState<Product | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [saving, setSaving] = useState(false)
 
@@ -115,7 +116,7 @@ export default function AdminPanel() {
     )
   }, [products, search, statusFilter])
 
-  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
     setLoading(true)
@@ -148,6 +149,7 @@ export default function AdminPanel() {
   }
 
   function openNewProduct() {
+    setFormOpen(true)
     setEditing(null)
     setForm({ ...emptyForm, categoryId: categories[0]?.id || '' })
     setError('')
@@ -155,6 +157,7 @@ export default function AdminPanel() {
   }
 
   function openEditProduct(product: Product) {
+    setFormOpen(true)
     setEditing(product)
     setForm(toForm(product))
     setError('')
@@ -165,7 +168,7 @@ export default function AdminPanel() {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
-  async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
+  async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!token) return
     setSaving(true)
@@ -189,6 +192,7 @@ export default function AdminPanel() {
         setNotice('Producto creado correctamente.')
       }
       setEditing(null)
+      setFormOpen(false)
       await loadData(token)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar el producto.')
@@ -250,9 +254,9 @@ export default function AdminPanel() {
           </div>
           {notice && <div className="admin-alert success">{notice}</div>}
           {error && <div className="admin-alert error">{error}</div>}
-          {editing !== null || form.sku !== '' ? (
+          {formOpen ? (
             <form className="admin-form-card" onSubmit={saveProduct}>
-              <div className="admin-form-heading"><div><span className="admin-kicker">{editing ? 'EDITAR CATÁLOGO' : 'NUEVO REGISTRO'}</span><h2>{editing ? 'Editar producto' : 'Crear producto'}</h2></div><button type="button" className="admin-quiet-button" onClick={() => setEditing(null)}>Cancelar</button></div>
+              <div className="admin-form-heading"><div><span className="admin-kicker">{editing ? 'EDITAR CATÁLOGO' : 'NUEVO REGISTRO'}</span><h2>{editing ? 'Editar producto' : 'Crear producto'}</h2></div><button type="button" className="admin-quiet-button" onClick={() => { setEditing(null); setFormOpen(false) }}>Cancelar</button></div>
               <div className="admin-form-grid">
                 <label>Nombre del producto<input value={form.name} onChange={(event) => { updateField('name', event.target.value); if (!editing) updateField('slug', slugify(event.target.value)) }} required minLength={2} /></label>
                 <label>SKU<input value={form.sku} onChange={(event) => updateField('sku', event.target.value)} required /></label>
