@@ -1,0 +1,21 @@
+services:
+  ecommercevm-postgres:
+    image: postgres:16-alpine
+    container_name: ecommercevm_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ecommercevm
+      POSTGRES_PASSWORD: ecommercevm_dev
+      POSTGRES_DB: ecommercevm
+    ports:
+      - "5547:5432"
+    volumes:
+      - ecommercevm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommercevm -d ecommercevm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ecommercevm_postgres_data:
