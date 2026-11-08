@@ -23,7 +23,8 @@
     "helmet": "^8.1.0",
     "zod": "^3.25.76",
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "express-rate-limit": "^8.2.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
