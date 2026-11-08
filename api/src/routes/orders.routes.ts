@@ -67,7 +67,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           lineTotalArs: product.priceArs * item.quantity,
         }
       })
-      if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1) {
+      if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
         throw new OrderConflictError('El importe del pedido no es válido.')
       }
       for (const item of input.items) {
@@ -97,7 +97,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         },
         include: { items: true },
       })
-    })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
     res.status(201).json({
       data: {
         id: order.id,
