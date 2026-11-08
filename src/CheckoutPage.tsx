@@ -8,12 +8,13 @@ type Props = {
   cart: CartLine[]
   subtotal: number
   onBack: () => void
+  onFinish: () => void
   onOrderCreated: () => void
 }
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 
-export default function CheckoutPage({ cart, subtotal, onBack, onOrderCreated }: Props) {
+export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrderCreated }: Props) {
   const [customerName, setCustomerName] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -78,7 +79,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onOrderCreated }:
           </div>
           <div className="checkout-success-total"><span>Subtotal de productos</span><strong>{formatPrice(createdOrder.subtotalArs)}</strong></div>
           <p className="checkout-small">El envío y el total final quedan sujetos a confirmación. Este pedido todavía no está pagado.</p>
-          <button className="checkout-submit" onClick={onBack}>Volver a la tienda</button>
+          <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
         </section>
       </main>
     )
