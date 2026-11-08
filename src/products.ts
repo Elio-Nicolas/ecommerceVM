@@ -1,5 +1,7 @@
 export type Product = {
   id: string
+  slug: string
+  stock: number
   name: string
   category: string
   price: number
