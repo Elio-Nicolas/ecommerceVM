@@ -4,7 +4,7 @@ import { formatPrice } from './products'
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const TOKEN_KEY = 'ecommercevm_admin_token'
 
-type Category = { id: string; name: string; slug: string }
+type Category = { id: string; name: string; slug: string; description?: string | null; _count?: { products: number } }
 type ProductStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
 type Product = {
   id: string; sku: string; slug: string; name: string; description: string
@@ -69,13 +69,18 @@ export default function AdminPanel() {
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [categoryName, setCategoryName] = useState('')
+  const [categorySlug, setCategorySlug] = useState('')
+  const [categoryDescription, setCategoryDescription] = useState('')
+  const [categoryEditing, setCategoryEditing] = useState<string | null>(null)
+  const [categorySaving, setCategorySaving] = useState(false)
 
   const loadData = useCallback(async (authToken: string) => {
     setLoading(true)
     try {
       const [productResult, categoryResult] = await Promise.all([
         request<{ data: Product[] }>('/admin/products?limit=100', authToken),
-        request<{ data: Category[] }>('/categories'),
+        request<{ data: Category[] }>('/admin/categories', authToken),
       ])
       setProducts(productResult.data)
       setCategories(categoryResult.data)
@@ -201,6 +206,39 @@ export default function AdminPanel() {
     }
   }
 
+  function resetCategoryForm() {
+    setCategoryEditing(null); setCategoryName(''); setCategorySlug(''); setCategoryDescription('')
+  }
+  function editCategory(category: Category) {
+    setCategoryEditing(category.id); setCategoryName(category.name); setCategorySlug(category.slug)
+    setCategoryDescription(category.description || ''); setError(''); setNotice('')
+  }
+  async function saveCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token) return
+    setCategorySaving(true); setError(''); setNotice('')
+    try {
+      const payload = { name: categoryName.trim(), slug: categorySlug.trim(), description: categoryDescription.trim() || null }
+      if (categoryEditing) {
+        await request(`/admin/categories/${categoryEditing}`, token, { method: 'PUT', body: JSON.stringify(payload) })
+        setNotice('Categoría actualizada correctamente.')
+      } else {
+        await request('/admin/categories', token, { method: 'POST', body: JSON.stringify(payload) })
+        setNotice('Categoría creada correctamente.')
+      }
+      resetCategoryForm(); await loadData(token)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la categoría.') }
+    finally { setCategorySaving(false) }
+  }
+  async function deleteCategory(category: Category) {
+    if (!token || !window.confirm(`¿Eliminar la categoría "${category.name}"?`)) return
+    setError(''); setNotice('')
+    try {
+      await request(`/admin/categories/${category.id}`, token, { method: 'DELETE' })
+      setNotice('Categoría eliminada.'); await loadData(token)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo eliminar la categoría.') }
+  }
+
   async function archiveProduct(product: Product) {
     if (!token || !window.confirm(`¿Archivar "${product.name}"? Dejará de mostrarse en la tienda, pero conservará sus datos.`)) return
     setError('')
@@ -252,6 +290,16 @@ export default function AdminPanel() {
             <div><span>BORRADORES</span><strong>{products.filter((item) => item.status === 'DRAFT').length}</strong></div>
             <div><span>STOCK TOTAL</span><strong>{products.reduce((total, item) => total + item.stock, 0).toLocaleString('es-AR')}</strong></div>
           </div>
+          <section className="admin-category-card">
+            <div className="admin-category-heading"><h2>Categorías</h2><p>Organizá el catálogo y asigná productos.</p></div>
+            <form className="admin-category-form" onSubmit={saveCategory}>
+              <label>Nombre<input value={categoryName} onChange={(event) => { setCategoryName(event.target.value); if (!categoryEditing) setCategorySlug(slugify(event.target.value)) }} required minLength={2} maxLength={80} /></label>
+              <label>Slug<input value={categorySlug} onChange={(event) => setCategorySlug(slugify(event.target.value))} required /></label>
+              <label>Descripción<input value={categoryDescription} onChange={(event) => setCategoryDescription(event.target.value)} maxLength={500} /></label>
+              <div className="admin-category-actions"><button className="admin-primary" disabled={categorySaving}>{categorySaving ? 'Guardando...' : categoryEditing ? 'Guardar cambios' : '＋ Agregar'}</button>{categoryEditing && <button type="button" className="admin-quiet-button" onClick={resetCategoryForm}>Cancelar</button>}</div>
+            </form>
+            <div className="admin-category-list">{categories.map((category) => <div className="admin-category-row" key={category.id}><div><strong>{category.name}</strong><small>{category.slug} · {category._count?.products ?? 0} productos</small></div><div><button type="button" onClick={() => editCategory(category)}>Editar</button><button type="button" className="archive-action" onClick={() => deleteCategory(category)}>Eliminar</button></div></div>)}</div>
+          </section>
           {notice && <div className="admin-alert success">{notice}</div>}
           {error && <div className="admin-alert error">{error}</div>}
           {formOpen ? (
