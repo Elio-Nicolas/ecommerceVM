@@ -7,7 +7,7 @@ type CartLine = { product: Product; quantity: number }
 const CART_STORAGE_KEY = 'ecommercevm:cart:v1'
 
 function getProductSlugFromPath() {
-  const match = window.location.pathname.match(/^\\/producto\\/([^/]+)\\/?$/)
+  const match = window.location.pathname.match(/^\/producto\/([^/]+)\/?$/)
   return match ? decodeURIComponent(match[1]) : null
 }
 
@@ -111,7 +111,7 @@ export default function App() {
   function openProduct(product: Product) {
     window.history.pushState({}, '', `/producto/${encodeURIComponent(product.slug)}`)
     setSelected(product)
-    window.scrollTo({ top: 0, behavior: 'instant' })
+    window.scrollTo({ top: 0, behavior: 'auto' })
   }
 
   function closeProduct() {
