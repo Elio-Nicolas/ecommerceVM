@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { categories, formatPrice, products, type Product } from './products'
+import { useEffect, useMemo, useState } from 'react'
+import { formatPrice, type Product } from './products'
+import { fetchCategories, fetchProducts } from './catalog-api'
 
 type CartLine = { product: Product; quantity: number }
 
@@ -14,12 +15,34 @@ function ArrowIcon() {
 }
 
 export default function App() {
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<string[]>(['Todos'])
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
   const [category, setCategory] = useState('Todos')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('featured')
   const [cart, setCart] = useState<CartLine[]>([])
   const [cartOpen, setCartOpen] = useState(false)
   const [selected, setSelected] = useState<Product | null>(null)
+
+  useEffect(() => {
+    let active = true
+    Promise.all([fetchProducts(), fetchCategories()])
+      .then(([items, categoryNames]) => {
+        if (!active) return
+        setProducts(items)
+        setCategories(['Todos', ...categoryNames])
+        setCatalogError('')
+      })
+      .catch(() => {
+        if (active) setCatalogError('No pudimos cargar el catálogo. Verificá que la API esté funcionando.')
+      })
+      .finally(() => {
+        if (active) setCatalogLoading(false)
+      })
+    return () => { active = false }
+  }, [])
 
   const visibleProducts = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('es')
@@ -112,7 +135,7 @@ export default function App() {
             <label className="sort-control"><span>Ordenar:</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option value="featured">Destacados</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option><option value="name">Nombre</option></select></label>
           </div>
           <div className="results-line"><span>{visibleProducts.length} productos</span><span>Precios de muestra · Valores editables</span></div>
-          {visibleProducts.length ? (
+          {catalogLoading ? <div className="empty-results"><strong>Cargando catálogo...</strong></div> : catalogError ? <div className="empty-results"><strong>No se pudo cargar el catálogo.</strong><span>{catalogError}</span></div> : visibleProducts.length ? (
             <div className="product-grid">
               {visibleProducts.map((product) => (
                 <article className="product-card" key={product.id}>
