@@ -71,7 +71,7 @@ export default function App() {
     setCartOpen(true)
   }
 
-  function changeQuantity(id: number, delta: number) {
+  function changeQuantity(id: string, delta: number) {
     setCart((current) => current
       .map((line) => line.product.id === id ? { ...line, quantity: line.quantity + delta } : line)
       .filter((line) => line.quantity > 0))
