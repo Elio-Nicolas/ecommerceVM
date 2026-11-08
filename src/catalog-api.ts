@@ -6,6 +6,8 @@ type ApiProduct = {
   id: string
   name: string
   slug: string
+  stock: number
+  slug: string
   description: string
   priceArs: number
   compareAtArs: number | null
@@ -29,6 +31,8 @@ export async function fetchProducts(): Promise<Product[]> {
   const response = await get<ApiList<ApiProduct>>('/products?limit=48&page=1&sort=featured')
   return response.data.map((item) => ({
     id: item.id,
+    slug: item.slug,
+    stock: item.stock,
     name: item.name,
     category: item.category.name,
     price: item.priceArs,
