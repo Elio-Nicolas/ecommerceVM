@@ -18,7 +18,7 @@ const createOrderLimiter = rateLimit({
 const createOrderSchema = z.object({
   customerName: z.string().trim().min(2).max(120),
   customerEmail: z.union([z.string().trim().email().max(160), z.literal('')]).optional().transform((value) => value || null),
-  customerPhone: z.string().trim().min(8).max(30).regex(/^[+0-9\s().-]+$/, 'Ingresá un teléfono válido.'),
+  customerPhone: z.string().trim().min(8).max(30).regex(/^[+0-9\s().-]+$/, 'Ingresá un teléfono válido.').refine((value) => value.replace(/\D/g, '').length >= 8, 'Ingresá al menos 8 dígitos.'),
   addressLine: z.string().trim().min(4).max(180),
   city: z.string().trim().min(2).max(100),
   province: z.string().trim().min(2).max(100),
