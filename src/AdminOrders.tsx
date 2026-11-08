@@ -136,9 +136,9 @@ export default function AdminOrders() {
           <div className="admin-page-heading"><div><h2>Gestión de pedidos</h2><p>Consultá pedidos, revisá sus datos y actualizá el estado de preparación y entrega.</p></div></div>
           <div className="admin-stats order-stats">
             <div><span>PEDIDOS EN LISTADO</span><strong>{total}</strong></div>
-            <div><span>PENDIENTES</span><strong>{orders.filter((item) => item.status === 'PENDING').length}</strong></div>
-            <div><span>EN PREPARACIÓN</span><strong>{orders.filter((item) => item.status === 'PREPARING').length}</strong></div>
-            <div><span>ENTREGADOS</span><strong>{orders.filter((item) => item.status === 'DELIVERED').length}</strong></div>
+            <div><span>PENDIENTES EN ESTA PÁGINA</span><strong>{orders.filter((item) => item.status === 'PENDING').length}</strong></div>
+            <div><span>EN PREPARACIÓN EN ESTA PÁGINA</span><strong>{orders.filter((item) => item.status === 'PREPARING').length}</strong></div>
+            <div><span>ENTREGADOS EN ESTA PÁGINA</span><strong>{orders.filter((item) => item.status === 'DELIVERED').length}</strong></div>
           </div>
           {notice && <div className="admin-alert success">{notice}</div>}
           {error && <div className="admin-alert error">{error}</div>}
