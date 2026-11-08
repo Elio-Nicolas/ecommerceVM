@@ -33,7 +33,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setSubmitting(true)
     setError('')
     try {
-      const response = await fetch(\`\${API_URL}/api/v1/orders\`, {
+      const response = await fetch(`${API_URL}/api/v1/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
