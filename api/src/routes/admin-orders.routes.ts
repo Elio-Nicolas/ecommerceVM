@@ -164,6 +164,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
+  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ENVIOPACK' && existing.enviopackShipmentStatus !== 'P') {
+    res.status(409).json({ error: { code: 'ENVIOPACK_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando Envíopack confirme el procesamiento y la etiqueta esté disponible.' } })
+    return
+  }
   if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ENVIOPACK' && (existing.shippingCostArs === null || !existing.shippingCarrier)) {
     res.status(409).json({ error: { code: 'SHIPPING_NOT_CONFIGURED', message: 'Antes de marcar el pedido como enviado, registrá el costo y el transporte.' } })
     return
