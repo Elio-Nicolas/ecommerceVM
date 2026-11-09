@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { formatPrice } from './products'
 import ShippingOriginsPanel from './ShippingOriginsPanel'
+import ShippingSettingsPanel from './ShippingSettingsPanel'
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const TOKEN_KEY = 'ecommercevm_admin_token'
@@ -338,6 +339,7 @@ export default function AdminPanel() {
             </form>
             <div className="admin-category-list">{categories.map((category) => <div className="admin-category-row" key={category.id}><div><strong>{category.name}</strong><small>{category.slug} · {category._count?.products ?? 0} productos</small></div><div><button type="button" onClick={() => editCategory(category)}>Editar</button><button type="button" className="archive-action" onClick={() => deleteCategory(category)}>Eliminar</button></div></div>)}</div>
           </section>
+          <ShippingSettingsPanel token={token} />
           <ShippingOriginsPanel token={token} />
           {notice && <div className="admin-alert success">{notice}</div>}
           {error && <div className="admin-alert error">{error}</div>}
