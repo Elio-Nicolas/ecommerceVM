@@ -98,6 +98,9 @@ model Order {
   shippingQuoteId String?
   shippingOptionKey String?
   shippingCostOptions Json?
+  deliveryMethod String @default("ENVIOPACK")
+  shippingInternalCostArs Int?
+  deliveryInstructions String?
   items OrderItem[]
   history OrderStatusHistory[]
   createdAt DateTime @default(now())
