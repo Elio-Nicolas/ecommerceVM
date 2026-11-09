@@ -12,6 +12,12 @@ type ShippingOption = {
   priceArs: number
   estimatedHours: number | null
 }
+type DeliveryMethod = 'ENVIOPACK' | 'LOCAL_DELIVERY' | 'PICKUP'
+type DeliveryMethods = {
+  pickup: { enabled: boolean; address: string; instructions: string; priceArs: number }
+  localDelivery: { enabled: boolean; postalCodes: string[]; priceArs: number | null; coordinate: boolean }
+  enviopack: { enabled: boolean }
+}
 type ShippingQuote = {
   id: string
   subtotalArs: number
@@ -60,6 +66,8 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [provinceCode, setProvinceCode] = useState('')
   const [postalCode, setPostalCode] = useState('')
   const [customerNotes, setCustomerNotes] = useState('')
+  const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethods | null>(null)
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('ENVIOPACK')
   const [quote, setQuote] = useState<ShippingQuote | null>(null)
   const [selectedOptionKey, setSelectedOptionKey] = useState('')
   const [quoteLoading, setQuoteLoading] = useState(false)
@@ -73,6 +81,13 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const selectedOption = quote?.options.find((option) => option.key === selectedOptionKey) || null
   const provinceName = PROVINCES.find(([code]) => code === provinceCode)?.[1] || ''
   const displayedSubtotal = quote?.subtotalArs ?? subtotal
+  const localDeliveryAvailable = Boolean(deliveryMethods?.localDelivery.enabled && deliveryMethods.localDelivery.postalCodes.includes(postalCode))
+  const selectedShippingPrice = deliveryMethod === 'PICKUP' ? 0 : deliveryMethod === 'LOCAL_DELIVERY' ? (deliveryMethods?.localDelivery.priceArs ?? 0) : (selectedOption?.priceArs ?? 0)
+  const canSubmit = deliveryMethod === 'PICKUP' ? Boolean(deliveryMethods?.pickup.enabled) : deliveryMethod === 'LOCAL_DELIVERY' ? localDeliveryAvailable : Boolean(quote && selectedOption && !quoteExpired)
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/v1/shipping/methods`).then((response) => response.json()).then((payload) => setDeliveryMethods(payload.data as DeliveryMethods)).catch(() => setDeliveryMethods(null))
+  }, [])
 
   useEffect(() => {
     if (!quote) {
@@ -94,7 +109,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setSelectedOptionKey('')
     setQuoteError('')
     setQuoteLoading(false)
-    if (!provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
+    if (deliveryMethod !== 'ENVIOPACK' || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
       return () => controller.abort()
     }
 
@@ -127,11 +142,11 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     }, 500)
 
     return () => { window.clearTimeout(timeout); controller.abort() }
-  }, [provinceCode, postalCode, cartKey])
+  }, [provinceCode, postalCode, cartKey, deliveryMethod])
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (submitting || cart.length === 0 || !quote || !selectedOption || quoteExpired) return
+    if (submitting || cart.length === 0 || !canSubmit) return
     setSubmitting(true)
     setError('')
     try {
@@ -145,11 +160,11 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           addressLine,
           city,
           province: provinceName,
-          provinceCode,
+          provinceCode: provinceCode || undefined,
           postalCode,
           customerNotes,
-          shippingQuoteId: quote.id,
-          shippingOptionKey: selectedOption.key,
+          deliveryMethod,
+          ...(deliveryMethod === 'ENVIOPACK' && quote && selectedOption ? { shippingQuoteId: quote.id, shippingOptionKey: selectedOption.key } : {}),
           items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
         }),
       })
@@ -197,7 +212,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
         <button type="button" className="checkout-back" onClick={onBack}>← Volver al carrito</button>
         <span className="checkout-eyebrow">FINALIZAR PEDIDO</span>
         <h1>Un último paso.</h1>
-        <p>Calculamos el envío con Envíopack según el destino y los paquetes. No se realizará ningún cobro en esta instancia.</p>
+        <p>Elegí cómo querés recibir tu pedido. El costo y la disponibilidad dependen de la modalidad y del destino.</p>
       </div>
       <div className="checkout-layout">
         <form className="checkout-form" onSubmit={submitOrder}>
@@ -225,7 +240,23 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             </div>
           </section>
           <section className="checkout-card">
-            <h2>Opciones de envío</h2>
+            <h2>Cómo querés recibir tu pedido</h2>
+            {!deliveryMethods ? <p className="checkout-shipping-hint">Consultando modalidades disponibles...</p> : <div className="checkout-shipping-options">
+              {deliveryMethods.pickup.enabled && <label className={deliveryMethod === 'PICKUP' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
+                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'PICKUP'} onChange={() => setDeliveryMethod('PICKUP')} />
+                <span className="checkout-shipping-option-copy"><strong>Retirar por domicilio del vendedor</strong><small>{deliveryMethods.pickup.address}. {deliveryMethods.pickup.instructions}</small></span><strong className="checkout-shipping-price">Sin cargo</strong>
+              </label>}
+              {deliveryMethods.localDelivery.enabled && <label className={deliveryMethod === 'LOCAL_DELIVERY' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
+                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'LOCAL_DELIVERY'} onChange={() => setDeliveryMethod('LOCAL_DELIVERY')} />
+                <span className="checkout-shipping-option-copy"><strong>Entrega local</strong><small>{localDeliveryAvailable ? (deliveryMethods.localDelivery.coordinate ? 'Costo a coordinar luego de confirmar el pedido.' : 'Disponible para tu código postal.') : 'No disponible para este código postal.'}</small></span><strong className="checkout-shipping-price">{deliveryMethods.localDelivery.coordinate ? 'A coordinar' : formatPrice(deliveryMethods.localDelivery.priceArs || 0)}</strong>
+              </label>}
+              {deliveryMethods.enviopack.enabled && <label className={deliveryMethod === 'ENVIOPACK' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
+                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'ENVIOPACK'} onChange={() => setDeliveryMethod('ENVIOPACK')} />
+                <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por Envíopack</strong><small>Cotización según el código postal de destino.</small></span>
+              </label>}
+            </div>}
+            {deliveryMethod === 'PICKUP' ? <p className="checkout-shipping-hint">El retiro no depende de tu localidad. Coordinaremos la entrega del pedido luego de confirmarlo.</p> : deliveryMethod === 'LOCAL_DELIVERY' ? <p className="checkout-shipping-hint">{localDeliveryAvailable ? 'La entrega local está disponible para tu destino.' : 'Ingresá un código postal cubierto por la entrega local.'}</p> : null}
+            {deliveryMethod === 'ENVIOPACK' && <>
             {!provinceCode || !/^\d{4}$/.test(postalCode)
               ? <p className="checkout-shipping-hint">Ingresá provincia y código postal para calcular el envío.</p>
               : quoteLoading
@@ -248,12 +279,13 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
                       </div>
                     : quote ? <p className="checkout-shipping-hint">No hay servicios disponibles para este destino.</p>
                     : <p className="checkout-shipping-hint">El costo se calculará automáticamente al completar el destino.</p>}
+            </>}
           </section>
           {error && <div className="checkout-error" role="alert">{error}</div>}
-          <button className="checkout-submit" type="submit" disabled={submitting || cart.length === 0 || !selectedOption || quoteExpired}>
+          <button className="checkout-submit" type="submit" disabled={submitting || cart.length === 0 || !canSubmit}>
             {submitting ? 'Registrando pedido...' : 'Confirmar pedido'}
           </button>
-          <p className="checkout-disclaimer">El pedido se registra únicamente después de seleccionar una cotización válida. El pago se incorporará en la siguiente etapa.</p>
+          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. El pago se incorporará en la siguiente etapa.</p>
         </form>
         <aside className="checkout-summary">
           <h2>Tu pedido</h2>
@@ -266,9 +298,9 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             ))}
           </div>
           <div className="checkout-summary-total"><span>Subtotal</span><strong>{formatPrice(displayedSubtotal)}</strong></div>
-          <div className="checkout-summary-total"><span>Envío</span><strong>{selectedOption ? formatPrice(selectedOption.priceArs) : 'A calcular'}</strong></div>
-          <div className="checkout-summary-grand-total"><span>Total</span><strong>{formatPrice(displayedSubtotal + (selectedOption?.priceArs || 0))}</strong></div>
-          <p className="checkout-summary-note">El importe del envío se obtiene de Envíopack. El total queda confirmado al registrar el pedido.</p>
+          <div className="checkout-summary-total"><span>Envío</span><strong>{deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate ? 'A coordinar' : canSubmit ? formatPrice(selectedShippingPrice) : 'A calcular'}</strong></div>
+          <div className="checkout-summary-grand-total"><span>Total</span><strong>{formatPrice(displayedSubtotal + selectedShippingPrice)}</strong></div>
+          <p className="checkout-summary-note">El importe se calcula según la modalidad seleccionada. El total queda confirmado al registrar el pedido.</p>
         </aside>
       </div>
     </main>
