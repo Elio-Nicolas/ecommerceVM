@@ -60,7 +60,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           usedAt: null,
         },
       })
-      if (!quote || quote.cartFingerprint !== shippingCartFingerprint(input.items)) {
+      if (!quote) {
         throw new OrderConflictError('La cotización de envío venció o ya no corresponde al carrito. Volvé a cotizar.')
       }
       const quoteOptions = Array.isArray(quote.options) ? quote.options : []
@@ -83,10 +83,13 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
 
       const products = await tx.product.findMany({
         where: { id: { in: input.items.map((item) => item.productId) }, status: 'ACTIVE' },
-        select: { id: true, sku: true, name: true, priceArs: true, stock: true },
+        select: { id: true, sku: true, name: true, priceArs: true, stock: true, weightGrams: true, packageLengthCm: true, packageWidthCm: true, packageHeightCm: true },
       })
       if (products.length !== input.items.length) {
         throw new OrderConflictError('Uno o más productos ya no están disponibles. Actualizá el carrito.')
+      }
+      if (quote.cartFingerprint !== shippingCartFingerprint(input.items, products)) {
+        throw new OrderConflictError('Los productos o sus paquetes cambiaron desde la cotización. Volvé a calcular el envío.')
       }
       const byId = new Map(products.map((product) => [product.id, product]))
       let subtotalArs = 0
