@@ -65,7 +65,6 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [quoteError, setQuoteError] = useState('')
   const [quoteExpired, setQuoteExpired] = useState(false)
-  const [quoteExpired, setQuoteExpired] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
@@ -95,7 +94,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setSelectedOptionKey('')
     setQuoteError('')
     setQuoteLoading(false)
-    if (!provinceCode || !/^\\d{4}$/.test(postalCode) || cart.length === 0) {
+    if (!provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
       return () => controller.abort()
     }
 
