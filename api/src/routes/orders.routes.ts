@@ -144,6 +144,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           shippingEstimatedHours,
           shippingQuoteId: quote.id,
           shippingOptionKey: input.shippingOptionKey,
+          shippingCostOptions: selectedOption as Prisma.InputJsonObject,
           items: { create: snapshots },
           history: { create: { toStatus: 'PENDING', note: 'Pedido recibido; pendiente de confirmación.' } },
         },
