@@ -127,6 +127,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
+  if (input.status === 'SHIPPED' && (!existing.shippingCostArs && existing.shippingCostArs !== 0 || !existing.shippingCarrier)) {
+    res.status(409).json({ error: { code: 'SHIPPING_NOT_CONFIGURED', message: 'Antes de marcar el pedido como enviado, registrá el costo y el transporte.' } })
+    return
+  }
   if (input.status === existing.status || !transitions[existing.status].includes(input.status)) {
     res.status(409).json({ error: { code: 'INVALID_ORDER_TRANSITION', message: 'Ese cambio de estado no está permitido.' } })
     return
