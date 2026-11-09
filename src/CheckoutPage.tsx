@@ -87,7 +87,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const canSubmit = deliveryMethod === 'PICKUP' ? Boolean(deliveryMethods?.pickup.enabled) : deliveryMethod === 'LOCAL_DELIVERY' ? localDeliveryAvailable : Boolean(quote && selectedOption && !quoteExpired)
 
   useEffect(() => {
-    if (deliveryMethod === 'LOCAL_DELIVERY' && /^\\d{4}$/.test(postalCode) && deliveryMethods?.localDelivery.enabled && !localDeliveryAvailable) {
+    if (deliveryMethod === 'LOCAL_DELIVERY' && /^\d{4}$/.test(postalCode) && deliveryMethods?.localDelivery.enabled && !localDeliveryAvailable) {
       setCoverageNoticeOpen(true)
     } else {
       setCoverageNoticeOpen(false)
