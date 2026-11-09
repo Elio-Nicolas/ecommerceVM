@@ -13,6 +13,7 @@ import { adminStorageRouter } from './routes/admin-storage.routes'
 import { ordersRouter } from './routes/orders.routes'
 import { adminOrdersRouter } from './routes/admin-orders.routes'
 import { adminShippingOriginsRouter } from './routes/admin-shipping-origins.routes'
+import { shippingRouter } from './routes/shipping.routes'
 
 export const app = express()
 app.disable('x-powered-by')
@@ -29,6 +30,7 @@ app.use('/api/v1/admin/orders', adminOrdersRouter)
 app.use('/api/v1/admin/shipping-origins', adminShippingOriginsRouter)
 app.use('/api/v1/categories', categoriesRouter)
 app.use('/api/v1/products', productsRouter)
+app.use('/api/v1/shipping', shippingRouter)
 app.use('/api/v1/orders', ordersRouter)
 app.use((_req, res) => { res.status(404).json({ error: { code: 'ROUTE_NOT_FOUND', message: 'Recurso no encontrado' } }) })
 app.use(errorHandler)
