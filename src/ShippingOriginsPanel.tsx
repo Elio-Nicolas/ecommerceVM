@@ -23,7 +23,7 @@ type OriginForm = {
 
 const emptyForm: OriginForm = {
   name: '',
-  provinceCode: 'S',
+  provinceCode: 'D',
   postalCode: '',
   enviopackAddressId: '',
   isDefault: false,
