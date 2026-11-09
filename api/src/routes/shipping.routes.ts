@@ -3,10 +3,34 @@ import { Prisma } from '@prisma/client'
 import { rateLimit } from 'express-rate-limit'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
+import { env } from '../config/env'
 import { quoteHomeDelivery, ShippingProviderError } from '../services/enviopack'
 import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 
 export const shippingRouter = Router()
+
+shippingRouter.get('/methods', (_req, res) => {
+  const postalCodes = env.LOCAL_DELIVERY_POSTAL_CODES.split(',').map((value) => value.trim()).filter(Boolean)
+  res.json({
+    data: {
+      pickup: {
+        enabled: env.PICKUP_ENABLED,
+        address: env.PICKUP_ADDRESS,
+        instructions: env.PICKUP_INSTRUCTIONS,
+        priceArs: 0,
+      },
+      localDelivery: {
+        enabled: env.LOCAL_DELIVERY_ENABLED,
+        postalCodes,
+        priceArs: env.LOCAL_DELIVERY_COORDINATE ? null : env.LOCAL_DELIVERY_FEE_ARS,
+        coordinate: env.LOCAL_DELIVERY_COORDINATE,
+      },
+      enviopack: {
+        enabled: Boolean(env.ENVIOPACK_API_KEY && env.ENVIOPACK_SECRET_KEY),
+      },
+    },
+  })
+})
 
 const quoteLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
