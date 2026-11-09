@@ -43,7 +43,7 @@ adminEnviopackRouter.get('/orders/:id/label', async (req, res) => {
     res.status(404).json({ error: { code: 'ENVIOPACK_SHIPMENT_NOT_FOUND', message: 'El pedido todavía no tiene un envío creado en Envíopack.' } })
     return
   }
-  if (order.enviopackShipmentStatus !== 'P') {
+  if (order.enviopackShipmentStatus !== 'P' && !order.enviopackLabelPdf) {
     res.status(409).json({ error: { code: 'ENVIOPACK_LABEL_NOT_READY', message: 'La etiqueta estará disponible cuando Envíopack confirme el procesamiento del envío.' } })
     return
   }
