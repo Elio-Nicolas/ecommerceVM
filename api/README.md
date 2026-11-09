@@ -47,3 +47,25 @@ Cada producto publicado que se envíe debe tener peso y dimensiones del paquete 
 - POST `/api/v1/orders` (requiere una cotización vigente y una opción seleccionada)
 
 La integración consulta dos endpoints distintos: `/cotizar/precio/a-domicilio` para el precio que paga el comprador y `/cotizar/costo` para los costos que paga la tienda por cada transportista. Son importes diferentes y no se deben intercambiar. El checkout recibe exclusivamente el precio del comprador; los costos de transportistas quedan guardados en el pedido y visibles solo en Administración, con una diferencia estimada entre ambos. El costo definitivo puede variar al generar la etiqueta.
+
+
+## Modalidades de entrega
+
+El checkout ofrece tres modalidades:
+
+- `PICKUP`: retiro por el domicilio del vendedor, sin cargo y sin depender del código postal del comprador.
+- `LOCAL_DELIVERY`: entrega local habilitada por lista de códigos postales.
+- `ENVIOPACK`: cotización a domicilio según el destino y los paquetes del carrito.
+
+Configuración inicial mediante variables del entorno de la API:
+
+- `PICKUP_ENABLED=true|false`
+- `PICKUP_ADDRESS`: dirección que se informa para el retiro.
+- `PICKUP_INSTRUCTIONS`: instrucciones de coordinación.
+- `LOCAL_DELIVERY_ENABLED=true|false`
+- `LOCAL_DELIVERY_POSTAL_CODES`: códigos postales separados por coma.
+- `LOCAL_DELIVERY_FEE_ARS`: importe fijo cobrado al comprador.
+- `LOCAL_DELIVERY_COORDINATE=true|false`: si es `true`, el costo queda pendiente de coordinación y no se suma al total inicial.
+- `LOCAL_DELIVERY_INTERNAL_COST_ARS`: costo interno estimado, visible solo en administración.
+
+El endpoint público `GET /api/v1/shipping/methods` informa las modalidades disponibles. La configuración es por entorno en esta primera iteración; todavía no se administra desde una pantalla del panel.
