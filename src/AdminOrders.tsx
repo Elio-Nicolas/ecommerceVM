@@ -17,7 +17,7 @@ type Order = {
   deliveryMethod: 'ENVIOPACK' | 'LOCAL_DELIVERY' | 'PICKUP'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
   shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
   enviopackOrderId: string | null; enviopackShipmentId: string | null; enviopackShipmentStatus: string | null
-  enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null; enviopackPackages: EnviopackPackage[] | null
+  enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null; enviopackPackages: EnviopackPackage[] | null; enviopackLabelSavedAt: string | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
@@ -295,7 +295,7 @@ export default function AdminOrders() {
               <div><span className="admin-kicker">ENVÍOPACK</span><h3>Generación de envío y etiqueta</h3></div>
               {activeOrder.enviopackShipmentId ? <div className="order-logistics-summary">
                 <span>Envío #{activeOrder.enviopackShipmentId} · Estado Envíopack: {activeOrder.enviopackShipmentStatus || 'Sin informar'}</span>
-                {activeOrder.enviopackTrackingNumber && <strong>Seguimiento: {activeOrder.enviopackTrackingNumber}</strong>}
+                {activeOrder.enviopackTrackingNumber && <strong>Seguimiento: {activeOrder.enviopackTrackingNumber}</strong>}{activeOrder.enviopackLabelSavedAt && <small>Etiqueta archivada para reimpresión · {formatDate(activeOrder.enviopackLabelSavedAt)}</small>}
                 <div className="admin-category-actions">
                   <button type="button" className="admin-quiet-button" disabled={shippingSaving} onClick={() => void refreshEnviopack(activeOrder)}>Actualizar estado</button>
                   {activeOrder.enviopackShipmentStatus === 'P' && <button type="button" className="admin-primary" disabled={shippingSaving} onClick={() => void downloadEnviopackLabel(activeOrder)}>Descargar etiqueta PDF</button>}
