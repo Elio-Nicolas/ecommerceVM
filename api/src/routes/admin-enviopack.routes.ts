@@ -14,9 +14,19 @@ export const adminEnviopackRouter = Router()
 adminEnviopackRouter.use(requireAdmin)
 
 adminEnviopackRouter.post('/orders/:id/create', async (req, res) => {
-  const input = z.object({ carrierId: z.string().trim().min(1).max(100) }).parse(req.body)
+  const input = z.object({
+    carrierId: z.string().trim().min(1).max(100),
+    packages: z.array(z.object({
+      alto: z.number().int().min(1).max(300),
+      ancho: z.number().int().min(1).max(300),
+      largo: z.number().int().min(1).max(300),
+      peso: z.number().positive().max(1000),
+      descripcion_primera_linea: z.string().trim().max(50).optional(),
+      descripcion_segunda_linea: z.string().trim().max(50).optional(),
+    })).min(1).max(20),
+  }).parse(req.body)
   try {
-    const result = await createEnviopackShipment(req.params.id, input.carrierId)
+    const result = await createEnviopackShipment(req.params.id, input.carrierId, input.packages)
     res.status(201).json({ data: result, message: 'Envío creado en Envíopack. La etiqueta estará disponible cuando el correo lo procese.' })
   } catch (error) {
     if (error instanceof EnviopackShipmentError) {
