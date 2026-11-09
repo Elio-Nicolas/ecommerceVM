@@ -16,7 +16,7 @@ type Order = {
   deliveryMethod: 'ENVIOPACK' | 'LOCAL_DELIVERY' | 'PICKUP'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
   shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
   enviopackOrderId: string | null; enviopackShipmentId: string | null; enviopackShipmentStatus: string | null
-  enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null
+  enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null; enviopackPackages: unknown[] | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
@@ -68,6 +68,7 @@ export default function AdminOrders() {
   const [note, setNote] = useState('')
   const [updating, setUpdating] = useState(false)
   const [shippingSaving, setShippingSaving] = useState(false)
+  const [packageCount, setPackageCount] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -139,12 +140,12 @@ export default function AdminOrders() {
     }
   }
 
-  async function createEnviopack(order: Order, carrierId: string) {
-    if (!token || shippingSaving || !carrierId) return
+  async function createEnviopack(order: Order, carrierId: string, packages: { alto: number; ancho: number; largo: number; peso: number }[]) {
+    if (!token || shippingSaving || !carrierId || packages.length < 1) return
     setShippingSaving(true); setError(''); setNotice('')
     try {
       const result = await request<{ data: { shipmentId: string; status: string }; message: string }>(`/admin/enviopack/orders/${order.id}/create`, token, {
-        method: 'POST', body: JSON.stringify({ carrierId }),
+        method: 'POST', body: JSON.stringify({ carrierId, packages }),
       })
       setNotice(result.message)
       await loadOrders(token)
@@ -298,8 +299,23 @@ export default function AdminOrders() {
                   <button type="button" className="admin-quiet-button" disabled={shippingSaving} onClick={() => void refreshEnviopack(activeOrder)}>Actualizar estado</button>
                   {activeOrder.enviopackShipmentStatus === 'P' && <button type="button" className="admin-primary" disabled={shippingSaving} onClick={() => void downloadEnviopackLabel(activeOrder)}>Descargar etiqueta PDF</button>}
                 </div>
-              </div> : activeOrder.status === 'PREPARING' ? <form className="order-shipping-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void createEnviopack(activeOrder, String(data.get('carrierId') || '')) }}>
-                <p>Elegí el correo y el servicio cotizados. Envíopack creará el envío confirmado; la etiqueta aparecerá cuando el correo lo procese.</p>
+                {Array.isArray(activeOrder.enviopackPackages) && <small>Bultos registrados: {activeOrder.enviopackPackages.length}</small>}
+              </div> : activeOrder.status === 'PREPARING' ? <form className="order-shipping-form" onSubmit={(event) => {
+                event.preventDefault()
+                const data = new FormData(event.currentTarget)
+                const packages = Array.from({ length: packageCount }, (_, index) => ({
+                  alto: Number(data.get(`package-${index}-alto`)),
+                  ancho: Number(data.get(`package-${index}-ancho`)),
+                  largo: Number(data.get(`package-${index}-largo`)),
+                  peso: Number(data.get(`package-${index}-peso`)),
+                }))
+                if (packages.some((item) => !Number.isInteger(item.alto) || !Number.isInteger(item.ancho) || !Number.isInteger(item.largo) || item.alto < 1 || item.ancho < 1 || item.largo < 1 || !Number.isFinite(item.peso) || item.peso <= 0)) {
+                  setError('Completá las dimensiones en centímetros y el peso en kilogramos para cada bulto.')
+                  return
+                }
+                void createEnviopack(activeOrder, String(data.get('carrierId') || ''), packages)
+              }}>
+                <p>Elegí el correo cotizado y declarÁ cómo preparaste físicamente el pedido. Cada fila representa un bulto real; no se genera un paquete por cada unidad comprada.</p>
                 {activeOrder.shippingCostOptions?.sellerOptions?.length ? <>
                   <label>Correo / operador
                     <select name="carrierId" required defaultValue="">
@@ -307,6 +323,19 @@ export default function AdminOrders() {
                       {activeOrder.shippingCostOptions.sellerOptions.map((option) => <option key={option.carrierId} value={option.carrierId}>{option.carrierName} · costo tienda {formatPrice(option.costArs)}</option>)}
                     </select>
                   </label>
+                  <div className="order-shipping-fields">
+                    {Array.from({ length: packageCount }, (_, index) => <div key={index} className="order-logistics-summary">
+                      <strong>Bulto {index + 1}</strong>
+                      <label>Alto (cm)<input name={`package-${index}-alto`} type="number" min="1" max="300" step="1" required placeholder="Alto" /></label>
+                      <label>Ancho (cm)<input name={`package-${index}-ancho`} type="number" min="1" max="300" step="1" required placeholder="Ancho" /></label>
+                      <label>Largo (cm)<input name={`package-${index}-largo`} type="number" min="1" max="300" step="1" required placeholder="Largo" /></label>
+                      <label>Peso (kg)<input name={`package-${index}-peso`} type="number" min="0.01" max="1000" step="0.01" required placeholder="Ej. 2.5" /></label>
+                    </div>)}
+                  </div>
+                  <div className="admin-category-actions">
+                    <button type="button" className="admin-quiet-button" disabled={packageCount <= 1 || shippingSaving} onClick={() => setPackageCount((count) => Math.max(1, count - 1))}>Quitar último bulto</button>
+                    <button type="button" className="admin-quiet-button" disabled={packageCount >= 20 || shippingSaving} onClick={() => setPackageCount((count) => Math.min(20, count + 1))}>Agregar bulto</button>
+                  </div>
                   <button className="admin-primary" disabled={shippingSaving}>{shippingSaving ? 'Creando envío...' : 'Crear envío en Envíopack'}</button>
                 </> : <p className="order-logistics-unavailable">La cotización no guardó opciones de transportista con costo interno. No se puede generar el envío hasta contar con una opción válida.</p>}
               </form> : <p>Para generar el envío, primero pasá el pedido a En preparación.</p>}
