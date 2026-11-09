@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAdmin } from '../middleware/require-admin'
-import { getEnviopackCredentials, getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
+import { getStoredEnviopackCredentials, getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
 import { testEnviopackCredentials, ShippingProviderError } from '../services/enviopack'
 
 export const adminShippingSettingsRouter = Router()
@@ -38,7 +38,7 @@ adminShippingSettingsRouter.post('/test', async (req, res) => {
   try {
     const credentials = input.apiKey && input.secretKey
       ? { apiKey: input.apiKey, secretKey: input.secretKey }
-      : await getEnviopackCredentials()
+      : await getStoredEnviopackCredentials()
     if (!credentials) {
       res.status(400).json({ error: { code: 'SHIPPING_CREDENTIALS_MISSING', message: 'Ingresá y guardá las credenciales de Envíopack antes de probar la conexión.' } })
       return
