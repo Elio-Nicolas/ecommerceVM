@@ -97,6 +97,7 @@ model Order {
   shippingEstimatedHours Int?
   shippingQuoteId String?
   shippingOptionKey String?
+  shippingCostOptions Json?
   items OrderItem[]
   history OrderStatusHistory[]
   createdAt DateTime @default(now())
