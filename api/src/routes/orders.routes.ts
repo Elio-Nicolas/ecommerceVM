@@ -23,7 +23,7 @@ const createOrderSchema = z.object({
   addressLine: z.string().trim().min(4).max(180),
   city: z.string().trim().min(2).max(100),
   province: z.string().trim().min(2).max(100),
-  postalCode: z.string().trim().regex(/^\\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
+  postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
   provinceCode: z.string().length(1).regex(/^[A-Z]$/),
   shippingQuoteId: z.string().uuid(),
   shippingOptionKey: z.string().trim().min(1).max(40),
