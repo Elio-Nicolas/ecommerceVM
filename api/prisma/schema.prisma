@@ -93,6 +93,10 @@ model Order {
   totalArs Int?
   shippingCarrier String?
   trackingCode String?
+  shippingService String?
+  shippingEstimatedHours Int?
+  shippingQuoteId String?
+  shippingOptionKey String?
   items OrderItem[]
   history OrderStatusHistory[]
   createdAt DateTime @default(now())
@@ -100,6 +104,18 @@ model Order {
   @@index([status, createdAt])
   @@index([customerPhone])
   @@index([customerName])
+}
+model ShippingQuote {
+  id String @id @default(uuid())
+  provinceCode String
+  postalCode String
+  cartFingerprint String
+  subtotalArs Int
+  options Json
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([expiresAt, usedAt])
 }
 model OrderItem {
   id String @id @default(uuid())
