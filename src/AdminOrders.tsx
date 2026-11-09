@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { formatPrice } from './products'
+import './order-logistics.css'
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const TOKEN_KEY = 'ecommercevm_admin_token'
