@@ -1,4 +1,3 @@
-import { env } from '../config/env'
 
 type EnviopackQuoteResponse = {
   modalidad?: string
@@ -29,7 +28,7 @@ export type ShippingOption = {
   sellerCostStatus: 'AVAILABLE' | 'UNAVAILABLE'
 }
 
-let cachedToken: { value: string; expiresAt: number } | null = null
+let cachedToken: { value: string; expiresAt: number; credentialKey: string } | null = null
 
 export class ShippingProviderError extends Error {
   constructor(message: string) {
@@ -38,15 +37,13 @@ export class ShippingProviderError extends Error {
   }
 }
 
-async function getAccessToken(): Promise<string> {
-  if (!env.ENVIOPACK_API_KEY || !env.ENVIOPACK_SECRET_KEY) {
-    throw new ShippingProviderError('La integración con Envíopack todavía no está configurada.')
-  }
-  if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value
+async function getAccessToken(credentials: { apiKey: string; secretKey: string }): Promise<string> {
+  const credentialKey = `${credentials.apiKey}:${credentials.secretKey}`
+  if (cachedToken && cachedToken.expiresAt > Date.now() && cachedToken.credentialKey === credentialKey) return cachedToken.value
 
   const body = new URLSearchParams({
-    'api-key': env.ENVIOPACK_API_KEY,
-    'secret-key': env.ENVIOPACK_SECRET_KEY,
+    'api-key': credentials.apiKey,
+    'secret-key': credentials.secretKey,
   })
   let response: Response
   try {
@@ -63,7 +60,7 @@ async function getAccessToken(): Promise<string> {
   const payload = await response.json() as { access_token?: string }
   if (!payload.access_token) throw new ShippingProviderError('Envíopack devolvió una respuesta de autenticación inválida.')
 
-  cachedToken = { value: payload.access_token, expiresAt: Date.now() + 3.8 * 60 * 60 * 1000 }
+  cachedToken = { value: payload.access_token, expiresAt: Date.now() + 3.8 * 60 * 60 * 1000, credentialKey }
   return payload.access_token
 }
 
@@ -93,8 +90,9 @@ export async function quoteHomeDelivery(input: {
   weightGrams: number
   packages: Array<{ lengthCm: number; widthCm: number; heightCm: number }>
   originAddressId?: string | null
+  credentials: { apiKey: string; secretKey: string }
 }): Promise<ShippingOption[]> {
-  const token = await getAccessToken()
+  const token = await getAccessToken(input.credentials)
   const packages = input.packages
     .map((item) => `${item.heightCm}x${item.widthCm}x${item.lengthCm}`)
     .join(',')
