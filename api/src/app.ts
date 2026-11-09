@@ -9,6 +9,7 @@ import { productsRouter } from './routes/products.routes'
 import { authRouter } from './routes/auth.routes'
 import { adminProductsRouter } from './routes/admin-products.routes'
 import { adminCategoriesRouter } from './routes/admin-categories.routes'
+import { adminStorageRouter } from './routes/admin-storage.routes'
 export const app = express()
 app.disable('x-powered-by')
 app.use(helmet())
@@ -19,6 +20,7 @@ app.use('/api/v1/health', healthRouter)
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/admin/products', adminProductsRouter)
 app.use('/api/v1/admin/categories', adminCategoriesRouter)
+app.use('/api/v1/admin/storage', adminStorageRouter)
 app.use('/api/v1/categories', categoriesRouter)
 app.use('/api/v1/products', productsRouter)
 app.use((_req, res) => { res.status(404).json({ error: { code: 'ROUTE_NOT_FOUND', message: 'Recurso no encontrado' } }) })

@@ -110,3 +110,10 @@
 .admin-category-row>div:last-child{display:flex;gap:12px}.admin-category-row button{border:0;background:none;color:#bd4937;font-size:9px;font-weight:700;padding:4px 0}.admin-category-row .archive-action{color:#8c969f}
 @media(max-width:900px){.admin-category-form{grid-template-columns:1fr 1fr}.admin-category-actions{grid-column:1/-1}}
 @media(max-width:620px){.admin-category-card{padding:16px}.admin-category-form{grid-template-columns:1fr}.admin-category-actions{grid-column:auto}.admin-category-list{grid-template-columns:1fr}}
+
+.admin-image-upload{display:flex;flex-direction:column;gap:10px}
+.admin-image-upload>label{display:flex;flex-direction:column;gap:8px;font-size:9px;font-weight:700;color:#53606c}
+.admin-image-upload input[type=file]{width:100%;min-height:38px;border:1px dashed #cbd2d8;padding:8px;background:#fafbfc;font:10px Manrope}
+.admin-image-upload>small,.admin-upload-status{font-size:9px;color:#87919b}
+.admin-image-preview{display:flex;align-items:center;gap:14px;padding:10px;border:1px solid #edf0f2;width:max-content;max-width:100%}
+.admin-image-preview img{width:76px;height:76px;object-fit:contain;background:#f5f6f7}

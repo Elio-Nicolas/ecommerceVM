@@ -69,6 +69,7 @@ export default function AdminPanel() {
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [imageUploading, setImageUploading] = useState(false)
   const [categoryName, setCategoryName] = useState('')
   const [categorySlug, setCategorySlug] = useState('')
   const [categoryDescription, setCategoryDescription] = useState('')
@@ -206,6 +207,30 @@ export default function AdminPanel() {
     }
   }
 
+  async function uploadProductImage(file: File) {
+    if (!token) return
+    setImageUploading(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = new FormData()
+      body.append('image', file)
+      const response = await fetch(`${API_URL}/api/v1/admin/storage/images`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error?.message || 'No se pudo subir la imagen.')
+      updateField('imageUrl', payload.data.imageUrl)
+      setNotice('Imagen subida correctamente. Guardá el producto para aplicar el cambio.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo subir la imagen.')
+    } finally {
+      setImageUploading(false)
+    }
+  }
+
   function resetCategoryForm() {
     setCategoryEditing(null); setCategoryName(''); setCategorySlug(''); setCategoryDescription('')
   }
@@ -314,13 +339,19 @@ export default function AdminPanel() {
                 <label>Precio anterior (ARS)<input type="number" min="1" step="1" value={form.compareAtArs} onChange={(event) => updateField('compareAtArs', event.target.value)} /></label>
                 <label>Stock disponible<input type="number" min="0" step="1" value={form.stock} onChange={(event) => updateField('stock', event.target.value)} required /></label>
                 <label>Estado<select value={form.status} onChange={(event) => updateField('status', event.target.value as ProductStatus)}><option value="DRAFT">Borrador</option><option value="ACTIVE">Publicado</option><option value="ARCHIVED">Archivado</option></select></label>
-                <label className="admin-full-field">URL de imagen<input type="url" placeholder="https://..." value={form.imageUrl} onChange={(event) => updateField('imageUrl', event.target.value)} /></label>
+                <div className="admin-full-field admin-image-upload">
+                  <label>Subir imagen del producto<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={imageUploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadProductImage(file); event.target.value = '' }} /></label>
+                  <small>JPG, PNG, WebP o AVIF · máximo 5 MB. La imagen se guarda en Supabase Storage.</small>
+                  {imageUploading && <span className="admin-upload-status">Subiendo imagen...</span>}
+                  {form.imageUrl && <div className="admin-image-preview"><img src={form.imageUrl} alt="Vista previa del producto" /><button type="button" className="admin-quiet-button" onClick={() => updateField('imageUrl', '')}>Quitar imagen</button></div>}
+                  <label>O pegar URL de imagen<input type="url" placeholder="https://..." value={form.imageUrl} onChange={(event) => updateField('imageUrl', event.target.value)} /></label>
+                </div>
                 <label className="admin-full-field">Descripción<textarea rows={3} value={form.description} onChange={(event) => updateField('description', event.target.value)} required minLength={5} /></label>
                 <label className="admin-full-field">Especificaciones <small>Separadas por coma</small><input value={form.specs} onChange={(event) => updateField('specs', event.target.value)} placeholder="Bluetooth, USB-C, Garantía..." /></label>
                 <label>Etiqueta comercial<input value={form.badge} onChange={(event) => updateField('badge', event.target.value)} placeholder="Novedad, Más elegido..." /></label>
                 <label className="admin-checkbox"><input type="checkbox" checked={form.featured} onChange={(event) => updateField('featured', event.target.checked)} /> Destacar en la tienda</label>
               </div>
-              <div className="admin-form-actions"><button type="button" className="admin-quiet-button" onClick={() => setEditing(null)}>Cancelar</button><button className="admin-primary" disabled={saving}>{saving ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear producto'}</button></div>
+              <div className="admin-form-actions"><button type="button" className="admin-quiet-button" onClick={() => setEditing(null)}>Cancelar</button><button className="admin-primary" disabled={saving || imageUploading}>{imageUploading ? 'Subiendo imagen...' : saving ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear producto'}</button></div>
             </form>
           ) : null}
           <div className="admin-table-card">
