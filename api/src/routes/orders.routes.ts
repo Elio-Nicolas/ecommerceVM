@@ -25,7 +25,7 @@ const createOrderSchema = z.object({
   city: z.string().trim().min(2).max(100),
   province: z.string().trim().min(2).max(100),
   postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
-  provinceCode: z.string().length(1).regex(/^[A-Z]$/),
+  provinceCode: z.string().length(1).regex(/^[A-Z]$/).optional(),
   deliveryMethod: z.enum(['ENVIOPACK', 'LOCAL_DELIVERY', 'PICKUP']).default('ENVIOPACK'),
   shippingQuoteId: z.string().uuid().optional(),
   shippingOptionKey: z.string().trim().min(1).max(40).optional(),
