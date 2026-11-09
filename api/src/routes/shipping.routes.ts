@@ -88,6 +88,7 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
       postalCode: input.postalCode,
       weightGrams,
       packages,
+      originAddressId: origin.enviopackAddressId,
     })
     if (options.length === 0) {
       res.status(422).json({ error: { code: 'SHIPPING_UNAVAILABLE', message: 'Envíopack no encontró servicios disponibles para ese código postal.' } })
@@ -109,7 +110,7 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
       data: {
         id: quote.id,
         subtotalArs,
-        options,
+        options: options.map(({ sellerOptions: _sellerOptions, sellerCostStatus: _sellerCostStatus, ...buyerOption }) => buyerOption),
         expiresAt: quote.expiresAt,
       },
     })
