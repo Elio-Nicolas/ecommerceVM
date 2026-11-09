@@ -105,7 +105,7 @@ export default function App() {
     if (sort === 'name') result.sort((a, b) => a.name.localeCompare(b.name, 'es'))
     if (sort === 'featured') result.sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)))
     return result
-  }, [category, query, sort])
+  }, [products, category, query, sort])
 
   const cartCount = cart.reduce((total, line) => total + line.quantity, 0)
   const cartTotal = cart.reduce((total, line) => total + line.product.price * line.quantity, 0)
