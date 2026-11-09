@@ -175,7 +175,6 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
       observaciones: order.customerNotes || undefined,
       confirmado: true,
       paquetes: packages,
-      despacho: 'D',
       modalidad: 'D',
       servicio: String(selected.serviceCode),
       correo: carrierId,
