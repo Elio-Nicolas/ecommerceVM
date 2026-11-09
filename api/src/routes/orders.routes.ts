@@ -4,6 +4,7 @@ import { rateLimit } from 'express-rate-limit'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
+import { env } from '../config/env'
 import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 
 export const ordersRouter = Router()
@@ -25,8 +26,9 @@ const createOrderSchema = z.object({
   province: z.string().trim().min(2).max(100),
   postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
   provinceCode: z.string().length(1).regex(/^[A-Z]$/),
-  shippingQuoteId: z.string().uuid(),
-  shippingOptionKey: z.string().trim().min(1).max(40),
+  deliveryMethod: z.enum(['ENVIOPACK', 'LOCAL_DELIVERY', 'PICKUP']).default('ENVIOPACK'),
+  shippingQuoteId: z.string().uuid().optional(),
+  shippingOptionKey: z.string().trim().min(1).max(40).optional(),
   customerNotes: z.string().trim().max(1000).optional().transform((value) => value || null),
   items: z.array(z.object({
     productId: z.string().uuid(),
@@ -51,35 +53,59 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   try {
     const order = await prisma.$transaction(async (tx) => {
       const now = new Date()
-      const quote = await tx.shippingQuote.findFirst({
-        where: {
-          id: input.shippingQuoteId,
-          provinceCode: input.provinceCode,
-          postalCode: input.postalCode,
-          expiresAt: { gt: now },
-          usedAt: null,
-        },
-      })
-      if (!quote) {
-        throw new OrderConflictError('La cotización de envío venció o ya no corresponde al carrito. Volvé a cotizar.')
+      let selectedOption: Prisma.JsonObject | undefined
+      let shippingCostArs = 0
+      let shippingCarrier: string | null = null
+      let shippingService: string | null = null
+      let shippingEstimatedHours: number | null = null
+      let shippingQuoteId: string | null = null
+      let shippingInternalCostArs: number | null = null
+      let deliveryInstructions: string | null = null
+
+      if (input.deliveryMethod === 'PICKUP') {
+        if (!env.PICKUP_ENABLED) throw new OrderConflictError('El retiro por domicilio no está disponible.')
+        deliveryInstructions = env.PICKUP_INSTRUCTIONS
+      } else if (input.deliveryMethod === 'LOCAL_DELIVERY') {
+        const allowedPostalCodes = env.LOCAL_DELIVERY_POSTAL_CODES.split(',').map((value) => value.trim()).filter(Boolean)
+        if (!env.LOCAL_DELIVERY_ENABLED || !allowedPostalCodes.includes(input.postalCode)) {
+          throw new OrderConflictError('La entrega local no está disponible para ese código postal.')
+        }
+        shippingCostArs = env.LOCAL_DELIVERY_COORDINATE ? 0 : env.LOCAL_DELIVERY_FEE_ARS
+        shippingCarrier = 'Entrega local'
+        shippingService = env.LOCAL_DELIVERY_COORDINATE ? 'A coordinar' : 'Entrega local'
+        shippingInternalCostArs = env.LOCAL_DELIVERY_INTERNAL_COST_ARS ?? null
+        deliveryInstructions = env.LOCAL_DELIVERY_COORDINATE ? 'El costo de entrega se coordinará luego de confirmar el pedido.' : null
+      } else {
+        if (!input.shippingQuoteId || !input.shippingOptionKey || !input.provinceCode) {
+          throw new OrderConflictError('Seleccioná una cotización vigente de Envíopack.')
+        }
+        const quote = await tx.shippingQuote.findFirst({
+          where: {
+            id: input.shippingQuoteId,
+            provinceCode: input.provinceCode,
+            postalCode: input.postalCode,
+            expiresAt: { gt: now },
+            usedAt: null,
+          },
+        })
+        if (!quote) throw new OrderConflictError('La cotización de envío venció o ya no corresponde al carrito. Volvé a cotizar.')
+        const quoteOptions = Array.isArray(quote.options) ? quote.options : []
+        selectedOption = quoteOptions.find((option) =>
+          typeof option === 'object' && option !== null && !Array.isArray(option) && option.key === input.shippingOptionKey,
+        ) as Prisma.JsonObject | undefined
+        if (!selectedOption) throw new OrderConflictError('La opción de envío seleccionada ya no está disponible. Volvé a cotizar.')
+        shippingCostArs = Number(selectedOption.priceArs)
+        shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : 'Envíopack'
+        shippingService = typeof selectedOption.serviceLabel === 'string' ? selectedOption.serviceLabel : 'Envío estándar'
+        shippingEstimatedHours = typeof selectedOption.estimatedHours === 'number' ? selectedOption.estimatedHours : null
+        if (!Number.isSafeInteger(shippingCostArs) || shippingCostArs < 0) throw new OrderConflictError('El importe del envío no es válido. Volvé a cotizar.')
+        const quoteUse = await tx.shippingQuote.updateMany({
+          where: { id: quote.id, usedAt: null, expiresAt: { gt: now } },
+          data: { usedAt: now },
+        })
+        if (quoteUse.count !== 1) throw new OrderConflictError('La cotización ya fue utilizada. Volvé a cotizar.')
+        shippingQuoteId = quote.id
       }
-      const quoteOptions = Array.isArray(quote.options) ? quote.options : []
-      const selectedOption = quoteOptions.find((option) =>
-        typeof option === 'object' && option !== null && !Array.isArray(option) && option.key === input.shippingOptionKey,
-      ) as Prisma.JsonObject | undefined
-      if (!selectedOption) throw new OrderConflictError('La opción de envío seleccionada ya no está disponible. Volvé a cotizar.')
-      const shippingCostArs = Number(selectedOption.priceArs)
-      const shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : 'Envíopack'
-      const shippingService = typeof selectedOption.serviceLabel === 'string' ? selectedOption.serviceLabel : 'Envío estándar'
-      const shippingEstimatedHours = typeof selectedOption.estimatedHours === 'number' ? selectedOption.estimatedHours : null
-      if (!Number.isSafeInteger(shippingCostArs) || shippingCostArs < 0) {
-        throw new OrderConflictError('El importe del envío no es válido. Volvé a cotizar.')
-      }
-      const quoteUse = await tx.shippingQuote.updateMany({
-        where: { id: quote.id, usedAt: null, expiresAt: { gt: now } },
-        data: { usedAt: now },
-      })
-      if (quoteUse.count !== 1) throw new OrderConflictError('La cotización ya fue utilizada. Volvé a cotizar.')
 
       const products = await tx.product.findMany({
         where: { id: { in: input.items.map((item) => item.productId) }, status: 'ACTIVE' },
@@ -88,8 +114,11 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (products.length !== input.items.length) {
         throw new OrderConflictError('Uno o más productos ya no están disponibles. Actualizá el carrito.')
       }
-      if (quote.cartFingerprint !== shippingCartFingerprint(input.items, products)) {
-        throw new OrderConflictError('Los productos o sus paquetes cambiaron desde la cotización. Volvé a calcular el envío.')
+      if (input.deliveryMethod === 'ENVIOPACK') {
+        const quote = input.shippingQuoteId ? await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } }) : null
+        if (!quote || quote.cartFingerprint !== shippingCartFingerprint(input.items, products)) {
+          throw new OrderConflictError('Los productos o sus paquetes cambiaron desde la cotización. Volvé a calcular el envío.')
+        }
       }
       const byId = new Map(products.map((product) => [product.id, product]))
       let subtotalArs = 0
@@ -108,8 +137,9 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
         throw new OrderConflictError('El importe del pedido no es válido.')
       }
-      if (quote.subtotalArs !== subtotalArs) {
-        throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
+      if (input.deliveryMethod === 'ENVIOPACK' && input.shippingQuoteId) {
+        const quote = await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } })
+        if (!quote || quote.subtotalArs !== subtotalArs) throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
       }
       const totalArs = subtotalArs + shippingCostArs
       if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
@@ -142,9 +172,12 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           shippingCarrier,
           shippingService,
           shippingEstimatedHours,
-          shippingQuoteId: quote.id,
-          shippingOptionKey: input.shippingOptionKey,
-          shippingCostOptions: selectedOption as Prisma.InputJsonObject,
+          shippingQuoteId,
+          shippingOptionKey: input.shippingOptionKey || null,
+          shippingCostOptions: selectedOption ? selectedOption as Prisma.InputJsonObject : Prisma.JsonNull,
+          deliveryMethod: input.deliveryMethod,
+          shippingInternalCostArs,
+          deliveryInstructions,
           items: { create: snapshots },
           history: { create: { toStatus: 'PENDING', note: 'Pedido recibido; pendiente de confirmación.' } },
         },
@@ -162,7 +195,8 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         createdAt: order.createdAt,
         items: order.items,
       },
-      message: 'Pedido registrado con el costo de envío cotizado. El pago todavía no está habilitado.',
+      deliveryMethod: order.deliveryMethod,
+      message: 'Pedido registrado. El pago todavía no está habilitado.',
     })
   } catch (error) {
     if (error instanceof OrderConflictError) {
