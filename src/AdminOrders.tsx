@@ -251,7 +251,7 @@ export default function AdminOrders() {
                   <td>{formatDate(order.createdAt)}</td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
                   <td className="admin-price">{formatPrice(order.subtotalArs)}</td>
                   <td><span className={`admin-status order-status ${order.status.toLowerCase()}`}>{statusLabels[order.status]}</span></td>
-                  <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote('') }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
+                  <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote(''); setPackageCount(1) }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
                 </tr>)}
               </tbody></table></div>
             )}
