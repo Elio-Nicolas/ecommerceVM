@@ -48,7 +48,16 @@ adminEnviopackRouter.get('/orders/:id/label', async (req, res) => {
     return
   }
   try {
-    const pdf = await downloadEnviopackLabel(order.enviopackShipmentId)
+    let pdf: Buffer
+    if (order.enviopackLabelPdf) {
+      pdf = Buffer.from(order.enviopackLabelPdf)
+    } else {
+      pdf = await downloadEnviopackLabel(order.enviopackShipmentId)
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { enviopackLabelPdf: pdf, enviopackLabelSavedAt: new Date() },
+      })
+    }
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="etiqueta-${order.code}.pdf"`)
     res.setHeader('Content-Length', pdf.length)
