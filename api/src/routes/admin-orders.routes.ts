@@ -168,6 +168,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(409).json({ error: { code: 'SHIPPING_NOT_CONFIGURED', message: 'Antes de marcar el pedido como enviado, registrá el costo y el transporte.' } })
     return
   }
+  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
+    res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Antes de despachar el pedido, registrá el costo de entrega local acordado con el comprador.' } })
+    return
+  }
   const allowedTransitions = existing.status === 'PREPARING' && existing.deliveryMethod === 'PICKUP'
     ? ['DELIVERED', 'CANCELLED']
     : transitions[existing.status]
