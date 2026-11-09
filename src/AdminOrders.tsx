@@ -36,6 +36,7 @@ const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
 
 function availableNextStatuses(order: Order): OrderStatus[] {
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
+  if (order.status === 'PREPARING' && order.deliveryMethod === 'ENVIOPACK' && order.enviopackShipmentStatus !== 'P') return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   return nextStatuses[order.status]
 }
