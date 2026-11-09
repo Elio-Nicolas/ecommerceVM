@@ -27,8 +27,8 @@ type ShippingQuote = {
 type CreatedOrder = {
   code: string
   subtotalArs: number
-  shippingCostArs: number
-  totalArs: number
+  shippingCostArs: number | null
+  totalArs: number | null
   shippingCarrier: string | null
   shippingService: string | null
 }
@@ -204,8 +204,8 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <strong>{createdOrder.code}</strong>
           </div>
           <div className="checkout-success-total"><span>Productos</span><strong>{formatPrice(createdOrder.subtotalArs)}</strong></div>
-          <div className="checkout-success-total"><span>Envío</span><strong>{formatPrice(createdOrder.shippingCostArs)}</strong></div>
-          <div className="checkout-success-total"><span>Total</span><strong>{formatPrice(createdOrder.totalArs)}</strong></div>
+          <div className="checkout-success-total"><span>Envío</span><strong>{createdOrder.shippingCostArs === null ? 'A coordinar' : formatPrice(createdOrder.shippingCostArs)}</strong></div>
+          <div className="checkout-success-total"><span>Total</span><strong>{createdOrder.totalArs === null ? 'A confirmar' : formatPrice(createdOrder.totalArs)}</strong></div>
           <p className="checkout-small">Este pedido quedó registrado, pero todavía no fue cobrado.</p>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
         </section>
@@ -306,7 +306,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           </div>
           <div className="checkout-summary-total"><span>Subtotal</span><strong>{formatPrice(displayedSubtotal)}</strong></div>
           <div className="checkout-summary-total"><span>Envío</span><strong>{deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate ? 'A coordinar' : canSubmit ? formatPrice(selectedShippingPrice) : 'A calcular'}</strong></div>
-          <div className="checkout-summary-grand-total"><span>Total</span><strong>{formatPrice(displayedSubtotal + selectedShippingPrice)}</strong></div>
+          <div className="checkout-summary-grand-total"><span>Total</span><strong>{deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate ? 'A confirmar' : formatPrice(displayedSubtotal + selectedShippingPrice)}</strong></div>
           <p className="checkout-summary-note">El importe se calcula según la modalidad seleccionada. El total queda confirmado al registrar el pedido.</p>
         </aside>
       </div>
