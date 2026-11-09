@@ -23,7 +23,20 @@ function decryptSecret(value: string): string {
 export async function getShippingSettings() {
   return prisma.shippingSettings.upsert({
     where: { id: SETTINGS_ID },
-    create: { id: SETTINGS_ID },
+    create: {
+      id: SETTINGS_ID,
+      enviopackEnabled: Boolean(env.ENVIOPACK_API_KEY && env.ENVIOPACK_SECRET_KEY),
+      enviopackApiKeyEncrypted: env.ENVIOPACK_API_KEY ? encryptSecret(env.ENVIOPACK_API_KEY) : null,
+      enviopackSecretKeyEncrypted: env.ENVIOPACK_SECRET_KEY ? encryptSecret(env.ENVIOPACK_SECRET_KEY) : null,
+      pickupEnabled: env.PICKUP_ENABLED,
+      pickupAddress: env.PICKUP_ADDRESS,
+      pickupInstructions: env.PICKUP_INSTRUCTIONS,
+      localDeliveryEnabled: env.LOCAL_DELIVERY_ENABLED,
+      localDeliveryPostalCodes: env.LOCAL_DELIVERY_POSTAL_CODES.split(',').map((value) => value.trim()).filter(Boolean),
+      localDeliveryFeeArs: env.LOCAL_DELIVERY_FEE_ARS,
+      localDeliveryInternalCostArs: env.LOCAL_DELIVERY_INTERNAL_COST_ARS ?? null,
+      localDeliveryCoordinate: env.LOCAL_DELIVERY_COORDINATE,
+    },
     update: {},
   })
 }
