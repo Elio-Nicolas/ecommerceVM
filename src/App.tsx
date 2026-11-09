@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { formatPrice, type Product } from './products'
 import { fetchCategories, fetchProducts } from './catalog-api'
+import CheckoutPage from './CheckoutPage'
 
 type CartLine = { product: Product; quantity: number }
 
@@ -45,6 +46,7 @@ export default function App() {
     }
   })
   const [cartOpen, setCartOpen] = useState(false)
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [selected, setSelected] = useState<Product | null>(null)
 
   useEffect(() => {
@@ -103,7 +105,7 @@ export default function App() {
     if (sort === 'name') result.sort((a, b) => a.name.localeCompare(b.name, 'es'))
     if (sort === 'featured') result.sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)))
     return result
-  }, [category, query, sort])
+  }, [products, category, query, sort])
 
   const cartCount = cart.reduce((total, line) => total + line.quantity, 0)
   const cartTotal = cart.reduce((total, line) => total + line.product.price * line.quantity, 0)
@@ -243,10 +245,12 @@ export default function App() {
               <div className="cart-line-info"><strong>{line.product.name}</strong><span>{formatPrice(line.product.price)}</span><div className="quantity-control"><button onClick={() => changeQuantity(line.product.id, -1)} aria-label="Quitar una unidad">−</button><span>{line.quantity}</span><button onClick={() => changeQuantity(line.product.id, 1)} aria-label="Agregar una unidad">+</button></div></div>
               <button className="remove-line" onClick={() => setCart((current) => current.filter((item) => item.product.id !== line.product.id))}>Quitar</button>
             </div>)}</div>
-            <div className="cart-summary"><div><span>Subtotal</span><strong>{formatPrice(cartTotal)}</strong></div><small>El costo de envío se calcula más adelante.</small><button className="checkout-disabled" disabled>Finalizar compra <ArrowIcon /></button><p>La integración de pagos y checkout estará disponible en una próxima etapa.</p></div>
+            <div className="cart-summary"><div><span>Subtotal</span><strong>{formatPrice(cartTotal)}</strong></div><small>El costo de envío se calcula más adelante.</small><button className="checkout-continue" onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>Continuar con el pedido <ArrowIcon /></button><p>Sin cobro online. El envío y el pago se coordinan después de confirmar el pedido.</p></div>
           </> : <div className="empty-cart"><div className="empty-bag"><BagIcon /></div><strong>Tu carrito está esperando.</strong><span>Sumá productos que te interesen y aparecerán acá.</span><button className="primary-button" onClick={() => setCartOpen(false)}>Seguir explorando <ArrowIcon /></button></div>}
         </aside>
       </div>}
+
+      {checkoutOpen && <CheckoutPage cart={cart} subtotal={cartTotal} onBack={() => { setCheckoutOpen(false); setCartOpen(true) }} onFinish={() => { setCheckoutOpen(false); setCartOpen(false) }} onOrderCreated={() => { setCart([]); void fetchProducts().then(setProducts).catch(() => undefined) }} />}
 
       {selected && <div className="product-page-overlay">
         <section className="product-page">

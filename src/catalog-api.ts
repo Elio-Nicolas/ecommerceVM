@@ -21,7 +21,7 @@ type ApiProduct = {
 type ApiList<T> = { data: T[] }
 
 async function get<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_URL}/api/v1${path}`)
+  const response = await fetch(`${API_URL}/api/v1${path}`, { cache: 'no-store' })
   if (!response.ok) throw new Error(`API error: ${response.status}`)
   return response.json() as Promise<T>
 }
