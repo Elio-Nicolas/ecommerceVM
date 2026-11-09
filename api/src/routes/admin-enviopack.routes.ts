@@ -98,9 +98,4 @@ enviopackWebhookRouter.get('/', enviopackWebhookLimiter, (req, res) => {
     console.error('No se pudo validar la notificación de Envíopack:', error)
     res.status(500).send('Error interno')
   })
-  /*
-  void refreshEnviopackShipment(input.data.id).catch((error) => {
-    console.error('No se pudo sincronizar la notificación de Envíopack:', error)
-  })
-  */
 })
