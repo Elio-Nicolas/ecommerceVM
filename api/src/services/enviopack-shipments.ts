@@ -56,8 +56,8 @@ function splitCustomerName(fullName: string) {
 }
 
 function splitStreet(addressLine: string) {
-  const match = addressLine.trim().match(/^(.+?)\s+(\d{1,5}[A-Za-z]?)$/)
-  if (!match) throw new EnviopackShipmentError('La dirección del pedido debe incluir calle y número para generar la etiqueta. Corregí el domicilio antes de continuar.')
+  const match = addressLine.trim().match(/^(.+?)\s+(\d{1,5}[A-Za-z]?)(?:\s*[,;].*|\s+.*)?$/)
+  if (!match) throw new EnviopackShipmentError('La dirección del pedido debe incluir calle y altura para generar la etiqueta. Corregí el domicilio antes de continuar.')
   return { calle: match[1].slice(0, 50), numero: match[2].slice(0, 5) }
 }
 
