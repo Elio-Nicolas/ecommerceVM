@@ -3,33 +3,14 @@ import { Prisma } from '@prisma/client'
 import { rateLimit } from 'express-rate-limit'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { env } from '../config/env'
+import { getEnviopackCredentials, getShippingSettingsPublic } from '../services/shipping-settings'
 import { quoteHomeDelivery, ShippingProviderError } from '../services/enviopack'
 import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 
 export const shippingRouter = Router()
 
-shippingRouter.get('/methods', (_req, res) => {
-  const postalCodes = env.LOCAL_DELIVERY_POSTAL_CODES.split(',').map((value) => value.trim()).filter(Boolean)
-  res.json({
-    data: {
-      pickup: {
-        enabled: env.PICKUP_ENABLED,
-        address: env.PICKUP_ADDRESS,
-        instructions: env.PICKUP_INSTRUCTIONS,
-        priceArs: 0,
-      },
-      localDelivery: {
-        enabled: env.LOCAL_DELIVERY_ENABLED,
-        postalCodes,
-        priceArs: env.LOCAL_DELIVERY_COORDINATE ? null : env.LOCAL_DELIVERY_FEE_ARS,
-        coordinate: env.LOCAL_DELIVERY_COORDINATE,
-      },
-      enviopack: {
-        enabled: Boolean(env.ENVIOPACK_API_KEY && env.ENVIOPACK_SECRET_KEY),
-      },
-    },
-  })
+shippingRouter.get('/methods', async (_req, res) => {
+  res.json({ data: await getShippingSettingsPublic() })
 })
 
 const quoteLimiter = rateLimit({
@@ -107,12 +88,18 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
   }
 
   try {
+    const credentials = await getEnviopackCredentials()
+    if (!credentials) {
+      res.status(503).json({ error: { code: 'SHIPPING_PROVIDER_NOT_CONFIGURED', message: 'Envíopack no está habilitado o todavía no tiene credenciales configuradas en Administración > Envíos.' } })
+      return
+    }
     const options = await quoteHomeDelivery({
       provinceCode: input.provinceCode,
       postalCode: input.postalCode,
       weightGrams,
       packages,
       originAddressId: origin.enviopackAddressId,
+      credentials,
     })
     if (options.length === 0) {
       res.status(422).json({ error: { code: 'SHIPPING_UNAVAILABLE', message: 'Envíopack no encontró servicios disponibles para ese código postal.' } })
