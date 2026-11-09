@@ -130,7 +130,7 @@ export default function ShippingOriginsPanel({ token }: { token: string }) {
     <section className="admin-category-card">
       <div className="admin-category-heading">
         <h2>Depósitos de despacho</h2>
-        <p>Configurá desde dónde se preparan los envíos. El identificador corresponde al depósito registrado en Envíopack.</p>
+        <p>Configurá los orígenes de despacho. Para cotizar a domicilio, Envíopack utiliza el depósito predeterminado de tu cuenta; el ID local queda disponible para la futura generación de etiquetas.</p>
       </div>
       <div className="admin-category-actions">
         <button type="button" className="admin-primary" onClick={() => { setExpanded((value) => !value); if (expanded) resetForm() }}>
