@@ -1,49 +1,51 @@
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 enum ProductStatus {
   DRAFT
   ACTIVE
   ARCHIVED
 }
-
+model AdminUser {
+  id String @id @default(uuid())
+  email String @unique
+  passwordHash String
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 model Category {
-  id          String    @id @default(uuid())
-  name        String
-  slug        String    @unique
+  id String @id @default(uuid())
+  name String
+  slug String @unique
   description String?
-  products    Product[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
+  products Product[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   @@index([name])
 }
-
 model Product {
-  id              String        @id @default(uuid())
-  sku             String        @unique
-  slug            String        @unique
-  name            String
-  description     String
-  priceArs        Int
-  compareAtArs    Int?
-  stock           Int           @default(0)
-  status          ProductStatus @default(DRAFT)
-  featured        Boolean       @default(false)
-  badge           String?
-  imageUrl        String?
-  specs           String[]      @default([])
-  categoryId      String
-  category        Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
+  id String @id @default(uuid())
+  sku String @unique
+  slug String @unique
+  name String
+  description String
+  priceArs Int
+  compareAtArs Int?
+  stock Int @default(0)
+  status ProductStatus @default(DRAFT)
+  featured Boolean @default(false)
+  badge String?
+  imageUrl String?
+  specs String[] @default([])
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   @@index([status, categoryId])
   @@index([featured, createdAt])
   @@index([name])

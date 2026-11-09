@@ -94,7 +94,7 @@ docker-compose.yml    # PostgreSQL local
 
 1. Conectar el frontend con la API y trasladar los productos demostrativos a PostgreSQL.
 2. Definir identidad comercial y validar proveedores, catálogo real, precios, stock y logística nacional.
-3. Incorporar administración de productos, inventario y pedidos.
+3. Incorporar administración protegida de productos e inventario (API inicial implementada; interfaz administrativa pendiente).
 4. Implementar checkout y pagos reales; verificar pagos siempre desde el backend.
 5. Incorporar políticas comerciales, privacidad, cambios, devoluciones, garantías y atención.
 

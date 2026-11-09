@@ -1,4 +1,7 @@
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+import { config } from 'dotenv'
+config()
 
 const prisma = new PrismaClient()
 
@@ -24,6 +27,16 @@ const catalog = [
 ]
 
 async function main() {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase()
+  const adminPassword = process.env.ADMIN_PASSWORD
+  if (adminEmail && adminPassword) {
+    const passwordHash = await bcrypt.hash(adminPassword, 12)
+    await prisma.adminUser.upsert({ where: { email: adminEmail }, update: { passwordHash, isActive: true }, create: { email: adminEmail, passwordHash } })
+    console.log('Usuario administrador inicial configurado.')
+  } else {
+    console.log('ADMIN_EMAIL/ADMIN_PASSWORD no definidos: se omite la creación del administrador.')
+  }
+
   for (const group of catalog) {
     const category = await prisma.category.upsert({
       where: { slug: group.slug },
