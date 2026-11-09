@@ -26,6 +26,7 @@ export type ShippingOption = {
   priceArs: number
   estimatedHours: number | null
   sellerOptions: SellerShippingOption[]
+  sellerCostStatus: 'AVAILABLE' | 'UNAVAILABLE'
 }
 
 let cachedToken: { value: string; expiresAt: number } | null = null
@@ -118,7 +119,13 @@ export async function quoteHomeDelivery(input: {
     sellerUrl.searchParams.set('modalidad', 'D')
     sellerUrl.searchParams.set('despacho', 'D')
     sellerUrl.searchParams.set('servicio', serviceCode)
-    const sellerQuotes = await getQuotePayload(sellerUrl)
+    let sellerQuotes: EnviopackQuoteResponse[] = []
+    try {
+      sellerQuotes = await getQuotePayload(sellerUrl)
+    } catch {
+      sellerCostsByService.set(serviceCode, [])
+      return
+    }
     const sellerOptions = sellerQuotes.flatMap((quote) => {
       const cost = Number(quote.valor)
       const carrierId = quote.correo?.id
@@ -149,6 +156,7 @@ export async function quoteHomeDelivery(input: {
       priceArs: Math.round(price),
       estimatedHours: Number.isFinite(hours) && hours > 0 ? hours : null,
       sellerOptions: sellerCostsByService.get(serviceCode) || [],
+      sellerCostStatus: (sellerCostsByService.get(serviceCode)?.length || 0) > 0 ? 'AVAILABLE' : 'UNAVAILABLE',
     }]
   })
 }
