@@ -37,12 +37,17 @@ async function getAccessToken(): Promise<string> {
     'api-key': env.ENVIOPACK_API_KEY,
     'secret-key': env.ENVIOPACK_SECRET_KEY,
   })
-  const response = await fetch('https://api.enviopack.com/auth', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body,
-    signal: AbortSignal.timeout(15000),
-  })
+  let response: Response
+  try {
+    response = await fetch('https://api.enviopack.com/auth', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body,
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch {
+    throw new ShippingProviderError('No se pudo conectar con Envíopack. Intentá nuevamente en unos minutos.')
+  }
   if (!response.ok) throw new ShippingProviderError('Envíopack no pudo autenticar la cuenta. Revisá las credenciales.')
   const payload = await response.json() as { access_token?: string }
   if (!payload.access_token) throw new ShippingProviderError('Envíopack devolvió una respuesta de autenticación inválida.')
@@ -74,7 +79,12 @@ export async function quoteHomeDelivery(input: {
     .map((item) => `${item.heightCm}x${item.widthCm}x${item.lengthCm}`)
     .join(','))
 
-  const response = await fetch(url, { signal: AbortSignal.timeout(20000) })
+  let response: Response
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(20000) })
+  } catch {
+    throw new ShippingProviderError('No se pudo conectar con Envíopack para cotizar el envío. Intentá nuevamente.')
+  }
   if (!response.ok) throw new ShippingProviderError('Envíopack no pudo calcular el envío para ese destino.')
   const payload = await response.json() as EnviopackQuoteResponse[]
   if (!Array.isArray(payload)) throw new ShippingProviderError('Envíopack devolvió una cotización inválida.')
