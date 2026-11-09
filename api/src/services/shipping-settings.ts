@@ -48,15 +48,19 @@ export async function getShippingSettingsPublic() {
   }
 }
 
-export async function getEnviopackCredentials() {
+export async function getStoredEnviopackCredentials() {
   const settings = await getShippingSettings()
-  if (!settings.enviopackEnabled || !settings.enviopackApiKeyEncrypted || !settings.enviopackSecretKeyEncrypted) {
-    return null
-  }
+  if (!settings.enviopackApiKeyEncrypted || !settings.enviopackSecretKeyEncrypted) return null
   return {
     apiKey: decryptSecret(settings.enviopackApiKeyEncrypted),
     secretKey: decryptSecret(settings.enviopackSecretKeyEncrypted),
   }
+}
+
+export async function getEnviopackCredentials() {
+  const settings = await getShippingSettings()
+  if (!settings.enviopackEnabled) return null
+  return getStoredEnviopackCredentials()
 }
 
 export async function saveShippingSettings(input: {
