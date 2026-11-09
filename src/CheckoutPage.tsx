@@ -65,6 +65,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [quoteError, setQuoteError] = useState('')
   const [quoteExpired, setQuoteExpired] = useState(false)
+  const [quoteExpired, setQuoteExpired] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
@@ -72,13 +73,31 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const cartKey = cart.map((line) => `${line.product.id}:${line.quantity}`).sort().join('|')
   const selectedOption = quote?.options.find((option) => option.key === selectedOptionKey) || null
   const provinceName = PROVINCES.find(([code]) => code === provinceCode)?.[1] || ''
-  const quoteExpired = quote ? new Date(quote.expiresAt).getTime() <= Date.now() : false
+  const displayedSubtotal = quote?.subtotalArs ?? subtotal
 
   useEffect(() => {
+    if (!quote) {
+      setQuoteExpired(false)
+      return
+    }
+    const remaining = new Date(quote.expiresAt).getTime() - Date.now()
+    if (remaining <= 0) {
+      setQuoteExpired(true)
+      return
+    }
+    const expiryTimer = window.setTimeout(() => setQuoteExpired(true), remaining)
+    return () => window.clearTimeout(expiryTimer)
+  }, [quote])
+
+  useEffect(() => {
+    const controller = new AbortController()
     setQuote(null)
     setSelectedOptionKey('')
     setQuoteError('')
-    if (!provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) return
+    setQuoteLoading(false)
+    if (!provinceCode || !/^\\d{4}$/.test(postalCode) || cart.length === 0) {
+      return () => controller.abort()
+    }
 
     const timeout = window.setTimeout(async () => {
       setQuoteLoading(true)
