@@ -185,9 +185,9 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
 }
 
 export async function refreshEnviopackShipment(shipmentId: string) {
-  const shipment = await requestEnviopack<EnviopackResponse>(`/envios/${encodeURIComponent(shipmentId)}`)
   const order = await prisma.order.findFirst({ where: { enviopackShipmentId: shipmentId } })
   if (!order) return null
+  const shipment = await requestEnviopack<EnviopackResponse>(`/envios/${encodeURIComponent(shipmentId)}`)
   const processed = shipment.estado === 'P'
   await prisma.$transaction(async (tx) => {
     await tx.order.update({
