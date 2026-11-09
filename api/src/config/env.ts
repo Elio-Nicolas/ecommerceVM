@@ -10,5 +10,16 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
   SUPABASE_BUCKET: z.string().min(1).default('product-images'),
+  // Legacy bootstrap only: imported once into ShippingSettings, then managed in admin.
+  ENVIOPACK_API_KEY: z.string().min(1).optional(),
+  ENVIOPACK_SECRET_KEY: z.string().min(1).optional(),
+  PICKUP_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
+  PICKUP_ADDRESS: z.string().default('Domicilio del vendedor'),
+  PICKUP_INSTRUCTIONS: z.string().default('La dirección exacta y el horario se coordinarán luego de confirmar el pedido.'),
+  LOCAL_DELIVERY_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
+  LOCAL_DELIVERY_POSTAL_CODES: z.string().default('5730'),
+  LOCAL_DELIVERY_FEE_ARS: z.coerce.number().int().min(0).max(2_000_000_000).default(0),
+  LOCAL_DELIVERY_INTERNAL_COST_ARS: z.coerce.number().int().min(0).max(2_000_000_000).optional(),
+  LOCAL_DELIVERY_COORDINATE: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
 })
 export const env = envSchema.parse(process.env)
