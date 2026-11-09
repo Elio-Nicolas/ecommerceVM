@@ -37,6 +37,10 @@ export class ShippingProviderError extends Error {
   }
 }
 
+export async function testEnviopackCredentials(credentials: { apiKey: string; secretKey: string }): Promise<void> {
+  await getAccessToken(credentials)
+}
+
 async function getAccessToken(credentials: { apiKey: string; secretKey: string }): Promise<string> {
   const credentialKey = `${credentials.apiKey}:${credentials.secretKey}`
   if (cachedToken && cachedToken.expiresAt > Date.now() && cachedToken.credentialKey === credentialKey) return cachedToken.value
