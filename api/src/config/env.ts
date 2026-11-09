@@ -10,5 +10,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
   SUPABASE_BUCKET: z.string().min(1).default('product-images'),
+  ENVIOPACK_API_KEY: z.string().min(1).optional(),
+  ENVIOPACK_SECRET_KEY: z.string().min(1).optional(),
 })
 export const env = envSchema.parse(process.env)
