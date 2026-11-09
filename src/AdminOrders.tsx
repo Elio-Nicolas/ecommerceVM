@@ -298,7 +298,7 @@ export default function AdminOrders() {
                 {activeOrder.enviopackTrackingNumber && <strong>Seguimiento: {activeOrder.enviopackTrackingNumber}</strong>}{activeOrder.enviopackLabelSavedAt && <small>Etiqueta archivada para reimpresión · {formatDate(activeOrder.enviopackLabelSavedAt)}</small>}
                 <div className="admin-category-actions">
                   <button type="button" className="admin-quiet-button" disabled={shippingSaving} onClick={() => void refreshEnviopack(activeOrder)}>Actualizar estado</button>
-                  {activeOrder.enviopackShipmentStatus === 'P' && <button type="button" className="admin-primary" disabled={shippingSaving} onClick={() => void downloadEnviopackLabel(activeOrder)}>Descargar etiqueta PDF</button>}
+                  {(activeOrder.enviopackShipmentStatus === 'P' || activeOrder.enviopackLabelSavedAt) && <button type="button" className="admin-primary" disabled={shippingSaving} onClick={() => void downloadEnviopackLabel(activeOrder)}>Descargar etiqueta PDF</button>}
                 </div>
                 {Array.isArray(activeOrder.enviopackPackages) && <small>Bultos registrados: {activeOrder.enviopackPackages.length}</small>}
               </div> : activeOrder.status === 'PREPARING' ? <form className="order-shipping-form" onSubmit={(event) => {
