@@ -133,7 +133,11 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
   })))
   let existingShipments: EnviopackResponse[] = []
   try {
-    existingShipments = await requestEnviopack<EnviopackResponse[]>('/pedidos/' + encodeURIComponent(enviopackOrderId) + '/envios')
+    const linkedOrder = await requestEnviopack<{ envios_asociados?: EnviopackResponse[] }>('/pedidos/obtener-ids', {
+      method: 'POST',
+      body: JSON.stringify({ id_externo: order.code, plataforma: 'web' }),
+    })
+    existingShipments = Array.isArray(linkedOrder.envios_asociados) ? linkedOrder.envios_asociados : []
   } catch (error) {
     if (!(error instanceof EnviopackShipmentError && error.statusCode === 404)) throw error
   }
