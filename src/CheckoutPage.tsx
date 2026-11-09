@@ -76,6 +76,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
+  const [coverageNoticeOpen, setCoverageNoticeOpen] = useState(false)
 
   const cartKey = cart.map((line) => `${line.product.id}:${line.quantity}`).sort().join('|')
   const selectedOption = quote?.options.find((option) => option.key === selectedOptionKey) || null
@@ -84,6 +85,14 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const localDeliveryAvailable = Boolean(deliveryMethods?.localDelivery.enabled && deliveryMethods.localDelivery.postalCodes.includes(postalCode))
   const selectedShippingPrice = deliveryMethod === 'PICKUP' ? 0 : deliveryMethod === 'LOCAL_DELIVERY' ? (deliveryMethods?.localDelivery.priceArs ?? 0) : (selectedOption?.priceArs ?? 0)
   const canSubmit = deliveryMethod === 'PICKUP' ? Boolean(deliveryMethods?.pickup.enabled) : deliveryMethod === 'LOCAL_DELIVERY' ? localDeliveryAvailable : Boolean(quote && selectedOption && !quoteExpired)
+
+  useEffect(() => {
+    if (deliveryMethod === 'LOCAL_DELIVERY' && /^\\d{4}$/.test(postalCode) && deliveryMethods?.localDelivery.enabled && !localDeliveryAvailable) {
+      setCoverageNoticeOpen(true)
+    } else {
+      setCoverageNoticeOpen(false)
+    }
+  }, [deliveryMethod, postalCode, deliveryMethods, localDeliveryAvailable])
 
   useEffect(() => {
     fetch(`${API_URL}/api/v1/shipping/methods`).then((response) => response.json()).then((payload) => {
@@ -215,6 +224,14 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
 
   return (
     <main className="checkout-page">
+      {coverageNoticeOpen && <div className="checkout-modal-backdrop" role="presentation" onClick={() => setCoverageNoticeOpen(false)}>
+        <section className="checkout-modal" role="alertdialog" aria-modal="true" aria-labelledby="coverage-notice-title" onClick={(event) => event.stopPropagation()}>
+          <div className="checkout-modal-icon" aria-hidden="true">!</div>
+          <h2 id="coverage-notice-title">No llegamos a tu zona todavía</h2>
+          <p>No realizamos entregas locales en este código postal. Podés elegir retiro por domicilio del vendedor u otro método de envío disponible.</p>
+          <button type="button" className="checkout-submit" onClick={() => setCoverageNoticeOpen(false)}>Entendido</button>
+        </section>
+      </div>}
       <div className="checkout-top">
         <button type="button" className="checkout-back" onClick={onBack}>← Volver al carrito</button>
         <span className="checkout-eyebrow">FINALIZAR PEDIDO</span>
