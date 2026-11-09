@@ -13,6 +13,7 @@ type Order = {
   customerPhone: string; addressLine: string; city: string; province: string; postalCode: string | null
   customerNotes: string | null; subtotalArs: number; shippingCostArs: number | null; totalArs: number | null
   shippingCarrier: string | null; trackingCode: string | null; shippingService: string | null; shippingEstimatedHours: number | null
+  deliveryMethod: 'ENVIOPACK' | 'LOCAL_DELIVERY' | 'PICKUP'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
   shippingCostOptions: { priceArs?: number; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
 }
@@ -202,12 +203,13 @@ export default function AdminOrders() {
             <div className="admin-form-heading"><div><span className="admin-kicker">PEDIDO {activeOrder.code}</span><h2>Detalle del pedido</h2></div><button className="admin-quiet-button" onClick={() => setSelected(null)}>Cerrar</button></div>
             <div className="order-detail-grid">
               <div><span>CLIENTE</span><strong>{activeOrder.customerName}</strong><small>{activeOrder.customerPhone}</small><small>{activeOrder.customerEmail || 'Sin correo informado'}</small></div>
-              <div><span>ENTREGA</span><strong>{activeOrder.addressLine}</strong><small>{[activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(' · ')}</small></div>
+              <div><span>MODALIDAD DE ENTREGA</span><strong>{activeOrder.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : 'Envíopack'}</strong><small>{activeOrder.deliveryInstructions || [activeOrder.addressLine, activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(' · ')}</small></div>
               <div><span>NOTAS</span><strong>{activeOrder.customerNotes || 'Sin indicaciones adicionales'}</strong></div>
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
             <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de cotización · Total final: pendiente' : `Envío: ${formatPrice(activeOrder.shippingCostArs)} · Total: ${formatPrice(activeOrder.totalArs ?? activeOrder.subtotalArs + activeOrder.shippingCostArs)}`}</small></div>
-            {activeOrder.shippingCarrier && <div className="order-shipping-meta"><span>OPERADOR</span><strong>{activeOrder.shippingCarrier}</strong>{activeOrder.shippingService && <><span>SERVICIO</span><strong>{activeOrder.shippingService}</strong></>}{activeOrder.shippingEstimatedHours && <><span>PLAZO ESTIMADO</span><strong>{Math.ceil(activeOrder.shippingEstimatedHours / 24)} días</strong></>}{activeOrder.trackingCode && <><span>SEGUIMIENTO</span><strong>{activeOrder.trackingCode}</strong></>}</div>}
+            {activeOrder.deliveryMethod !== 'PICKUP' && activeOrder.shippingCarrier && <div className="order-shipping-meta"><span>OPERADOR</span><strong>{activeOrder.shippingCarrier}</strong>{activeOrder.shippingService && <><span>SERVICIO</span><strong>{activeOrder.shippingService}</strong></>}{activeOrder.shippingEstimatedHours && <><span>PLAZO ESTIMADO</span><strong>{Math.ceil(activeOrder.shippingEstimatedHours / 24)} días</strong></>}{activeOrder.trackingCode && <><span>SEGUIMIENTO</span><strong>{activeOrder.trackingCode}</strong></>}</div>}
+            {activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingInternalCostArs !== null && <section className="order-logistics-breakdown"><div><span className="admin-kicker">INFORMACIÓN INTERNA · SOLO ADMINISTRACIÓN</span><h3>Costo estimado de entrega local</h3></div><div className="order-logistics-summary"><span>Costo interno estimado</span><strong>{formatPrice(activeOrder.shippingInternalCostArs)}</strong><small>Importe configurado para esta modalidad; no es una liquidación definitiva.</small></div></section>}
             {activeOrder.shippingCostOptions && <section className="order-logistics-breakdown">
               <div><span className="admin-kicker">INFORMACIÓN INTERNA · SOLO ADMINISTRACIÓN</span><h3>Desglose de costos logísticos</h3><p>El comprador solo ve el precio de envío. Estos son los costos estimados que Envíopack informa para la tienda.</p></div>
               <div className="order-logistics-summary"><span>Precio cobrado al cliente</span><strong>{formatPrice(activeOrder.shippingCostOptions.priceArs ?? activeOrder.shippingCostArs ?? 0)}</strong></div>
@@ -226,7 +228,7 @@ export default function AdminOrders() {
             <div className="order-history"><h3>Historial de estados</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{statusLabels[entry.toStatus]}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {nextStatuses[activeOrder.status].length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{nextStatuses[activeOrder.status].map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
           </section>}
-          <p className="admin-footnote">Los pedidos se registran con una cotización de envío vigente de Envíopack. El pago todavía no está habilitado; el seguimiento se completará al generar la etiqueta.</p>
+          <p className="admin-footnote">Los pedidos pueden registrarse con retiro, entrega local o Envíopack. El pago todavía no está habilitado.</p>
         </section>
       </main>
     </div>
