@@ -76,6 +76,21 @@ model ShippingOrigin {
   updatedAt DateTime @updatedAt
   @@index([isActive, isDefault])
 }
+model ShippingSettings {
+  id String @id @default("default")
+  enviopackEnabled Boolean @default(false)
+  enviopackApiKeyEncrypted String?
+  enviopackSecretKeyEncrypted String?
+  pickupEnabled Boolean @default(true)
+  pickupAddress String @default("Domicilio del vendedor")
+  pickupInstructions String @default("La dirección exacta y el horario se coordinarán luego de confirmar el pedido.")
+  localDeliveryEnabled Boolean @default(false)
+  localDeliveryPostalCodes String[] @default([])
+  localDeliveryFeeArs Int @default(0)
+  localDeliveryInternalCostArs Int?
+  localDeliveryCoordinate Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
 model Order {
   id String @id @default(uuid())
   code String @unique
@@ -93,6 +108,14 @@ model Order {
   totalArs Int?
   shippingCarrier String?
   trackingCode String?
+  shippingService String?
+  shippingEstimatedHours Int?
+  shippingQuoteId String?
+  shippingOptionKey String?
+  shippingCostOptions Json?
+  deliveryMethod String @default("ENVIOPACK")
+  shippingInternalCostArs Int?
+  deliveryInstructions String?
   items OrderItem[]
   history OrderStatusHistory[]
   createdAt DateTime @default(now())
@@ -100,6 +123,18 @@ model Order {
   @@index([status, createdAt])
   @@index([customerPhone])
   @@index([customerName])
+}
+model ShippingQuote {
+  id String @id @default(uuid())
+  provinceCode String
+  postalCode String
+  cartFingerprint String
+  subtotalArs Int
+  options Json
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([expiresAt, usedAt])
 }
 model OrderItem {
   id String @id @default(uuid())

@@ -4,6 +4,8 @@ import { rateLimit } from 'express-rate-limit'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
+import { getShippingSettings } from '../services/shipping-settings'
+import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 
 export const ordersRouter = Router()
 
@@ -22,7 +24,11 @@ const createOrderSchema = z.object({
   addressLine: z.string().trim().min(4).max(180),
   city: z.string().trim().min(2).max(100),
   province: z.string().trim().min(2).max(100),
-  postalCode: z.string().trim().max(20).optional().transform((value) => value || null),
+  postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
+  provinceCode: z.string().length(1).regex(/^[A-Z]$/).optional(),
+  deliveryMethod: z.enum(['ENVIOPACK', 'LOCAL_DELIVERY', 'PICKUP']).default('ENVIOPACK'),
+  shippingQuoteId: z.string().uuid().optional(),
+  shippingOptionKey: z.string().trim().min(1).max(40).optional(),
   customerNotes: z.string().trim().max(1000).optional().transform((value) => value || null),
   items: z.array(z.object({
     productId: z.string().uuid(),
@@ -45,13 +51,76 @@ class OrderConflictError extends Error {
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
   try {
+    const deliverySettings = await getShippingSettings()
     const order = await prisma.$transaction(async (tx) => {
+      const now = new Date()
+      let selectedOption: Prisma.JsonObject | undefined
+      let shippingCostArs: number | null = 0
+      let shippingCarrier: string | null = null
+      let shippingService: string | null = null
+      let shippingEstimatedHours: number | null = null
+      let shippingQuoteId: string | null = null
+      let shippingInternalCostArs: number | null = null
+      let deliveryInstructions: string | null = null
+
+      if (input.deliveryMethod === 'PICKUP') {
+        if (!deliverySettings.pickupEnabled) throw new OrderConflictError('El retiro por domicilio no está disponible.')
+        shippingCarrier = 'Retiro por domicilio'
+        shippingService = 'Retiro coordinado'
+        deliveryInstructions = `${deliverySettings.pickupAddress}. ${deliverySettings.pickupInstructions}`
+      } else if (input.deliveryMethod === 'LOCAL_DELIVERY') {
+        if (!deliverySettings.localDeliveryEnabled || !deliverySettings.localDeliveryPostalCodes.includes(input.postalCode)) {
+          throw new OrderConflictError('La entrega local no está disponible para ese código postal.')
+        }
+        shippingCostArs = deliverySettings.localDeliveryCoordinate ? null : deliverySettings.localDeliveryFeeArs
+        shippingCarrier = 'Entrega local'
+        shippingService = deliverySettings.localDeliveryCoordinate ? 'A coordinar' : 'Entrega local'
+        shippingInternalCostArs = deliverySettings.localDeliveryInternalCostArs
+        deliveryInstructions = deliverySettings.localDeliveryCoordinate ? 'El costo de entrega se coordinará luego de confirmar el pedido.' : null
+      } else {
+        if (!input.shippingQuoteId || !input.shippingOptionKey || !input.provinceCode) {
+          throw new OrderConflictError('Seleccioná una cotización vigente de Envíopack.')
+        }
+        const quote = await tx.shippingQuote.findFirst({
+          where: {
+            id: input.shippingQuoteId,
+            provinceCode: input.provinceCode,
+            postalCode: input.postalCode,
+            expiresAt: { gt: now },
+            usedAt: null,
+          },
+        })
+        if (!quote) throw new OrderConflictError('La cotización de envío venció o ya no corresponde al carrito. Volvé a cotizar.')
+        const quoteOptions = Array.isArray(quote.options) ? quote.options : []
+        selectedOption = quoteOptions.find((option) =>
+          typeof option === 'object' && option !== null && !Array.isArray(option) && option.key === input.shippingOptionKey,
+        ) as Prisma.JsonObject | undefined
+        if (!selectedOption) throw new OrderConflictError('La opción de envío seleccionada ya no está disponible. Volvé a cotizar.')
+        shippingCostArs = Number(selectedOption.priceArs)
+        shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : 'Envíopack'
+        shippingService = typeof selectedOption.serviceLabel === 'string' ? selectedOption.serviceLabel : 'Envío estándar'
+        shippingEstimatedHours = typeof selectedOption.estimatedHours === 'number' ? selectedOption.estimatedHours : null
+        if (!Number.isSafeInteger(shippingCostArs) || shippingCostArs < 0) throw new OrderConflictError('El importe del envío no es válido. Volvé a cotizar.')
+        const quoteUse = await tx.shippingQuote.updateMany({
+          where: { id: quote.id, usedAt: null, expiresAt: { gt: now } },
+          data: { usedAt: now },
+        })
+        if (quoteUse.count !== 1) throw new OrderConflictError('La cotización ya fue utilizada. Volvé a cotizar.')
+        shippingQuoteId = quote.id
+      }
+
       const products = await tx.product.findMany({
         where: { id: { in: input.items.map((item) => item.productId) }, status: 'ACTIVE' },
-        select: { id: true, sku: true, name: true, priceArs: true, stock: true },
+        select: { id: true, sku: true, name: true, priceArs: true, stock: true, weightGrams: true, packageLengthCm: true, packageWidthCm: true, packageHeightCm: true },
       })
       if (products.length !== input.items.length) {
         throw new OrderConflictError('Uno o más productos ya no están disponibles. Actualizá el carrito.')
+      }
+      if (input.deliveryMethod === 'ENVIOPACK') {
+        const quote = input.shippingQuoteId ? await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } }) : null
+        if (!quote || quote.cartFingerprint !== shippingCartFingerprint(input.items, products)) {
+          throw new OrderConflictError('Los productos o sus paquetes cambiaron desde la cotización. Volvé a calcular el envío.')
+        }
       }
       const byId = new Map(products.map((product) => [product.id, product]))
       let subtotalArs = 0
@@ -69,6 +138,14 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       })
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
         throw new OrderConflictError('El importe del pedido no es válido.')
+      }
+      if (input.deliveryMethod === 'ENVIOPACK' && input.shippingQuoteId) {
+        const quote = await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } })
+        if (!quote || quote.subtotalArs !== subtotalArs) throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
+      }
+      const totalArs = shippingCostArs === null ? null : subtotalArs + shippingCostArs
+      if (totalArs !== null && (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000)) {
+        throw new OrderConflictError('El total del pedido supera el importe permitido.')
       }
       for (const item of input.items) {
         const reserved = await tx.product.updateMany({
@@ -92,6 +169,17 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           postalCode: input.postalCode,
           customerNotes: input.customerNotes,
           subtotalArs,
+          shippingCostArs,
+          totalArs,
+          shippingCarrier,
+          shippingService,
+          shippingEstimatedHours,
+          shippingQuoteId,
+          shippingOptionKey: input.shippingOptionKey || null,
+          shippingCostOptions: selectedOption ? selectedOption as Prisma.InputJsonObject : Prisma.JsonNull,
+          deliveryMethod: input.deliveryMethod,
+          shippingInternalCostArs,
+          deliveryInstructions,
           items: { create: snapshots },
           history: { create: { toStatus: 'PENDING', note: 'Pedido recibido; pendiente de confirmación.' } },
         },
@@ -109,7 +197,8 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         createdAt: order.createdAt,
         items: order.items,
       },
-      message: 'Pedido recibido. El envío y el importe final quedan sujetos a confirmación.',
+      deliveryMethod: order.deliveryMethod,
+      message: 'Pedido registrado. El pago todavía no está habilitado.',
     })
   } catch (error) {
     if (error instanceof OrderConflictError) {

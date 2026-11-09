@@ -208,3 +208,23 @@
 .order-shipping-fields input:focus{outline:2px solid #e5a59a;outline-offset:1px;border-color:#bd4937}
 .order-shipping-form>.admin-primary{align-self:flex-start;min-height:40px;padding:0 16px}
 @media(max-width:760px){.order-shipping-fields{grid-template-columns:1fr}.order-shipping-form>.admin-primary{width:100%}}
+
+
+/* Shipping settings */
+.shipping-settings-card{margin-top:18px}
+.shipping-settings-form{display:flex;flex-direction:column;gap:0}
+.shipping-setting-section{padding:22px 0;border-top:1px solid #e9edf1;display:flex;flex-direction:column;gap:16px}
+.shipping-setting-title{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.shipping-setting-title h3{margin:5px 0 4px;font-size:17px;color:#142331}
+.shipping-setting-title p{margin:0;color:#71808d;font-size:12px;line-height:1.6;max-width:620px}
+.shipping-setting-title>.admin-checkbox{white-space:nowrap;margin-top:8px}
+.shipping-credential-status{display:flex;align-items:center;gap:9px;font-size:12px;color:#53606c}
+.shipping-status-dot{width:8px;height:8px;border-radius:50%;background:#d97706;display:inline-block}
+.shipping-status-dot.is-ready{background:#16a36a}
+.shipping-credential-status button{margin-left:8px}
+.shipping-settings-help{margin:0;color:#7a8792;font-size:11px;line-height:1.6}
+.shipping-inline-check{align-self:flex-start}
+.shipping-full-field{grid-column:1/-1}
+.shipping-full-field textarea{width:100%;resize:vertical;border:1px solid #dfe4e8;border-radius:3px;padding:10px 11px;font:12px Manrope;color:#273440;background:#fff}
+.shipping-settings-actions{padding-top:18px;border-top:1px solid #e9edf1}
+@media(max-width:760px){.shipping-setting-title{flex-direction:column}.shipping-setting-title>.admin-checkbox{margin-top:0}.shipping-settings-actions>.admin-primary{width:100%}}

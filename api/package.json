@@ -13,7 +13,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "prisma:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
@@ -36,6 +37,7 @@
     "tsx": "^4.20.6",
     "typescript": "~5.8.3",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/multer": "^2.0.0"
+    "@types/multer": "^2.0.0",
+    "@types/bcryptjs": "^2.4.6"
   }
 }
