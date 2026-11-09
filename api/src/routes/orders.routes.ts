@@ -4,7 +4,7 @@ import { rateLimit } from 'express-rate-limit'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { env } from '../config/env'
+import { getShippingSettings } from '../services/shipping-settings'
 import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 
 export const ordersRouter = Router()
@@ -61,22 +61,22 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       let shippingQuoteId: string | null = null
       let shippingInternalCostArs: number | null = null
       let deliveryInstructions: string | null = null
+      const deliverySettings = await getShippingSettings()
 
       if (input.deliveryMethod === 'PICKUP') {
-        if (!env.PICKUP_ENABLED) throw new OrderConflictError('El retiro por domicilio no está disponible.')
+        if (!deliverySettings.pickupEnabled) throw new OrderConflictError('El retiro por domicilio no está disponible.')
         shippingCarrier = 'Retiro por domicilio'
         shippingService = 'Retiro coordinado'
-        deliveryInstructions = `${env.PICKUP_ADDRESS}. ${env.PICKUP_INSTRUCTIONS}`
+        deliveryInstructions = `${deliverySettings.pickupAddress}. ${deliverySettings.pickupInstructions}`
       } else if (input.deliveryMethod === 'LOCAL_DELIVERY') {
-        const allowedPostalCodes = env.LOCAL_DELIVERY_POSTAL_CODES.split(',').map((value) => value.trim()).filter(Boolean)
-        if (!env.LOCAL_DELIVERY_ENABLED || !allowedPostalCodes.includes(input.postalCode)) {
+        if (!deliverySettings.localDeliveryEnabled || !deliverySettings.localDeliveryPostalCodes.includes(input.postalCode)) {
           throw new OrderConflictError('La entrega local no está disponible para ese código postal.')
         }
-        shippingCostArs = env.LOCAL_DELIVERY_COORDINATE ? null : env.LOCAL_DELIVERY_FEE_ARS
+        shippingCostArs = deliverySettings.localDeliveryCoordinate ? null : deliverySettings.localDeliveryFeeArs
         shippingCarrier = 'Entrega local'
-        shippingService = env.LOCAL_DELIVERY_COORDINATE ? 'A coordinar' : 'Entrega local'
-        shippingInternalCostArs = env.LOCAL_DELIVERY_INTERNAL_COST_ARS ?? null
-        deliveryInstructions = env.LOCAL_DELIVERY_COORDINATE ? 'El costo de entrega se coordinará luego de confirmar el pedido.' : null
+        shippingService = deliverySettings.localDeliveryCoordinate ? 'A coordinar' : 'Entrega local'
+        shippingInternalCostArs = deliverySettings.localDeliveryInternalCostArs
+        deliveryInstructions = deliverySettings.localDeliveryCoordinate ? 'El costo de entrega se coordinará luego de confirmar el pedido.' : null
       } else {
         if (!input.shippingQuoteId || !input.shippingOptionKey || !input.provinceCode) {
           throw new OrderConflictError('Seleccioná una cotización vigente de Envíopack.')
