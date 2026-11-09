@@ -15,7 +15,7 @@ Tienda online independiente orientada al público general de Argentina. La marca
 - PostgreSQL 16 aislado para desarrollo local.
 - Prisma ORM y modelos iniciales de categorías y productos.
 - Endpoints de salud, categorías y catálogo con búsqueda, filtros y paginación.
-- El frontend todavía utiliza el catálogo local; la conexión se realizará en el siguiente bloque.
+- El frontend consume categorías y productos desde la API. Los diez productos iniciales se cargan mediante el seed de Prisma.
 
 ## Puertos locales
 
@@ -58,6 +58,7 @@ Copy-Item .env.example .env
 npm install
 npm run prisma:generate
 npm run prisma:migrate -- --name init
+npm run db:seed
 npm run dev
 ```
 
