@@ -18,3 +18,11 @@
 .checkout-shipping-expiry{margin:3px 0 0;color:#929ba4;font-size:9px}
 .checkout-summary-grand-total{display:flex;justify-content:space-between;gap:12px;margin-top:16px;padding-top:18px;border-top:1px solid #dfe4e8;font-size:14px;font-weight:800;color:#17212d}
 .checkout-summary-grand-total strong{font-size:18px;color:#bd4937}
+
+
+.checkout-modal-backdrop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:20px;background:rgba(15,23,42,.58)}
+.checkout-modal{width:min(100%,440px);padding:30px;background:#fff;border:1px solid #e7eaee;box-shadow:0 24px 80px rgba(15,23,42,.22);text-align:center}
+.checkout-modal-icon{width:42px;height:42px;margin:0 auto 16px;border-radius:50%;display:grid;place-items:center;background:#fff2ef;color:#a43d30;font-size:22px;font-weight:800}
+.checkout-modal h2{margin:0 0 12px;color:#17212d;font:800 20px Manrope,sans-serif}
+.checkout-modal p{margin:0 0 22px;color:#65717c;font-size:13px;line-height:1.7}
+.checkout-modal .checkout-submit{min-width:140px}
