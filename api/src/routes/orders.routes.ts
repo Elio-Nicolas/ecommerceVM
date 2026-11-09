@@ -66,7 +66,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         if (!env.PICKUP_ENABLED) throw new OrderConflictError('El retiro por domicilio no está disponible.')
         shippingCarrier = 'Retiro por domicilio'
         shippingService = 'Retiro coordinado'
-        deliveryInstructions = env.PICKUP_INSTRUCTIONS
+        deliveryInstructions = `${env.PICKUP_ADDRESS}. ${env.PICKUP_INSTRUCTIONS}`
       } else if (input.deliveryMethod === 'LOCAL_DELIVERY') {
         const allowedPostalCodes = env.LOCAL_DELIVERY_POSTAL_CODES.split(',').map((value) => value.trim()).filter(Boolean)
         if (!env.LOCAL_DELIVERY_ENABLED || !allowedPostalCodes.includes(input.postalCode)) {
