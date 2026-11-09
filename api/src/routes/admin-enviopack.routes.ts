@@ -85,8 +85,22 @@ enviopackWebhookRouter.get('/', enviopackWebhookLimiter, (req, res) => {
     res.status(400).send('Parámetros inválidos')
     return
   }
-  res.status(200).send('OK')
+  void prisma.order.findFirst({ where: { enviopackShipmentId: input.data.id }, select: { id: true } }).then((order) => {
+    if (!order) {
+      res.status(404).send('Envío no registrado')
+      return
+    }
+    res.status(200).send('OK')
+    void refreshEnviopackShipment(input.data.id).catch((error) => {
+      console.error('No se pudo sincronizar la notificación de Envíopack:', error)
+    })
+  }).catch((error) => {
+    console.error('No se pudo validar la notificación de Envíopack:', error)
+    res.status(500).send('Error interno')
+  })
+  /*
   void refreshEnviopackShipment(input.data.id).catch((error) => {
     console.error('No se pudo sincronizar la notificación de Envíopack:', error)
   })
+  */
 })
