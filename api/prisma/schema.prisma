@@ -75,6 +75,8 @@ model Order {
   subtotalArs Int
   shippingCostArs Int?
   totalArs Int?
+  shippingCarrier String?
+  trackingCode String?
   items OrderItem[]
   history OrderStatusHistory[]
   createdAt DateTime @default(now())
