@@ -86,7 +86,14 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const canSubmit = deliveryMethod === 'PICKUP' ? Boolean(deliveryMethods?.pickup.enabled) : deliveryMethod === 'LOCAL_DELIVERY' ? localDeliveryAvailable : Boolean(quote && selectedOption && !quoteExpired)
 
   useEffect(() => {
-    fetch(`${API_URL}/api/v1/shipping/methods`).then((response) => response.json()).then((payload) => setDeliveryMethods(payload.data as DeliveryMethods)).catch(() => setDeliveryMethods(null))
+    fetch(`${API_URL}/api/v1/shipping/methods`).then((response) => response.json()).then((payload) => {
+      const methods = payload.data as DeliveryMethods
+      setDeliveryMethods(methods)
+      if (!methods.enviopack.enabled) {
+        if (methods.pickup.enabled) setDeliveryMethod('PICKUP')
+        else if (methods.localDelivery.enabled) setDeliveryMethod('LOCAL_DELIVERY')
+      }
+    }).catch(() => setDeliveryMethods(null))
   }, [])
 
   useEffect(() => {
@@ -157,11 +164,11 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           customerName,
           customerEmail,
           customerPhone,
-          addressLine,
-          city,
-          province: provinceName,
+          addressLine: addressLine || (deliveryMethod === 'PICKUP' ? 'Retiro en domicilio del vendedor' : addressLine),
+          city: city || (deliveryMethod === 'PICKUP' ? 'A coordinar' : city),
+          province: provinceName || (deliveryMethod === 'PICKUP' ? 'San Luis' : provinceName),
           provinceCode: provinceCode || undefined,
-          postalCode,
+          postalCode: postalCode || (deliveryMethod === 'PICKUP' ? '5730' : postalCode),
           customerNotes,
           deliveryMethod,
           ...(deliveryMethod === 'ENVIOPACK' && quote && selectedOption ? { shippingQuoteId: quote.id, shippingOptionKey: selectedOption.key } : {}),
@@ -191,7 +198,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-mark">✓</div>
           <span className="checkout-eyebrow">PEDIDO REGISTRADO</span>
           <h1>¡Gracias por tu pedido!</h1>
-          <p>Recibimos tu pedido con el costo de envío calculado. El pago todavía no está habilitado.</p>
+          <p>Recibimos tu pedido. El pago todavía no está habilitado.</p>
           <div className="checkout-order-code">
             <span>CÓDIGO DE PEDIDO</span>
             <strong>{createdOrder.code}</strong>
@@ -227,15 +234,15 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <section className="checkout-card">
             <h2>Dirección de entrega</h2>
             <div className="checkout-fields">
-              <label className="checkout-field-full">Calle y altura<input required minLength={4} maxLength={180} autoComplete="street-address" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></label>
-              <label>Localidad<input required minLength={2} maxLength={100} autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} /></label>
+              <label className="checkout-field-full">Calle y altura<input required={deliveryMethod !== 'PICKUP'} minLength={4} maxLength={180} autoComplete="street-address" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></label>
+              <label>Localidad<input required={deliveryMethod !== 'PICKUP'} minLength={2} maxLength={100} autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} /></label>
               <label>Provincia
-                <select required value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
+                <select required={deliveryMethod === 'ENVIOPACK' || deliveryMethod === 'LOCAL_DELIVERY'} value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
                   <option value="">Seleccionar provincia</option>
                   {PROVINCES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                 </select>
               </label>
-              <label>Código postal<input required maxLength={4} minLength={4} inputMode="numeric" pattern="\d{4}" autoComplete="postal-code" value={postalCode} onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 4))} /></label>
+              <label>Código postal<input required={deliveryMethod !== 'PICKUP'} maxLength={4} minLength={4} inputMode="numeric" pattern="\d{4}" autoComplete="postal-code" value={postalCode} onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 4))} /></label>
               <label className="checkout-field-full">Indicaciones adicionales <span>(opcional)</span><textarea maxLength={1000} rows={3} value={customerNotes} onChange={(event) => setCustomerNotes(event.target.value)} placeholder="Piso, departamento, referencias para la entrega..." /></label>
             </div>
           </section>
