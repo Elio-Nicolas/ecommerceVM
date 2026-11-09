@@ -51,6 +51,9 @@ class OrderConflictError extends Error {
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
   try {
+    if (input.deliveryMethod === 'ENVIOPACK' && !input.customerEmail) {
+      throw new OrderConflictError('Para realizar un envío por Envíopack necesitamos el correo electrónico del comprador.')
+    }
     const deliverySettings = await getShippingSettings()
     const order = await prisma.$transaction(async (tx) => {
       const now = new Date()
