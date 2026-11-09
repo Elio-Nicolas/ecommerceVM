@@ -64,6 +64,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [selectedOptionKey, setSelectedOptionKey] = useState('')
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [quoteError, setQuoteError] = useState('')
+  const [quoteExpired, setQuoteExpired] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
@@ -85,6 +86,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
         const response = await fetch(`${API_URL}/api/v1/shipping/quotes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             provinceCode,
             postalCode,
@@ -98,15 +100,15 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
         if (!response.ok || !payload.data) {
           throw new Error(payload.error?.message || 'No pudimos calcular el envío.')
         }
-        setQuote(payload.data)
+        if (!controller.signal.aborted) setQuote(payload.data)
       } catch (cause) {
-        setQuoteError(cause instanceof Error ? cause.message : 'No pudimos calcular el envío.')
+        if (!controller.signal.aborted) setQuoteError(cause instanceof Error ? cause.message : 'No pudimos calcular el envío.')
       } finally {
-        setQuoteLoading(false)
+        if (!controller.signal.aborted) setQuoteLoading(false)
       }
     }, 500)
 
-    return () => window.clearTimeout(timeout)
+    return () => { window.clearTimeout(timeout); controller.abort() }
   }, [provinceCode, postalCode, cartKey])
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
@@ -245,9 +247,9 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
               </div>
             ))}
           </div>
-          <div className="checkout-summary-total"><span>Subtotal</span><strong>{formatPrice(subtotal)}</strong></div>
+          <div className="checkout-summary-total"><span>Subtotal</span><strong>{formatPrice(displayedSubtotal)}</strong></div>
           <div className="checkout-summary-total"><span>Envío</span><strong>{selectedOption ? formatPrice(selectedOption.priceArs) : 'A calcular'}</strong></div>
-          <div className="checkout-summary-grand-total"><span>Total</span><strong>{formatPrice(subtotal + (selectedOption?.priceArs || 0))}</strong></div>
+          <div className="checkout-summary-grand-total"><span>Total</span><strong>{formatPrice(displayedSubtotal + (selectedOption?.priceArs || 0))}</strong></div>
           <p className="checkout-summary-note">El importe del envío se obtiene de Envíopack. El total queda confirmado al registrar el pedido.</p>
         </aside>
       </div>
