@@ -36,6 +36,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
   const [clearCredentials, setClearCredentials] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -64,6 +65,28 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
 
   function update<K extends keyof ShippingSettings>(key: K, value: ShippingSettings[K]) {
     setSettings((current) => ({ ...current, [key]: value }))
+  }
+
+  async function testConnection() {
+    if (testing) return
+    if (Boolean(apiKey.trim()) !== Boolean(secretKey.trim())) {
+      setError('Ingresá la API Key y la Secret Key juntas para probar la conexión.')
+      return
+    }
+    setTesting(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await request<{ message: string }>('/admin/shipping-settings/test', {
+        method: 'POST',
+        body: JSON.stringify({ ...(apiKey.trim() && secretKey.trim() ? { apiKey: apiKey.trim(), secretKey: secretKey.trim() } : {}) }),
+      })
+      setNotice(result.message || 'Conexión con Envíopack verificada correctamente.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo verificar la conexión.')
+    } finally {
+      setTesting(false)
+    }
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -120,7 +143,8 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
             <label>API Key<input type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings.enviopackConfigured && !clearCredentials ? 'Credencial guardada · dejar vacío para conservar' : 'Ingresar API Key'} /></label>
             <label>Secret Key<input type="password" autoComplete="new-password" value={secretKey} onChange={(event) => setSecretKey(event.target.value)} placeholder={settings.enviopackConfigured && !clearCredentials ? 'Credencial guardada · dejar vacío para conservar' : 'Ingresar Secret Key'} /></label>
           </div>
-          <div className="shipping-credential-status"><span className={settings.enviopackConfigured && !clearCredentials ? 'shipping-status-dot is-ready' : 'shipping-status-dot'} />{settings.enviopackConfigured && !clearCredentials ? 'Credenciales almacenadas' : 'Credenciales pendientes'}{settings.enviopackConfigured && <button type="button" className="archive-action" onClick={() => { setClearCredentials((value) => { update('enviopackEnabled', value ? settings.enviopackEnabled : false); return !value }); setApiKey(''); setSecretKey('') }}>{clearCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales'}</button>}</div>
+          <div className="shipping-credential-status"><span className={settings.enviopackConfigured && !clearCredentials ? 'shipping-status-dot is-ready' : 'shipping-status-dot'} />{settings.enviopackConfigured && !clearCredentials ? 'Credenciales almacenadas' : 'Credenciales pendientes'}{settings.enviopackConfigured && <button type="button" className="archive-action" onClick={() => { const next = !clearCredentials; setClearCredentials(next); setApiKey(''); setSecretKey(''); if (next) update('enviopackEnabled', false) }}>{clearCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales'}</button>}</div>
+          <div className="admin-category-actions"><button type="button" className="admin-quiet-button" onClick={() => void testConnection()} disabled={testing}>{testing ? 'Probando conexión...' : 'Probar conexión con Envíopack'}</button></div>
           <p className="shipping-settings-help">Para cotizar también necesitás configurar un depósito predeterminado en la sección “Depósitos de despacho” y completar peso y dimensiones en cada producto.</p>
         </section>
 
