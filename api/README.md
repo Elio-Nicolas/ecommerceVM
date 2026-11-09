@@ -46,4 +46,4 @@ Cada producto publicado que se envíe debe tener peso y dimensiones del paquete 
 - POST `/api/v1/shipping/quotes` (público, limitado por IP)
 - POST `/api/v1/orders` (requiere una cotización vigente y una opción seleccionada)
 
-La cotización inicial devuelve servicios configurados por Envíopack (por ejemplo estándar/prioritario). El endpoint documentado de precio a domicilio no garantiza devolver el nombre de cada correo; no se muestra un transportista específico si Envíopack no lo informa.
+La integración consulta dos endpoints distintos: `/cotizar/precio/a-domicilio` para el precio que paga el comprador y `/cotizar/costo` para los costos que paga la tienda por cada transportista. Son importes diferentes y no se deben intercambiar. El checkout recibe exclusivamente el precio del comprador; los costos de transportistas quedan guardados en el pedido y visibles solo en Administración, con una diferencia estimada entre ambos. El costo definitivo puede variar al generar la etiqueta.
