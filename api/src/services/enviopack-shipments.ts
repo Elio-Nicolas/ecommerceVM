@@ -150,6 +150,9 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
     if (!(error instanceof EnviopackShipmentError && error.statusCode === 404)) throw error
   }
   const pendingShipment = existingShipments.find((item) => item.estado !== 'P' && item.id)
+  if (existingShipments.some((item) => item.id) && !pendingShipment) {
+    throw new EnviopackShipmentError('Este pedido ya tiene un envío procesado en Envíopack, pero no está vinculado en ecommerceVM. Revisá el historial antes de generar otro para evitar un segundo despacho.')
+  }
   if (pendingShipment && !order.enviopackPackages) {
     throw new EnviopackShipmentError('Ya existe un envío pendiente en Envíopack sin un registro local de sus bultos. Revisá ese envío en Envíopack antes de continuar para evitar duplicados o datos de embalaje incorrectos.')
   }
