@@ -3,6 +3,8 @@ name: ecommerceVM CI
 on:
   pull_request:
     branches: [main, fix/admin-shipping-method-guard]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
   push:
     branches: [main, feature/enviopack-checkout, 'feat/**']
 
