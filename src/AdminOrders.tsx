@@ -316,7 +316,7 @@ export default function AdminOrders() {
                 }
                 void createEnviopack(activeOrder, String(data.get('carrierId') || ''), packages)
               }}>
-                <p>Elegí el correo cotizado y declarÁ cómo preparaste físicamente el pedido. Cada fila representa un bulto real; no se genera un paquete por cada unidad comprada.</p>{activeOrder.enviopackPackages && <p className="order-logistics-footnote">Los bultos quedaron guardados para este intento y no se pueden modificar al reintentar.</p>}
+                <p>Elegí el correo cotizado y indicá cómo preparaste físicamente el pedido. Cada fila representa un bulto real; no se genera un paquete por cada unidad comprada.</p>{activeOrder.enviopackPackages && <p className="order-logistics-footnote">Los bultos quedaron guardados para este intento y no se pueden modificar al reintentar.</p>}
                 {activeOrder.shippingCostOptions?.sellerOptions?.length ? <>
                   <label>Correo / operador
                     <select name="carrierId" required defaultValue="">
