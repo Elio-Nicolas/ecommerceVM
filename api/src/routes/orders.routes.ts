@@ -51,6 +51,7 @@ class OrderConflictError extends Error {
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
   try {
+    const deliverySettings = await getShippingSettings()
     const order = await prisma.$transaction(async (tx) => {
       const now = new Date()
       let selectedOption: Prisma.JsonObject | undefined
@@ -61,7 +62,6 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       let shippingQuoteId: string | null = null
       let shippingInternalCostArs: number | null = null
       let deliveryInstructions: string | null = null
-      const deliverySettings = await getShippingSettings()
 
       if (input.deliveryMethod === 'PICKUP') {
         if (!deliverySettings.pickupEnabled) throw new OrderConflictError('El retiro por domicilio no está disponible.')
