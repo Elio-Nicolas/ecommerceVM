@@ -105,6 +105,9 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
         throw new OrderConflictError('El importe del pedido no es válido.')
       }
+      if (quote.subtotalArs !== subtotalArs) {
+        throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
+      }
       const totalArs = subtotalArs + shippingCostArs
       if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
         throw new OrderConflictError('El total del pedido supera el importe permitido.')
