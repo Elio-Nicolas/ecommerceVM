@@ -4,7 +4,7 @@ import { rateLimit } from 'express-rate-limit'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { shippingCartFingerprint } from './shipping.routes'
+import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 
 export const ordersRouter = Router()
 
