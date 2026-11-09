@@ -12,6 +12,8 @@ import { adminCategoriesRouter } from './routes/admin-categories.routes'
 import { adminStorageRouter } from './routes/admin-storage.routes'
 import { ordersRouter } from './routes/orders.routes'
 import { adminOrdersRouter } from './routes/admin-orders.routes'
+import { adminShippingOriginsRouter } from './routes/admin-shipping-origins.routes'
+
 export const app = express()
 app.disable('x-powered-by')
 app.use(helmet())
@@ -24,6 +26,7 @@ app.use('/api/v1/admin/products', adminProductsRouter)
 app.use('/api/v1/admin/categories', adminCategoriesRouter)
 app.use('/api/v1/admin/storage', adminStorageRouter)
 app.use('/api/v1/admin/orders', adminOrdersRouter)
+app.use('/api/v1/admin/shipping-origins', adminShippingOriginsRouter)
 app.use('/api/v1/categories', categoriesRouter)
 app.use('/api/v1/products', productsRouter)
 app.use('/api/v1/orders', ordersRouter)

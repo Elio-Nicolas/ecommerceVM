@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { formatPrice } from './products'
+import ShippingOriginsPanel from './ShippingOriginsPanel'
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const TOKEN_KEY = 'ecommercevm_admin_token'
@@ -8,18 +9,20 @@ type Category = { id: string; name: string; slug: string; description?: string |
 type ProductStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
 type Product = {
   id: string; sku: string; slug: string; name: string; description: string
-  priceArs: number; compareAtArs: number | null; stock: number; status: ProductStatus
+  priceArs: number; compareAtArs: number | null; stock: number
+  weightGrams: number | null; packageLengthCm: number | null; packageWidthCm: number | null; packageHeightCm: number | null; status: ProductStatus
   featured: boolean; badge: string | null; imageUrl: string | null; specs: string[]
   categoryId: string; category: { id: string; name: string }
 }
 type ProductForm = {
   sku: string; slug: string; name: string; description: string
-  priceArs: string; compareAtArs: string; stock: string; status: ProductStatus
+  priceArs: string; compareAtArs: string; stock: string
+  weightGrams: string; packageLengthCm: string; packageWidthCm: string; packageHeightCm: string; status: ProductStatus
   featured: boolean; badge: string; imageUrl: string; specs: string; categoryId: string
 }
 const emptyForm: ProductForm = {
   sku: '', slug: '', name: '', description: '', priceArs: '', compareAtArs: '',
-  stock: '0', status: 'DRAFT', featured: false, badge: '', imageUrl: '', specs: '', categoryId: '',
+  stock: '0', weightGrams: '', packageLengthCm: '', packageWidthCm: '', packageHeightCm: '', status: 'DRAFT', featured: false, badge: '', imageUrl: '', specs: '', categoryId: '',
 }
 
 async function request<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
@@ -40,7 +43,11 @@ function toForm(product: Product): ProductForm {
   return {
     sku: product.sku, slug: product.slug, name: product.name, description: product.description,
     priceArs: String(product.priceArs), compareAtArs: product.compareAtArs == null ? '' : String(product.compareAtArs),
-    stock: String(product.stock), status: product.status, featured: product.featured,
+    stock: String(product.stock), weightGrams: product.weightGrams == null ? '' : String(product.weightGrams),
+    packageLengthCm: product.packageLengthCm == null ? '' : String(product.packageLengthCm),
+    packageWidthCm: product.packageWidthCm == null ? '' : String(product.packageWidthCm),
+    packageHeightCm: product.packageHeightCm == null ? '' : String(product.packageHeightCm),
+    status: product.status, featured: product.featured,
     badge: product.badge || '', imageUrl: product.imageUrl || '', specs: product.specs.join(', '),
     categoryId: product.categoryId,
   }
@@ -184,7 +191,12 @@ export default function AdminPanel() {
       sku: form.sku.trim(), slug: form.slug.trim(), name: form.name.trim(),
       description: form.description.trim(), priceArs: Number(form.priceArs),
       compareAtArs: form.compareAtArs.trim() ? Number(form.compareAtArs) : null,
-      stock: Number(form.stock), status: form.status, featured: form.featured,
+      stock: Number(form.stock),
+      weightGrams: form.weightGrams.trim() ? Number(form.weightGrams) : null,
+      packageLengthCm: form.packageLengthCm.trim() ? Number(form.packageLengthCm) : null,
+      packageWidthCm: form.packageWidthCm.trim() ? Number(form.packageWidthCm) : null,
+      packageHeightCm: form.packageHeightCm.trim() ? Number(form.packageHeightCm) : null,
+      status: form.status, featured: form.featured,
       badge: form.badge.trim() || null, imageUrl: form.imageUrl.trim() || null,
       specs: form.specs.split(',').map((item) => item.trim()).filter(Boolean),
       categoryId: form.categoryId,
@@ -326,6 +338,7 @@ export default function AdminPanel() {
             </form>
             <div className="admin-category-list">{categories.map((category) => <div className="admin-category-row" key={category.id}><div><strong>{category.name}</strong><small>{category.slug} · {category._count?.products ?? 0} productos</small></div><div><button type="button" onClick={() => editCategory(category)}>Editar</button><button type="button" className="archive-action" onClick={() => deleteCategory(category)}>Eliminar</button></div></div>)}</div>
           </section>
+          <ShippingOriginsPanel token={token} />
           {notice && <div className="admin-alert success">{notice}</div>}
           {error && <div className="admin-alert error">{error}</div>}
           {formOpen ? (
@@ -339,6 +352,10 @@ export default function AdminPanel() {
                 <label>Precio (ARS)<input type="number" min="1" step="1" value={form.priceArs} onChange={(event) => updateField('priceArs', event.target.value)} required /></label>
                 <label>Precio anterior (ARS)<input type="number" min="1" step="1" value={form.compareAtArs} onChange={(event) => updateField('compareAtArs', event.target.value)} /></label>
                 <label>Stock disponible<input type="number" min="0" step="1" value={form.stock} onChange={(event) => updateField('stock', event.target.value)} required /></label>
+                <label>Peso del paquete (gramos)<input type="number" min="1" max="1000000" step="1" value={form.weightGrams} onChange={(event) => updateField('weightGrams', event.target.value)} placeholder="Ej. 850" /></label>
+                <label>Largo del paquete (cm)<input type="number" min="1" max="300" step="1" value={form.packageLengthCm} onChange={(event) => updateField('packageLengthCm', event.target.value)} placeholder="Ej. 25" /></label>
+                <label>Ancho del paquete (cm)<input type="number" min="1" max="300" step="1" value={form.packageWidthCm} onChange={(event) => updateField('packageWidthCm', event.target.value)} placeholder="Ej. 18" /></label>
+                <label>Alto del paquete (cm)<input type="number" min="1" max="300" step="1" value={form.packageHeightCm} onChange={(event) => updateField('packageHeightCm', event.target.value)} placeholder="Ej. 12" /></label>
                 <label>Estado<select value={form.status} onChange={(event) => updateField('status', event.target.value as ProductStatus)}><option value="DRAFT">Borrador</option><option value="ACTIVE">Publicado</option><option value="ARCHIVED">Archivado</option></select></label>
                 <div className="admin-full-field admin-image-upload">
                   <label>Subir imagen del producto<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={imageUploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadProductImage(file); event.target.value = '' }} /></label>

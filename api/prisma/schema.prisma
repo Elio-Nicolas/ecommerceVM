@@ -46,6 +46,10 @@ model Product {
   priceArs Int
   compareAtArs Int?
   stock Int @default(0)
+  weightGrams Int?
+  packageLengthCm Int?
+  packageWidthCm Int?
+  packageHeightCm Int?
   status ProductStatus @default(DRAFT)
   featured Boolean @default(false)
   badge String?
@@ -59,6 +63,18 @@ model Product {
   @@index([status, categoryId])
   @@index([featured, createdAt])
   @@index([name])
+}
+model ShippingOrigin {
+  id String @id @default(uuid())
+  name String
+  provinceCode String
+  postalCode String
+  enviopackAddressId String?
+  isDefault Boolean @default(false)
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([isActive, isDefault])
 }
 model Order {
   id String @id @default(uuid())
