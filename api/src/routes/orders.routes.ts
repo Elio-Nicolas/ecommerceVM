@@ -54,7 +54,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
     const order = await prisma.$transaction(async (tx) => {
       const now = new Date()
       let selectedOption: Prisma.JsonObject | undefined
-      let shippingCostArs = 0
+      let shippingCostArs: number | null = 0
       let shippingCarrier: string | null = null
       let shippingService: string | null = null
       let shippingEstimatedHours: number | null = null
@@ -64,13 +64,15 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
 
       if (input.deliveryMethod === 'PICKUP') {
         if (!env.PICKUP_ENABLED) throw new OrderConflictError('El retiro por domicilio no está disponible.')
+        shippingCarrier = 'Retiro por domicilio'
+        shippingService = 'Retiro coordinado'
         deliveryInstructions = env.PICKUP_INSTRUCTIONS
       } else if (input.deliveryMethod === 'LOCAL_DELIVERY') {
         const allowedPostalCodes = env.LOCAL_DELIVERY_POSTAL_CODES.split(',').map((value) => value.trim()).filter(Boolean)
         if (!env.LOCAL_DELIVERY_ENABLED || !allowedPostalCodes.includes(input.postalCode)) {
           throw new OrderConflictError('La entrega local no está disponible para ese código postal.')
         }
-        shippingCostArs = env.LOCAL_DELIVERY_COORDINATE ? 0 : env.LOCAL_DELIVERY_FEE_ARS
+        shippingCostArs = env.LOCAL_DELIVERY_COORDINATE ? null : env.LOCAL_DELIVERY_FEE_ARS
         shippingCarrier = 'Entrega local'
         shippingService = env.LOCAL_DELIVERY_COORDINATE ? 'A coordinar' : 'Entrega local'
         shippingInternalCostArs = env.LOCAL_DELIVERY_INTERNAL_COST_ARS ?? null
@@ -141,8 +143,8 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         const quote = await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } })
         if (!quote || quote.subtotalArs !== subtotalArs) throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
       }
-      const totalArs = subtotalArs + shippingCostArs
-      if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
+      const totalArs = shippingCostArs === null ? null : subtotalArs + shippingCostArs
+      if (totalArs !== null && (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000)) {
         throw new OrderConflictError('El total del pedido supera el importe permitido.')
       }
       for (const item of input.items) {
