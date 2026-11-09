@@ -65,7 +65,9 @@ function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 
-export async function createEnviopackShipment(orderId: string, carrierId: string) {
+export type EnviopackPackageInput = { alto: number; ancho: number; largo: number; peso: number; descripcion_primera_linea?: string; descripcion_segunda_linea?: string }
+
+export async function createEnviopackShipment(orderId: string, carrierId: string, inputPackages: EnviopackPackageInput[]) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { items: true },
@@ -83,8 +85,14 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
   const carrier = sellerOptions.find((option) => String(option.carrierId || '') === carrierId)
   if (!carrier) throw new EnviopackShipmentError('El transportista elegido no pertenece a la cotización guardada del pedido. Volvé a cotizar.')
   if (!['N', 'P', 'X', 'R'].includes(String(selected.serviceCode || ''))) throw new EnviopackShipmentError('La cotización no contiene un código de servicio válido.')
-  if (order.items.some((item) => !item.weightGrams || !item.packageLengthCm || !item.packageWidthCm || !item.packageHeightCm)) {
-    throw new EnviopackShipmentError('Faltan peso o dimensiones guardadas en uno o más productos del pedido.')
+  if (!Array.isArray(inputPackages) || inputPackages.length < 1 || inputPackages.length > 20) {
+    throw new EnviopackShipmentError('Definí entre 1 y 20 bultos para este envío.')
+  }
+  for (const item of inputPackages) {
+    if (![item.alto, item.ancho, item.largo].every((value) => Number.isInteger(value) && value >= 1 && value <= 300)
+      || !Number.isFinite(item.peso) || item.peso <= 0 || item.peso > 1000) {
+      throw new EnviopackShipmentError('Cada bulto debe tener dimensiones enteras entre 1 y 300 cm y peso mayor a 0 y hasta 1000 kg.')
+    }
   }
   const { calle, numero } = splitStreet(order.addressLine)
   const name = splitCustomerName(order.customerName)
@@ -123,14 +131,14 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
     await prisma.order.update({ where: { id: order.id }, data: { enviopackOrderId } })
   }
 
-  const packages = order.items.flatMap((item) => Array.from({ length: item.quantity }, () => ({
-    alto: item.packageHeightCm!,
-    ancho: item.packageWidthCm!,
-    largo: item.packageLengthCm!,
-    peso: Number((item.weightGrams! / 1000).toFixed(2)),
-    descripcion_primera_linea: item.productName.slice(0, 50),
-    descripcion_segunda_linea: item.productSku.slice(0, 50),
-  })))
+  const packages = inputPackages.map((item) => ({
+    alto: item.alto,
+    ancho: item.ancho,
+    largo: item.largo,
+    peso: Number(item.peso.toFixed(2)),
+    descripcion_primera_linea: item.descripcion_primera_linea?.slice(0, 50) || 'Pedido ecommerceVM',
+    descripcion_segunda_linea: item.descripcion_segunda_linea?.slice(0, 50) || order.code,
+  }))
   let existingShipments: EnviopackResponse[] = []
   try {
     const linkedOrder = await requestEnviopack<{ envios_asociados?: EnviopackResponse[] }>('/pedidos/obtener-ids', {
@@ -168,6 +176,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
     data: {
       enviopackShipmentId: String(shipment.id),
       enviopackShipmentStatus: shipment.estado || 'E',
+      enviopackPackages: packages,
       shippingCarrier: String(carrier.carrierName || carrierId),
       trackingCode: shipment.tracking_number ? String(shipment.tracking_number) : null,
     },
