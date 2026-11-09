@@ -76,6 +76,21 @@ model ShippingOrigin {
   updatedAt DateTime @updatedAt
   @@index([isActive, isDefault])
 }
+model ShippingSettings {
+  id String @id @default("default")
+  enviopackEnabled Boolean @default(false)
+  enviopackApiKeyEncrypted String?
+  enviopackSecretKeyEncrypted String?
+  pickupEnabled Boolean @default(true)
+  pickupAddress String @default("Domicilio del vendedor")
+  pickupInstructions String @default("La dirección exacta y el horario se coordinarán luego de confirmar el pedido.")
+  localDeliveryEnabled Boolean @default(false)
+  localDeliveryPostalCodes String[] @default([])
+  localDeliveryFeeArs Int @default(0)
+  localDeliveryInternalCostArs Int?
+  localDeliveryCoordinate Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
 model Order {
   id String @id @default(uuid())
   code String @unique
