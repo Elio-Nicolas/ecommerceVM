@@ -1,0 +1,40 @@
+name: ecommerceVM CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feature/enviopack-checkout]
+
+jobs:
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  api:
+    name: API Prisma and TypeScript build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    env:
+      DATABASE_URL: postgresql://ecommercevm:ecommercevm_dev@localhost:5547/ecommercevm?schema=public
+      JWT_SECRET: ci-only-secret-not-used-for-deployment-000000000000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npm run build
