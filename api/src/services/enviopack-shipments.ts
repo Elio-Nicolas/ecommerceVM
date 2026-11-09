@@ -225,7 +225,20 @@ export async function refreshEnviopackShipment(shipmentId: string) {
       })
     }
   })
-  return { orderId: order.id, status: shipment.estado || null, processed }
+  let labelSaved = Boolean(order.enviopackLabelPdf)
+  if (processed && !labelSaved) {
+    try {
+      const pdf = await downloadEnviopackLabel(shipmentId)
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { enviopackLabelPdf: pdf, enviopackLabelSavedAt: new Date() },
+      })
+      labelSaved = true
+    } catch (error) {
+      console.error('No se pudo archivar automáticamente la etiqueta de Envíopack:', error)
+    }
+  }
+  return { orderId: order.id, status: shipment.estado || null, processed, labelSaved }
 }
 
 export async function downloadEnviopackLabel(shipmentId: string): Promise<Buffer> {
