@@ -193,3 +193,18 @@
 .order-cancel-button{min-height:42px;border:1px solid #e6c7c1;border-radius:3px;padding:0 16px;background:#fff7f5;color:#a43d30;font-size:10px;font-weight:700}
 .order-update-status button:disabled{opacity:.6;cursor:wait}
 @media(max-width:620px){.order-detail-card{padding:16px}.order-detail-grid{grid-template-columns:1fr}.order-totals{align-items:flex-start;flex-wrap:wrap}.order-totals small{width:100%;margin:0}.order-pagination{align-items:flex-start;flex-direction:column}.order-pagination>div{width:100%;justify-content:space-between}}
+
+
+/* PR #11: cotización y seguimiento logístico */
+.order-shipping-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:13px 0;border-bottom:1px solid #edf0f2}
+.order-shipping-meta span{font-size:8px;letter-spacing:.12em;color:#929ba4;font-weight:800}
+.order-shipping-meta strong{font-size:10px;color:#273440;margin-right:12px}
+.order-shipping-form{display:flex;flex-direction:column;gap:15px;padding:20px 0;border-bottom:1px solid #edf0f2}
+.order-shipping-form h3{font:700 13px Manrope;margin:5px 0}
+.order-shipping-form p{font-size:10px;line-height:1.6;color:#929ba4;margin:0;max-width:560px}
+.order-shipping-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.order-shipping-fields label{display:flex;flex-direction:column;gap:7px;font-size:9px;font-weight:700;color:#53606c}
+.order-shipping-fields input{height:39px;min-width:0;border:1px solid #dfe4e8;border-radius:3px;padding:0 11px;font:10px Manrope;color:#273440;background:#fff}
+.order-shipping-fields input:focus{outline:2px solid #e5a59a;outline-offset:1px;border-color:#bd4937}
+.order-shipping-form>.admin-primary{align-self:flex-start;min-height:40px;padding:0 16px}
+@media(max-width:760px){.order-shipping-fields{grid-template-columns:1fr}.order-shipping-form>.admin-primary{width:100%}}

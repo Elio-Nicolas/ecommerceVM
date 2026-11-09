@@ -62,6 +62,58 @@ adminOrdersRouter.get('/:id', async (req, res) => {
   res.json({ data: order })
 })
 
+adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
+  const input = z.object({
+    shippingCostArs: z.number().int().min(0).max(2_000_000_000),
+    shippingCarrier: z.string().trim().max(100).nullable().optional().transform((value) => value || null),
+    trackingCode: z.string().trim().max(120).nullable().optional().transform((value) => value || null),
+  }).parse(req.body)
+
+  const existing = await prisma.order.findUnique({ where: { id: req.params.id } })
+  if (!existing) {
+    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (existing.status === 'CANCELLED') {
+    res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se puede cotizar el envío de un pedido cancelado.' } })
+    return
+  }
+
+  const totalArs = existing.subtotalArs + input.shippingCostArs
+  if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
+    res.status(400).json({ error: { code: 'INVALID_ORDER_TOTAL', message: 'El total del pedido supera el importe permitido.' } })
+    return
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id: existing.id },
+      data: {
+        shippingCostArs: input.shippingCostArs,
+        totalArs,
+        shippingCarrier: input.shippingCarrier,
+        trackingCode: input.trackingCode,
+      },
+    })
+    const trackingDetails = [
+      input.shippingCarrier ? `Transporte: ${input.shippingCarrier}` : null,
+      input.trackingCode ? `Seguimiento: ${input.trackingCode}` : null,
+    ].filter(Boolean).join(' · ')
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: existing.id,
+        fromStatus: existing.status,
+        toStatus: existing.status,
+        note: `Envío actualizado. Costo: ${input.shippingCostArs.toLocaleString('es-AR')}.${trackingDetails ? ` ${trackingDetails}.` : ''}`,
+        changedByAdminId: req.admin?.id || null,
+      },
+    })
+    return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
+  })
+
+  res.json({ data: updated, message: 'Datos de envío actualizados.' })
+})
+
 adminOrdersRouter.patch('/:id/status', async (req, res) => {
   const input = z.object({
     status: z.nativeEnum(OrderStatus),
@@ -73,6 +125,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (input.status === 'SHIPPED' && (existing.shippingCostArs === null || !existing.shippingCarrier)) {
+    res.status(409).json({ error: { code: 'SHIPPING_NOT_CONFIGURED', message: 'Antes de marcar el pedido como enviado, registrá el costo y el transporte.' } })
     return
   }
   if (input.status === existing.status || !transitions[existing.status].includes(input.status)) {

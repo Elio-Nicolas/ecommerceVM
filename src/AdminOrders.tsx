@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { formatPrice } from './products'
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
@@ -11,6 +11,7 @@ type Order = {
   id: string; code: string; status: OrderStatus; customerName: string; customerEmail: string | null
   customerPhone: string; addressLine: string; city: string; province: string; postalCode: string | null
   customerNotes: string | null; subtotalArs: number; shippingCostArs: number | null; totalArs: number | null
+  shippingCarrier: string | null; trackingCode: string | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
@@ -54,6 +55,7 @@ export default function AdminOrders() {
   const [selected, setSelected] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [updating, setUpdating] = useState(false)
+  const [shippingSaving, setShippingSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -95,6 +97,36 @@ export default function AdminOrders() {
     if (!checking && token) void loadOrders(token)
   }, [checking, token, loadOrders])
 
+  async function saveShipping(event: FormEvent<HTMLFormElement>, order: Order) {
+    event.preventDefault()
+    if (!token || shippingSaving) return
+    const formData = new FormData(event.currentTarget)
+    const shippingCostArs = Number(formData.get('shippingCostArs'))
+    if (!Number.isSafeInteger(shippingCostArs) || shippingCostArs < 0) {
+      setError('Ingresá un costo de envío válido.')
+      return
+    }
+    setShippingSaving(true)
+    setError('')
+    setNotice('')
+    try {
+      await request(`/admin/orders/${order.id}/shipping`, token, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          shippingCostArs,
+          shippingCarrier: String(formData.get('shippingCarrier') || '').trim() || null,
+          trackingCode: String(formData.get('trackingCode') || '').trim() || null,
+        }),
+      })
+      setNotice(`Envío del pedido ${order.code} actualizado. Total: ${formatPrice(order.subtotalArs + shippingCostArs)}.`)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el envío.')
+    } finally {
+      setShippingSaving(false)
+    }
+  }
+
   async function changeStatus(order: Order, next: OrderStatus) {
     if (!token || updating) return
     setUpdating(true)
@@ -127,7 +159,7 @@ export default function AdminOrders() {
         <div className="admin-nav-label">GESTIÓN</div>
         <a className="admin-nav-item" href="/admin"><span className="admin-nav-icon">▦</span> Productos</a>
         <a className="admin-nav-item active" href="/admin/pedidos"><span className="admin-nav-icon">▤</span> Pedidos</a>
-        <div className="admin-sidebar-bottom"><span className="admin-avatar">A</span><div><strong>Sesión administrativa</strong><small>Administrador</small></div><button onClick={() => { localStorage.removeItem(TOKEN_KEY); window.location.replace('/admin') }} title="Cerrar sesión">↗</button></div>
+        <div className="admin-sidebar-bottom"><span className="admin-avatar">A</span><div><strong>Sesión administrativa</strong><small>Administrador</small></div><button onClick={() => { setToken(''); localStorage.removeItem(TOKEN_KEY); window.location.replace('/admin') }} title="Cerrar sesión">↗</button></div>
       </aside>
 
       <main className="admin-main">
@@ -172,7 +204,17 @@ export default function AdminOrders() {
               <div><span>NOTAS</span><strong>{activeOrder.customerNotes || 'Sin indicaciones adicionales'}</strong></div>
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
-            <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>Envío: pendiente de cotización · Total final: pendiente</small></div>
+            <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de cotización · Total final: pendiente' : `Envío: ${formatPrice(activeOrder.shippingCostArs)} · Total: ${formatPrice(activeOrder.totalArs ?? activeOrder.subtotalArs + activeOrder.shippingCostArs)}`}</small></div>
+            {activeOrder.shippingCarrier && <div className="order-shipping-meta"><span>TRANSPORTE</span><strong>{activeOrder.shippingCarrier}</strong>{activeOrder.trackingCode && <><span>SEGUIMIENTO</span><strong>{activeOrder.trackingCode}</strong></>}</div>}
+            {activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
+              <div><span className="admin-kicker">LOGÍSTICA NACIONAL</span><h3>Cotizar envío y seguimiento</h3><p>Registrá el costo acordado y, cuando esté disponible, el transporte y su código de seguimiento.</p></div>
+              <div className="order-shipping-fields">
+                <label>Costo de envío (ARS)<input name="shippingCostArs" type="number" min="0" max="2000000000" step="1" required defaultValue={activeOrder.shippingCostArs ?? ''} placeholder="Ej. 8500" /></label>
+                <label>Correo / transporte<input name="shippingCarrier" maxLength={100} defaultValue={activeOrder.shippingCarrier ?? ''} placeholder="Ej. Correo Argentino" /></label>
+                <label className="tracking-field">Código de seguimiento<input name="trackingCode" maxLength={120} defaultValue={activeOrder.trackingCode ?? ''} placeholder="Código de envío" /></label>
+              </div>
+              <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando envío...' : 'Guardar cotización y seguimiento'}</button>
+            </form>}
             <div className="order-history"><h3>Historial de estados</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{statusLabels[entry.toStatus]}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {nextStatuses[activeOrder.status].length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{nextStatuses[activeOrder.status].map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
           </section>}
