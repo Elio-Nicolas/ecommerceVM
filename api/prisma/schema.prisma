@@ -122,6 +122,7 @@ model Order {
   enviopackShipmentStatus String?
   enviopackTrackingNumber String?
   enviopackProcessedAt DateTime?
+  enviopackPackages Json?
   items OrderItem[]
   history OrderStatusHistory[]
   createdAt DateTime @default(now())
