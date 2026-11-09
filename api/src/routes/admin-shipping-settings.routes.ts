@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAdmin } from '../middleware/require-admin'
-import { getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
+import { getEnviopackCredentials, getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
+import { testEnviopackCredentials, ShippingProviderError } from '../services/enviopack'
 
 export const adminShippingSettingsRouter = Router()
 adminShippingSettingsRouter.use(requireAdmin)
@@ -22,6 +23,32 @@ adminShippingSettingsRouter.get('/', async (_req, res) => {
       localDeliveryCoordinate: settings.localDeliveryCoordinate,
     },
   })
+})
+
+
+adminShippingSettingsRouter.post('/test', async (req, res) => {
+  const input = z.object({
+    apiKey: z.string().trim().min(1).max(300).optional(),
+    secretKey: z.string().trim().min(1).max(300).optional(),
+  }).parse(req.body)
+  if (Boolean(input.apiKey) !== Boolean(input.secretKey)) {
+    res.status(400).json({ error: { code: 'SHIPPING_CREDENTIALS_INCOMPLETE', message: 'Ingresá la API Key y la Secret Key juntas.' } })
+    return
+  }
+  try {
+    const credentials = input.apiKey && input.secretKey
+      ? { apiKey: input.apiKey, secretKey: input.secretKey }
+      : await getEnviopackCredentials()
+    if (!credentials) {
+      res.status(400).json({ error: { code: 'SHIPPING_CREDENTIALS_MISSING', message: 'Ingresá y guardá las credenciales de Envíopack antes de probar la conexión.' } })
+      return
+    }
+    await testEnviopackCredentials(credentials)
+    res.json({ data: { connected: true }, message: 'Conexión con Envíopack verificada correctamente.' })
+  } catch (error) {
+    const message = error instanceof ShippingProviderError ? error.message : 'No se pudo verificar la conexión con Envíopack.'
+    res.status(502).json({ error: { code: 'SHIPPING_CONNECTION_FAILED', message } })
+  }
 })
 
 const schema = z.object({
