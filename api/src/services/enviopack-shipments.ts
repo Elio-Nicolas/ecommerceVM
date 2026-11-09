@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma'
 import { getEnviopackCredentials } from './shipping-settings'
 
 export class EnviopackShipmentError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly statusCode?: number) {
     super(message)
     this.name = 'EnviopackShipmentError'
   }
@@ -41,7 +41,7 @@ async function requestEnviopack<T>(path: string, init?: RequestInit): Promise<T>
   })
   if (!response.ok) {
     const message = await response.text().catch(() => '')
-    throw new EnviopackShipmentError(message.slice(0, 500) || `Envíopack respondió HTTP ${response.status}.`)
+    throw new EnviopackShipmentError(message.slice(0, 500) || `Envíopack respondió HTTP ${response.status}.`, response.status)
   }
   return response.json() as Promise<T>
 }
@@ -97,8 +97,9 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
         method: 'POST',
         body: JSON.stringify({ id_externo: order.code, plataforma: 'web' }),
       })
-    } catch {
-      known = null
+    } catch (error) {
+      if (error instanceof EnviopackShipmentError && error.statusCode === 404) known = null
+      else throw error
     }
     if (known?.id_pedido) enviopackOrderId = String(known.id_pedido)
     else {
@@ -130,7 +131,14 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
     descripcion_primera_linea: item.productName.slice(0, 50),
     descripcion_segunda_linea: item.productSku.slice(0, 50),
   })))
-  const shipment = await requestEnviopack<EnviopackResponse>('/envios', {
+  let existingShipments: EnviopackResponse[] = []
+  try {
+    existingShipments = await requestEnviopack<EnviopackResponse[]>('/pedidos/' + encodeURIComponent(enviopackOrderId) + '/envios')
+  } catch (error) {
+    if (!(error instanceof EnviopackShipmentError && error.statusCode === 404)) throw error
+  }
+  const pendingShipment = existingShipments.find((item) => item.estado !== 'P' && item.id)
+  const shipment = pendingShipment || await requestEnviopack<EnviopackResponse>('/envios', {
     method: 'POST',
     body: JSON.stringify({
       pedido: Number(enviopackOrderId),
@@ -175,7 +183,7 @@ export async function refreshEnviopackShipment(shipmentId: string) {
         enviopackShipmentStatus: shipment.estado || order.enviopackShipmentStatus,
         enviopackTrackingNumber: shipment.tracking_number ? String(shipment.tracking_number) : order.enviopackTrackingNumber,
         trackingCode: shipment.tracking_number ? String(shipment.tracking_number) : order.trackingCode,
-        ...(processed ? { enviopackProcessedAt: new Date() } : {}),
+        ...(processed ? { enviopackProcessedAt: order.enviopackProcessedAt || new Date() } : {}),
         ...(processed && order.status === 'PREPARING' ? { status: 'SHIPPED' } : {}),
       },
     })
