@@ -4,6 +4,7 @@ import { rateLimit } from 'express-rate-limit'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
+import { shippingCartFingerprint } from './shipping.routes'
 
 export const ordersRouter = Router()
 
@@ -22,7 +23,10 @@ const createOrderSchema = z.object({
   addressLine: z.string().trim().min(4).max(180),
   city: z.string().trim().min(2).max(100),
   province: z.string().trim().min(2).max(100),
-  postalCode: z.string().trim().max(20).optional().transform((value) => value || null),
+  postalCode: z.string().trim().regex(/^\\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
+  provinceCode: z.string().length(1).regex(/^[A-Z]$/),
+  shippingQuoteId: z.string().uuid(),
+  shippingOptionKey: z.string().trim().min(1).max(40),
   customerNotes: z.string().trim().max(1000).optional().transform((value) => value || null),
   items: z.array(z.object({
     productId: z.string().uuid(),
@@ -46,6 +50,37 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
   try {
     const order = await prisma.$transaction(async (tx) => {
+      const now = new Date()
+      const quote = await tx.shippingQuote.findFirst({
+        where: {
+          id: input.shippingQuoteId,
+          provinceCode: input.provinceCode,
+          postalCode: input.postalCode,
+          expiresAt: { gt: now },
+          usedAt: null,
+        },
+      })
+      if (!quote || quote.cartFingerprint !== shippingCartFingerprint(input.items)) {
+        throw new OrderConflictError('La cotización de envío venció o ya no corresponde al carrito. Volvé a cotizar.')
+      }
+      const quoteOptions = Array.isArray(quote.options) ? quote.options : []
+      const selectedOption = quoteOptions.find((option) =>
+        typeof option === 'object' && option !== null && !Array.isArray(option) && option.key === input.shippingOptionKey,
+      ) as Prisma.JsonObject | undefined
+      if (!selectedOption) throw new OrderConflictError('La opción de envío seleccionada ya no está disponible. Volvé a cotizar.')
+      const shippingCostArs = Number(selectedOption.priceArs)
+      const shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : 'Envíopack'
+      const shippingService = typeof selectedOption.serviceLabel === 'string' ? selectedOption.serviceLabel : 'Envío estándar'
+      const shippingEstimatedHours = typeof selectedOption.estimatedHours === 'number' ? selectedOption.estimatedHours : null
+      if (!Number.isSafeInteger(shippingCostArs) || shippingCostArs < 0) {
+        throw new OrderConflictError('El importe del envío no es válido. Volvé a cotizar.')
+      }
+      const quoteUse = await tx.shippingQuote.updateMany({
+        where: { id: quote.id, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      })
+      if (quoteUse.count !== 1) throw new OrderConflictError('La cotización ya fue utilizada. Volvé a cotizar.')
+
       const products = await tx.product.findMany({
         where: { id: { in: input.items.map((item) => item.productId) }, status: 'ACTIVE' },
         select: { id: true, sku: true, name: true, priceArs: true, stock: true },
@@ -70,6 +105,10 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
         throw new OrderConflictError('El importe del pedido no es válido.')
       }
+      const totalArs = subtotalArs + shippingCostArs
+      if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
+        throw new OrderConflictError('El total del pedido supera el importe permitido.')
+      }
       for (const item of input.items) {
         const reserved = await tx.product.updateMany({
           where: { id: item.productId, status: 'ACTIVE', stock: { gte: item.quantity } },
@@ -92,6 +131,13 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           postalCode: input.postalCode,
           customerNotes: input.customerNotes,
           subtotalArs,
+          shippingCostArs,
+          totalArs,
+          shippingCarrier,
+          shippingService,
+          shippingEstimatedHours,
+          shippingQuoteId: quote.id,
+          shippingOptionKey: input.shippingOptionKey,
           items: { create: snapshots },
           history: { create: { toStatus: 'PENDING', note: 'Pedido recibido; pendiente de confirmación.' } },
         },
@@ -109,7 +155,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         createdAt: order.createdAt,
         items: order.items,
       },
-      message: 'Pedido recibido. El envío y el importe final quedan sujetos a confirmación.',
+      message: 'Pedido registrado con el costo de envío cotizado. El pago todavía no está habilitado.',
     })
   } catch (error) {
     if (error instanceof OrderConflictError) {
