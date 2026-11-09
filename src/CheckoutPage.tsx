@@ -77,7 +77,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setQuote(null)
     setSelectedOptionKey('')
     setQuoteError('')
-    if (!provinceCode || !/^\\d{4}$/.test(postalCode) || cart.length === 0) return
+    if (!provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) return
 
     const timeout = window.setTimeout(async () => {
       setQuoteLoading(true)
@@ -200,13 +200,13 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
                   {PROVINCES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                 </select>
               </label>
-              <label>Código postal<input required maxLength={4} minLength={4} inputMode="numeric" pattern="\\d{4}" autoComplete="postal-code" value={postalCode} onChange={(event) => setPostalCode(event.target.value.replace(/\\D/g, '').slice(0, 4))} /></label>
+              <label>Código postal<input required maxLength={4} minLength={4} inputMode="numeric" pattern="\d{4}" autoComplete="postal-code" value={postalCode} onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 4))} /></label>
               <label className="checkout-field-full">Indicaciones adicionales <span>(opcional)</span><textarea maxLength={1000} rows={3} value={customerNotes} onChange={(event) => setCustomerNotes(event.target.value)} placeholder="Piso, departamento, referencias para la entrega..." /></label>
             </div>
           </section>
           <section className="checkout-card">
             <h2>Opciones de envío</h2>
-            {!provinceCode || !/^\\d{4}$/.test(postalCode)
+            {!provinceCode || !/^\d{4}$/.test(postalCode)
               ? <p className="checkout-shipping-hint">Ingresá provincia y código postal para calcular el envío.</p>
               : quoteLoading
                 ? <p className="checkout-shipping-hint">Consultando tarifas de Envíopack...</p>
