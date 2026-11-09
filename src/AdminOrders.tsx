@@ -14,7 +14,9 @@ type Order = {
   customerNotes: string | null; subtotalArs: number; shippingCostArs: number | null; totalArs: number | null
   shippingCarrier: string | null; trackingCode: string | null; shippingService: string | null; shippingEstimatedHours: number | null
   deliveryMethod: 'ENVIOPACK' | 'LOCAL_DELIVERY' | 'PICKUP'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
-  shippingCostOptions: { priceArs?: number; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
+  shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
+  enviopackOrderId: string | null; enviopackShipmentId: string | null; enviopackShipmentStatus: string | null
+  enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
@@ -136,6 +138,54 @@ export default function AdminOrders() {
     }
   }
 
+  async function createEnviopack(order: Order, carrierId: string) {
+    if (!token || shippingSaving || !carrierId) return
+    setShippingSaving(true); setError(''); setNotice('')
+    try {
+      const result = await request<{ data: { shipmentId: string; status: string }; message: string }>(`/admin/enviopack/orders/${order.id}/create`, token, {
+        method: 'POST', body: JSON.stringify({ carrierId }),
+      })
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo crear el envío en Envíopack.')
+    } finally { setShippingSaving(false) }
+  }
+
+  async function refreshEnviopack(order: Order) {
+    if (!token || shippingSaving) return
+    setShippingSaving(true); setError(''); setNotice('')
+    try {
+      await request(`/admin/enviopack/orders/${order.id}/refresh`, token, { method: 'POST' })
+      setNotice('Estado del envío actualizado desde Envíopack.')
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo consultar Envíopack.')
+    } finally { setShippingSaving(false) }
+  }
+
+  async function downloadEnviopackLabel(order: Order) {
+    if (!token || shippingSaving) return
+    setShippingSaving(true); setError('')
+    try {
+      const response = await fetch(`${API_URL}/api/v1/admin/enviopack/orders/${order.id}/label`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error?.message || 'No se pudo descargar la etiqueta.')
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url; anchor.download = `etiqueta-${order.code}.pdf`
+      document.body.appendChild(anchor); anchor.click(); anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo descargar la etiqueta.')
+    } finally { setShippingSaving(false) }
+  }
+
   async function changeStatus(order: Order, next: OrderStatus) {
     if (!token || updating) return
     setUpdating(true)
@@ -238,6 +288,28 @@ export default function AdminOrders() {
               </div>
               <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando costo...' : 'Guardar costo acordado'}</button>
             </form>}
+            {activeOrder.deliveryMethod === 'ENVIOPACK' && activeOrder.status !== 'CANCELLED' && <section className="order-logistics-breakdown">
+              <div><span className="admin-kicker">ENVÍOPACK</span><h3>Generación de envío y etiqueta</h3></div>
+              {activeOrder.enviopackShipmentId ? <div className="order-logistics-summary">
+                <span>Envío #{activeOrder.enviopackShipmentId} · Estado Envíopack: {activeOrder.enviopackShipmentStatus || 'Sin informar'}</span>
+                {activeOrder.enviopackTrackingNumber && <strong>Seguimiento: {activeOrder.enviopackTrackingNumber}</strong>}
+                <div className="admin-category-actions">
+                  <button type="button" className="admin-quiet-button" disabled={shippingSaving} onClick={() => void refreshEnviopack(activeOrder)}>Actualizar estado</button>
+                  {activeOrder.enviopackShipmentStatus === 'P' && <button type="button" className="admin-primary" disabled={shippingSaving} onClick={() => void downloadEnviopackLabel(activeOrder)}>Descargar etiqueta PDF</button>}
+                </div>
+              </div> : activeOrder.status === 'PREPARING' ? <form className="order-shipping-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void createEnviopack(activeOrder, String(data.get('carrierId') || '')) }}>
+                <p>Elegí el correo y el servicio cotizados. Envíopack creará el envío confirmado; la etiqueta aparecerá cuando el correo lo procese.</p>
+                {activeOrder.shippingCostOptions?.sellerOptions?.length ? <>
+                  <label>Correo / operador
+                    <select name="carrierId" required defaultValue="">
+                      <option value="" disabled>Seleccionar transportista</option>
+                      {activeOrder.shippingCostOptions.sellerOptions.map((option) => <option key={option.carrierId} value={option.carrierId}>{option.carrierName} · costo tienda {formatPrice(option.costArs)}</option>)}
+                    </select>
+                  </label>
+                  <button className="admin-primary" disabled={shippingSaving}>{shippingSaving ? 'Creando envío...' : 'Crear envío en Envíopack'}</button>
+                </> : <p className="order-logistics-unavailable">La cotización no guardó opciones de transportista con costo interno. No se puede generar el envío hasta contar con una opción válida.</p>}
+              </form> : <p>Para generar el envío, primero pasá el pedido a En preparación.</p>}
+            </section>}
             <div className="order-history"><h3>Historial de estados</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{statusLabels[entry.toStatus]}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
           </section>}
