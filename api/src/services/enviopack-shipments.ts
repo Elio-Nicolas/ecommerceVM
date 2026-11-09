@@ -150,6 +150,15 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
     if (!(error instanceof EnviopackShipmentError && error.statusCode === 404)) throw error
   }
   const pendingShipment = existingShipments.find((item) => item.estado !== 'P' && item.id)
+  if (pendingShipment && !order.enviopackPackages) {
+    throw new EnviopackShipmentError('Ya existe un envío pendiente en Envíopack sin un registro local de sus bultos. Revisá ese envío en Envíopack antes de continuar para evitar duplicados o datos de embalaje incorrectos.')
+  }
+  if (order.enviopackPackages && JSON.stringify(order.enviopackPackages) !== JSON.stringify(packages)) {
+    throw new EnviopackShipmentError('Los bultos de este pedido ya quedaron registrados. Para evitar inconsistencias con Envíopack, no se pueden modificar al reintentar la operación.')
+  }
+  if (!order.enviopackPackages) {
+    await prisma.order.update({ where: { id: order.id }, data: { enviopackPackages: packages } })
+  }
   const shipment = pendingShipment || await requestEnviopack<EnviopackResponse>('/envios', {
     method: 'POST',
     body: JSON.stringify({
@@ -176,7 +185,6 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
     data: {
       enviopackShipmentId: String(shipment.id),
       enviopackShipmentStatus: shipment.estado || 'E',
-      enviopackPackages: packages,
       shippingCarrier: String(carrier.carrierName || carrierId),
       trackingCode: shipment.tracking_number ? String(shipment.tracking_number) : null,
     },
