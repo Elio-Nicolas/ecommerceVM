@@ -134,6 +134,10 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           unitPriceArs: product.priceArs,
           quantity: item.quantity,
           lineTotalArs: product.priceArs * item.quantity,
+          weightGrams: product.weightGrams,
+          packageLengthCm: product.packageLengthCm,
+          packageWidthCm: product.packageWidthCm,
+          packageHeightCm: product.packageHeightCm,
         }
       })
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
@@ -180,6 +184,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           deliveryMethod: input.deliveryMethod,
           shippingInternalCostArs,
           deliveryInstructions,
+          provinceCode: input.provinceCode || null,
           items: { create: snapshots },
           history: { create: { toStatus: 'PENDING', note: 'Pedido recibido; pendiente de confirmación.' } },
         },
