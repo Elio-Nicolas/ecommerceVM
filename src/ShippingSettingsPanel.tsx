@@ -72,6 +72,11 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     setSaving(true)
     setError('')
     setNotice('')
+    if (Boolean(apiKey.trim()) !== Boolean(secretKey.trim())) {
+      setError('Ingresá la API Key y la Secret Key juntas para actualizar las credenciales.')
+      setSaving(false)
+      return
+    }
     const postalCodes = [...new Set(postalCodesText.split(',').map((value) => value.trim()).filter(Boolean))]
     const payload = {
       ...settings,
@@ -115,7 +120,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
             <label>API Key<input type="password" autoComplete="new-password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={settings.enviopackConfigured && !clearCredentials ? 'Credencial guardada · dejar vacío para conservar' : 'Ingresar API Key'} /></label>
             <label>Secret Key<input type="password" autoComplete="new-password" value={secretKey} onChange={(event) => setSecretKey(event.target.value)} placeholder={settings.enviopackConfigured && !clearCredentials ? 'Credencial guardada · dejar vacío para conservar' : 'Ingresar Secret Key'} /></label>
           </div>
-          <div className="shipping-credential-status"><span className={settings.enviopackConfigured && !clearCredentials ? 'shipping-status-dot is-ready' : 'shipping-status-dot'} />{settings.enviopackConfigured && !clearCredentials ? 'Credenciales almacenadas' : 'Credenciales pendientes'}{settings.enviopackConfigured && <button type="button" className="archive-action" onClick={() => { setClearCredentials((value) => !value); setApiKey(''); setSecretKey(''); update('enviopackEnabled', false) }}>{clearCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales'}</button>}</div>
+          <div className="shipping-credential-status"><span className={settings.enviopackConfigured && !clearCredentials ? 'shipping-status-dot is-ready' : 'shipping-status-dot'} />{settings.enviopackConfigured && !clearCredentials ? 'Credenciales almacenadas' : 'Credenciales pendientes'}{settings.enviopackConfigured && <button type="button" className="archive-action" onClick={() => { setClearCredentials((value) => { update('enviopackEnabled', value ? settings.enviopackEnabled : false); return !value }); setApiKey(''); setSecretKey('') }}>{clearCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales'}</button>}</div>
           <p className="shipping-settings-help">Para cotizar también necesitás configurar un depósito predeterminado en la sección “Depósitos de despacho” y completar peso y dimensiones en cada producto.</p>
         </section>
 
