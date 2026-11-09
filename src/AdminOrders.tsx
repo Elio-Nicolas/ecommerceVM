@@ -11,7 +11,7 @@ type Order = {
   id: string; code: string; status: OrderStatus; customerName: string; customerEmail: string | null
   customerPhone: string; addressLine: string; city: string; province: string; postalCode: string | null
   customerNotes: string | null; subtotalArs: number; shippingCostArs: number | null; totalArs: number | null
-  shippingCarrier: string | null; trackingCode: string | null
+  shippingCarrier: string | null; trackingCode: string | null; shippingService: string | null; shippingEstimatedHours: number | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
@@ -205,7 +205,7 @@ export default function AdminOrders() {
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
             <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de cotización · Total final: pendiente' : `Envío: ${formatPrice(activeOrder.shippingCostArs)} · Total: ${formatPrice(activeOrder.totalArs ?? activeOrder.subtotalArs + activeOrder.shippingCostArs)}`}</small></div>
-            {activeOrder.shippingCarrier && <div className="order-shipping-meta"><span>TRANSPORTE</span><strong>{activeOrder.shippingCarrier}</strong>{activeOrder.trackingCode && <><span>SEGUIMIENTO</span><strong>{activeOrder.trackingCode}</strong></>}</div>}
+            {activeOrder.shippingCarrier && <div className="order-shipping-meta"><span>OPERADOR</span><strong>{activeOrder.shippingCarrier}</strong>{activeOrder.shippingService && <><span>SERVICIO</span><strong>{activeOrder.shippingService}</strong></>}{activeOrder.shippingEstimatedHours && <><span>PLAZO ESTIMADO</span><strong>{Math.ceil(activeOrder.shippingEstimatedHours / 24)} días</strong></>}{activeOrder.trackingCode && <><span>SEGUIMIENTO</span><strong>{activeOrder.trackingCode}</strong></>}</div>}
             {activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
               <div><span className="admin-kicker">LOGÍSTICA NACIONAL</span><h3>Cotizar envío y seguimiento</h3><p>Registrá el costo acordado y, cuando esté disponible, el transporte y su código de seguimiento.</p></div>
               <div className="order-shipping-fields">
@@ -218,7 +218,7 @@ export default function AdminOrders() {
             <div className="order-history"><h3>Historial de estados</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{statusLabels[entry.toStatus]}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {nextStatuses[activeOrder.status].length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{nextStatuses[activeOrder.status].map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
           </section>}
-          <p className="admin-footnote">Los pedidos se reciben sin cobrar. El costo de envío y el total final se confirman por separado; no hay pagos ni integración logística habilitados.</p>
+          <p className="admin-footnote">Los pedidos se registran con una cotización de envío vigente de Envíopack. El pago todavía no está habilitado; el seguimiento se completará al generar la etiqueta.</p>
         </section>
       </main>
     </div>
