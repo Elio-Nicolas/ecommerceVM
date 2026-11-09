@@ -39,7 +39,7 @@ Los tokens vencen a las 8 horas. Las contraseñas se almacenan con bcrypt. No ex
 
 ## Cotización de envíos
 
-La integración con Envíopack utiliza exclusivamente el servidor. Configurá `ENVIOPACK_API_KEY` y `ENVIOPACK_SECRET_KEY` en el archivo `.env` de la API; nunca en el frontend. En Envíopack debe existir un depósito predeterminado y debe coincidir con el origen cargado en Administración > Depósitos de despacho.
+La integración con Envíopack utiliza exclusivamente el servidor. Las credenciales se administran desde Administración > Configuración de envíos, se cifran antes de guardarse en PostgreSQL y nunca se envían al navegador. La clave de cifrado se deriva de `JWT_SECRET`; por eso, no cambies ese secreto sin planificar la recodificación de las credenciales almacenadas.
 
 Cada producto publicado que se envíe debe tener peso y dimensiones del paquete completos. El checkout cotiza a domicilio con el endpoint de precio para comprador, conserva las opciones durante 10 minutos y exige seleccionar una opción vigente antes de crear el pedido. El costo y total se calculan nuevamente en el backend; no se acepta un importe enviado por el navegador.
 
@@ -57,15 +57,6 @@ El checkout ofrece tres modalidades:
 - `LOCAL_DELIVERY`: entrega local habilitada por lista de códigos postales.
 - `ENVIOPACK`: cotización a domicilio según el destino y los paquetes del carrito.
 
-Configuración inicial mediante variables del entorno de la API:
+La configuración operativa se administra desde Administración > Configuración de envíos. Allí se habilitan las modalidades, se definen códigos postales, tarifas, costos internos, domicilio e instrucciones de retiro y credenciales de Envíopack. Los cambios se guardan en la tabla `ShippingSettings` y se aplican inmediatamente, sin reiniciar la API.
 
-- `PICKUP_ENABLED=true|false`
-- `PICKUP_ADDRESS`: dirección que se informa para el retiro.
-- `PICKUP_INSTRUCTIONS`: instrucciones de coordinación.
-- `LOCAL_DELIVERY_ENABLED=true|false`
-- `LOCAL_DELIVERY_POSTAL_CODES`: códigos postales separados por coma.
-- `LOCAL_DELIVERY_FEE_ARS`: importe fijo cobrado al comprador.
-- `LOCAL_DELIVERY_COORDINATE=true|false`: si es `true`, el costo queda pendiente de coordinación y no se suma al total inicial.
-- `LOCAL_DELIVERY_INTERNAL_COST_ARS`: costo interno estimado, visible solo en administración.
-
-El endpoint público `GET /api/v1/shipping/methods` informa las modalidades disponibles. La configuración es por entorno en esta primera iteración; todavía no se administra desde una pantalla del panel.
+La ruta protegida `GET/PUT /api/v1/admin/shipping-settings` permite administrar estos valores. La ruta pública `GET /api/v1/shipping/methods` solo expone los datos necesarios para el checkout; nunca expone credenciales.
