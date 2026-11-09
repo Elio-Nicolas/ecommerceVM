@@ -78,6 +78,10 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se puede cotizar el envío de un pedido cancelado.' } })
     return
   }
+  if (existing.deliveryMethod !== 'ENVIOPACK') {
+    res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'La edición manual del costo y seguimiento está disponible únicamente para pedidos Envíopack.' } })
+    return
+  }
 
   const totalArs = existing.subtotalArs + input.shippingCostArs
   if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
