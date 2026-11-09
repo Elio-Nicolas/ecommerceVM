@@ -44,7 +44,7 @@ La integración con Envíopack utiliza exclusivamente el servidor. Las credencia
 Cada producto publicado que se envíe debe tener peso y dimensiones del paquete completos. El checkout cotiza a domicilio con el endpoint de precio para comprador, conserva las opciones durante 10 minutos y exige seleccionar una opción vigente antes de crear el pedido. El costo y total se calculan nuevamente en el backend; no se acepta un importe enviado por el navegador.
 
 - POST `/api/v1/shipping/quotes` (público, limitado por IP)
-- POST `/api/v1/orders` (requiere una cotización vigente y una opción seleccionada)
+- POST `/api/v1/orders` (Envíopack requiere una cotización vigente; retiro y entrega local usan la configuración persistida)
 
 La integración consulta dos endpoints distintos: `/cotizar/precio/a-domicilio` para el precio que paga el comprador y `/cotizar/costo` para los costos que paga la tienda por cada transportista. Son importes diferentes y no se deben intercambiar. El checkout recibe exclusivamente el precio del comprador; los costos de transportistas quedan guardados en el pedido y visibles solo en Administración, con una diferencia estimada entre ambos. El costo definitivo puede variar al generar la etiqueta.
 
