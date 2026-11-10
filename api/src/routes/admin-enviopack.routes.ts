@@ -94,16 +94,22 @@ enviopackWebhookRouter.get('/', enviopackWebhookLimiter, (req, res) => {
     res.status(400).send('Parámetros inválidos')
     return
   }
-  // Envíopack exige un ACK HTTP 200 en menos de 5 segundos.
-  // La consulta y sincronización se ejecutan en segundo plano.
-  res.status(200).send('OK')
-  void prisma.order.findFirst({ where: { enviopackShipmentId: input.data.id }, select: { id: true } }).then(async (order) => {
+  // Primero persistimos el evento; solo después confirmamos HTTP 200.
+  // Así no se pierde una notificación si el proceso se reinicia tras el ACK.
+  try {
+    const order = await prisma.order.findFirst({ where: { enviopackShipmentId: input.data.id }, select: { id: true } })
     if (!order) {
       console.warn('Notificación de Envíopack recibida para un envío no registrado:', input.data.id)
+      res.status(200).send('OK')
       return
     }
-    await refreshEnviopackShipment(input.data.id)
-  }).catch((error) => {
-    console.error('No se pudo sincronizar la notificación de Envíopack:', error)
-  })
+    await prisma.enviopackWebhookEvent.create({
+      data: { shipmentId: input.data.id, type: input.data.tipo },
+    })
+    res.status(200).send('OK')
+  } catch (error) {
+    console.error('No se pudo guardar la notificación de Envíopack:', error)
+    // Un error distinto de 200 permite que Envíopack reintente la notificación.
+    res.status(503).send('No se pudo registrar la notificación')
+  }
 })
