@@ -164,7 +164,7 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
   }
 
   const pointOfSale = settings.pointOfSale
-  const orderId = Array.isArray(req.params.orderId) ? req.params.orderId[0] : req.params.orderId
+  const orderId = String(req.params.orderId)
   const lockKey = `arca-wsfe-${pointOfSale}-11`
   const reserved = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
@@ -237,7 +237,7 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
         type: FiscalDocumentType.INVOICE_C,
         status: FiscalDocumentStatus.ISSUING,
         requestKey: input.requestKey,
-        pointOfSale: settings.pointOfSale,
+        pointOfSale,
         voucherType: 11,
         voucherNumber,
         issueDate,
