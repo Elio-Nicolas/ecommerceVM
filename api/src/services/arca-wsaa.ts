@@ -191,7 +191,7 @@ function requestAndCacheTicket(environment: ArcaEnvironment, cacheKey: string): 
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : ''
-      const faultCodeMatch = message.match(/WSAA rechazó la autenticación: ([^:]+):/)
+      const faultCodeMatch = message.match(/WSAA rechazó la autenticación: (.+?): /)
       const qualifiedFaultCode = faultCodeMatch?.[1]?.trim() ?? ''
       const faultCode = qualifiedFaultCode.split(':').pop()?.toLowerCase() ?? ''
       const retryableFault = faultCode.startsWith('wsaa.') || faultCode === 'wsn.unavailable'
