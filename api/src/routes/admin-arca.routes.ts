@@ -357,7 +357,7 @@ adminArcaRouter.post('/documents/:documentId/reconcile', reconcileLimiter, async
       if (document.status === FiscalDocumentStatus.AUTHORIZED) {
         return { status: 200 as const, message: 'El comprobante ya figura autorizado en el sistema.', data: document }
       }
-      if (![FiscalDocumentStatus.PENDING, FiscalDocumentStatus.ISSUING, FiscalDocumentStatus.UNKNOWN].includes(document.status)) {
+      if (document.status !== FiscalDocumentStatus.PENDING && document.status !== FiscalDocumentStatus.ISSUING && document.status !== FiscalDocumentStatus.UNKNOWN) {
         return { status: 409 as const, message: 'Este comprobante no está pendiente de conciliación.', data: document }
       }
       if (!document.pointOfSale || !document.voucherNumber) {
