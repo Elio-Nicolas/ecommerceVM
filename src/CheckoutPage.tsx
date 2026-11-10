@@ -247,6 +247,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-total"><span>Productos</span><strong>{formatPrice(createdOrder.subtotalArs)}</strong></div>
           <div className="checkout-success-total"><span>Envío</span><strong>{createdOrder.shippingCostArs === null ? 'A coordinar' : formatPrice(createdOrder.shippingCostArs)}</strong></div>
           <div className="checkout-success-total"><span>Total</span><strong>{createdOrder.totalArs === null ? 'A confirmar' : formatPrice(createdOrder.totalArs)}</strong></div>
+          {createdOrder.shippingCostArs === null && <p className="checkout-small">Estamos esperando que se registre el costo acordado. El envío y el total se actualizarán automáticamente en este comprobante.</p>}
           <p className="checkout-small">Este pedido quedó registrado, pero todavía no fue cobrado.</p>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
         </section>
