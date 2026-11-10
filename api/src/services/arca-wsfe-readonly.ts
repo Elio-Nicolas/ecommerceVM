@@ -159,7 +159,7 @@ export async function getArcaVoucherTypes(environment: ArcaEnvironment): Promise
 
 export async function getArcaIvaReceiverConditions(
   environment: ArcaEnvironment,
-  voucherClass?: 'A' | 'B' | 'C' | 'M' | '49',
+  voucherClass?: 'A' | 'ALEY' | 'B' | 'C' | '49',
 ): Promise<ArcaIvaReceiverCondition[]> {
   const parameters = voucherClass
     ? `<ClaseCmp>${escapeXml(voucherClass)}</ClaseCmp>`
