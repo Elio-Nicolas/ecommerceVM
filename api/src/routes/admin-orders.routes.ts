@@ -74,8 +74,45 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
+  if (existing.deliveryMethod === 'LOCAL_DELIVERY') {
+    if (existing.shippingService !== 'A coordinar') {
+      res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'El costo manual solo se puede registrar para entregas locales configuradas como A coordinar.' } })
+      return
+    }
+    if (['SHIPPED', 'DELIVERED', 'CANCELLED'].includes(existing.status)) {
+      res.status(409).json({ error: { code: 'ORDER_ALREADY_DISPATCHED', message: 'El costo de entrega local debe registrarse antes de despachar el pedido.' } })
+      return
+    }
+    const totalArs = existing.subtotalArs + input.shippingCostArs
+    if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
+      res.status(400).json({ error: { code: 'INVALID_ORDER_TOTAL', message: 'El total del pedido supera el importe permitido.' } })
+      return
+    }
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: existing.id },
+        data: { shippingCostArs: input.shippingCostArs, totalArs },
+      })
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: existing.id,
+          fromStatus: existing.status,
+          toStatus: existing.status,
+          note: `Costo de entrega local coordinado: ${input.shippingCostArs.toLocaleString('es-AR')}.`,
+          changedByAdminId: req.admin?.id || null,
+        },
+      })
+      return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
+    })
+    res.json({ data: updated, message: 'Costo de entrega local registrado.' })
+    return
+  }
   if (existing.status === 'CANCELLED') {
     res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se puede cotizar el envío de un pedido cancelado.' } })
+    return
+  }
+  if (existing.deliveryMethod !== 'ENVIOPACK') {
+    res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'La edición manual del costo y seguimiento está disponible únicamente para pedidos Envíopack.' } })
     return
   }
 
@@ -127,11 +164,18 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  if (input.status === 'SHIPPED' && (existing.shippingCostArs === null || !existing.shippingCarrier)) {
+  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ENVIOPACK' && (existing.shippingCostArs === null || !existing.shippingCarrier)) {
     res.status(409).json({ error: { code: 'SHIPPING_NOT_CONFIGURED', message: 'Antes de marcar el pedido como enviado, registrá el costo y el transporte.' } })
     return
   }
-  if (input.status === existing.status || !transitions[existing.status].includes(input.status)) {
+  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
+    res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Antes de despachar el pedido, registrá el costo de entrega local acordado con el comprador.' } })
+    return
+  }
+  const allowedTransitions = existing.status === 'PREPARING' && existing.deliveryMethod === 'PICKUP'
+    ? ['DELIVERED', 'CANCELLED']
+    : transitions[existing.status]
+  if (input.status === existing.status || !allowedTransitions.includes(input.status)) {
     res.status(409).json({ error: { code: 'INVALID_ORDER_TRANSITION', message: 'Ese cambio de estado no está permitido.' } })
     return
   }

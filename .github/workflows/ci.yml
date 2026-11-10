@@ -2,7 +2,7 @@ name: ecommerceVM CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, fix/admin-shipping-method-guard]
   push:
     branches: [main, feature/enviopack-checkout]
 

@@ -32,6 +32,12 @@ const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
   CANCELLED: [],
 }
 
+function availableNextStatuses(order: Order): OrderStatus[] {
+  if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
+  if (order.status === 'PREPARING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
+  return nextStatuses[order.status]
+}
+
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}/api/v1${path}`, {
     ...init,
@@ -216,7 +222,7 @@ export default function AdminOrders() {
               {activeOrder.shippingCostOptions.sellerOptions?.length ? <div className="order-logistics-table"><div className="order-logistics-row order-logistics-head"><span>Transportista</span><span>Costo tienda</span><span>Diferencia estimada</span></div>{activeOrder.shippingCostOptions.sellerOptions.map((option) => <div className="order-logistics-row" key={option.carrierId}><span><strong>{option.carrierName}</strong><small>{option.fulfillmentMode === 'D' ? 'Retiro en depósito' : 'Despacho en sucursal'}{option.estimatedHours ? ` · ${Math.ceil(option.estimatedHours / 24)} días` : ''}</small></span><strong>{formatPrice(option.costArs)}</strong><strong className={((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs) >= 0 ? 'order-logistics-positive' : 'order-logistics-negative'}>{formatPrice((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs)}</strong></div>)}</div> : <p className="order-logistics-unavailable">Envíopack no devolvió costos por transportista para esta cotización. El precio al cliente sí quedó registrado.</p>}
               <p className="order-logistics-footnote">La diferencia es un margen logístico estimado, no una ganancia neta. El costo definitivo puede variar al generar la etiqueta.</p>
             </section>}
-            {activeOrder.deliveryMethod !== 'PICKUP' && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
+            {activeOrder.deliveryMethod === 'ENVIOPACK' && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
               <div><span className="admin-kicker">LOGÍSTICA NACIONAL</span><h3>Cotizar envío y seguimiento</h3><p>Este importe es el que se suma al total del comprador. El costo que cobra Envíopack se consulta y se muestra por separado en el desglose interno.</p></div>
               <div className="order-shipping-fields">
                 <label>Precio de envío cobrado al cliente (ARS)<input name="shippingCostArs" type="number" min="0" max="2000000000" step="1" required defaultValue={activeOrder.shippingCostArs ?? ''} placeholder="Ej. 8500" /></label>
@@ -225,8 +231,15 @@ export default function AdminOrders() {
               </div>
               <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando envío...' : 'Guardar cotización y seguimiento'}</button>
             </form>}
+            {activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingService === 'A coordinar' && activeOrder.shippingCostArs === null && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(activeOrder.status) && <form className="order-shipping-form" key={`${activeOrder.id}-local-coordinate`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
+              <div><span className="admin-kicker">ENTREGA LOCAL</span><h3>Registrar costo acordado</h3><p>Ingresá el importe que se coordinó con el comprador. Se sumará al total final del pedido; no requiere transportista ni seguimiento.</p></div>
+              <div className="order-shipping-fields">
+                <label>Precio de entrega acordado (ARS)<input name="shippingCostArs" type="number" min="0" max="2000000000" step="1" required placeholder="Ej. 2500" /></label>
+              </div>
+              <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando costo...' : 'Guardar costo acordado'}</button>
+            </form>}
             <div className="order-history"><h3>Historial de estados</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{statusLabels[entry.toStatus]}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
-            {nextStatuses[activeOrder.status].length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{nextStatuses[activeOrder.status].map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
+            {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
           </section>}
           <p className="admin-footnote">Los pedidos pueden registrarse con retiro, entrega local o Envíopack. El pago todavía no está habilitado.</p>
         </section>
