@@ -188,7 +188,6 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           deliveryMethod: input.deliveryMethod,
           shippingInternalCostArs,
           deliveryInstructions,
-          provinceCode: input.provinceCode || null,
           items: { create: snapshots },
           history: { create: { toStatus: 'PENDING', note: 'Pedido recibido; pendiente de confirmación.' } },
         },
