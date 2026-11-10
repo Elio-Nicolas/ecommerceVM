@@ -194,17 +194,20 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
       localidad: order.city.slice(0, 50),
     }),
   })
-  if (!shipment.id) throw new EnviopackShipmentError('Envíopack no devolvió el identificador del envío.')
+  if (!shipment.id || !['B', 'C', 'E', 'P'].includes(String(shipment.estado))) {
+    throw new EnviopackShipmentError('Envíopack no devolvió un identificador y estado de envío válidos.')
+  }
   await prisma.order.update({
     where: { id: order.id },
     data: {
       enviopackShipmentId: String(shipment.id),
-      enviopackShipmentStatus: shipment.estado || 'E',
+      enviopackShipmentStatus: String(shipment.estado),
       shippingCarrier: String(carrier.carrierName || carrierId),
       trackingCode: shipment.tracking_number ? String(shipment.tracking_number) : null,
+      enviopackTrackingNumber: shipment.tracking_number ? String(shipment.tracking_number) : null,
     },
   })
-  return { shipmentId: String(shipment.id), status: shipment.estado || 'E' }
+  return { shipmentId: String(shipment.id), status: String(shipment.estado) }
 }
 
 export async function refreshEnviopackShipment(shipmentId: string) {
@@ -273,5 +276,12 @@ export async function downloadEnviopackLabel(shipmentId: string): Promise<Buffer
     signal: AbortSignal.timeout(25000),
   })
   if (!response.ok) throw new EnviopackShipmentError('La etiqueta todavía no está disponible. Envíopack debe procesar el envío primero.')
-  return Buffer.from(await response.arrayBuffer())
+  const pdf = Buffer.from(await response.arrayBuffer())
+  if (pdf.length < 5 || pdf.subarray(0, 5).toString('ascii') !== '%PDF-') {
+    throw new EnviopackShipmentError('Envíopack no devolvió un archivo PDF de etiqueta válido.')
+  }
+  if (pdf.length > 25 * 1024 * 1024) {
+    throw new EnviopackShipmentError('El PDF de etiqueta supera el tamaño máximo permitido para archivarlo.')
+  }
+  return pdf
 }
