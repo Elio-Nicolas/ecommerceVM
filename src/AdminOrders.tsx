@@ -251,7 +251,7 @@ export default function AdminOrders() {
                   <td>{formatDate(order.createdAt)}</td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
                   <td className="admin-price">{formatPrice(order.subtotalArs)}</td>
                   <td><span className={`admin-status order-status ${order.status.toLowerCase()}`}>{statusLabels[order.status]}</span></td>
-                  <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote(''); setPackageCount(1) }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
+                  <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote(''); setPackageCount(order.enviopackPackages?.length || 1) }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
                 </tr>)}
               </tbody></table></div>
             )}
@@ -304,7 +304,7 @@ export default function AdminOrders() {
               </div> : activeOrder.status === 'PREPARING' ? <form className="order-shipping-form" onSubmit={(event) => {
                 event.preventDefault()
                 const data = new FormData(event.currentTarget)
-                const packages = Array.from({ length: activeOrder.enviopackPackages?.length || packageCount }, (_, index) => ({
+                const packages = Array.from({ length: packageCount }, (_, index) => ({
                   alto: Number(data.get(`package-${index}-alto`)),
                   ancho: Number(data.get(`package-${index}-ancho`)),
                   largo: Number(data.get(`package-${index}-largo`)),
@@ -325,7 +325,7 @@ export default function AdminOrders() {
                     </select>
                   </label>
                   <div className="order-shipping-fields">
-                    {Array.from({ length: activeOrder.enviopackPackages?.length || packageCount }, (_, index) => <div key={index} className="order-logistics-summary">
+                    {Array.from({ length: packageCount }, (_, index) => <div key={index} className="order-logistics-summary">
                       <strong>Bulto {index + 1}</strong>
                       <label>Alto (cm)<input name={`package-${index}-alto`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.alto ?? ''} placeholder="Alto" /></label>
                       <label>Ancho (cm)<input name={`package-${index}-ancho`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.ancho ?? ''} placeholder="Ancho" /></label>
