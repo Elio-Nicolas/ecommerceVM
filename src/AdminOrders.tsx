@@ -316,7 +316,7 @@ export default function AdminOrders() {
                 }
                 void createEnviopack(activeOrder, String(data.get('carrierId') || ''), packages)
               }}>
-                <p>Elegí el correo cotizado y indicá cómo preparaste físicamente el pedido. Cada fila representa un bulto real; no se genera un paquete por cada unidad comprada.</p>{activeOrder.enviopackPackages && <p className="order-logistics-footnote">Los bultos quedaron guardados para este intento y no se pueden modificar al reintentar.</p>}
+                <p>Elegí el correo cotizado y indicá cómo preparaste físicamente el pedido. Cada fila representa un bulto real; no se genera un paquete por cada unidad comprada.</p>{activeOrder.enviopackPackages && !activeOrder.enviopackShipmentId && <p className="order-logistics-footnote">Hay bultos guardados de un intento anterior. Si Envíopack no llegó a crear el envío, podés corregirlos; si ya lo creó, el sistema recuperará el envío existente para evitar duplicados.</p>}
                 {activeOrder.shippingCostOptions?.sellerOptions?.length ? <>
                   <label>Correo / operador
                     <select name="carrierId" required defaultValue="">
@@ -327,15 +327,15 @@ export default function AdminOrders() {
                   <div className="order-shipping-fields">
                     {Array.from({ length: activeOrder.enviopackPackages?.length || packageCount }, (_, index) => <div key={index} className="order-logistics-summary">
                       <strong>Bulto {index + 1}</strong>
-                      <label>Alto (cm)<input name={`package-${index}-alto`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackPackages)} defaultValue={activeOrder.enviopackPackages?.[index]?.alto ?? ''} placeholder="Alto" /></label>
-                      <label>Ancho (cm)<input name={`package-${index}-ancho`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackPackages)} defaultValue={activeOrder.enviopackPackages?.[index]?.ancho ?? ''} placeholder="Ancho" /></label>
-                      <label>Largo (cm)<input name={`package-${index}-largo`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackPackages)} defaultValue={activeOrder.enviopackPackages?.[index]?.largo ?? ''} placeholder="Largo" /></label>
-                      <label>Peso (kg)<input name={`package-${index}-peso`} type="number" min="0.01" max="1000" step="0.01" required readOnly={Boolean(activeOrder.enviopackPackages)} defaultValue={activeOrder.enviopackPackages?.[index]?.peso ?? ''} placeholder="Ej. 2.5" /></label>
+                      <label>Alto (cm)<input name={`package-${index}-alto`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.alto ?? ''} placeholder="Alto" /></label>
+                      <label>Ancho (cm)<input name={`package-${index}-ancho`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.ancho ?? ''} placeholder="Ancho" /></label>
+                      <label>Largo (cm)<input name={`package-${index}-largo`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.largo ?? ''} placeholder="Largo" /></label>
+                      <label>Peso (kg)<input name={`package-${index}-peso`} type="number" min="0.01" max="1000" step="0.01" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.peso ?? ''} placeholder="Ej. 2.5" /></label>
                     </div>)}
                   </div>
                   <div className="admin-category-actions">
-                    <button type="button" className="admin-quiet-button" disabled={Boolean(activeOrder.enviopackPackages) || packageCount <= 1 || shippingSaving} onClick={() => setPackageCount((count) => Math.max(1, count - 1))}>Quitar último bulto</button>
-                    <button type="button" className="admin-quiet-button" disabled={Boolean(activeOrder.enviopackPackages) || packageCount >= 20 || shippingSaving} onClick={() => setPackageCount((count) => Math.min(20, count + 1))}>Agregar bulto</button>
+                    <button type="button" className="admin-quiet-button" disabled={Boolean(activeOrder.enviopackShipmentId) || packageCount <= 1 || shippingSaving} onClick={() => setPackageCount((count) => Math.max(1, count - 1))}>Quitar último bulto</button>
+                    <button type="button" className="admin-quiet-button" disabled={Boolean(activeOrder.enviopackShipmentId) || packageCount >= 20 || shippingSaving} onClick={() => setPackageCount((count) => Math.min(20, count + 1))}>Agregar bulto</button>
                   </div>
                   <button className="admin-primary" disabled={shippingSaving}>{shippingSaving ? 'Creando envío...' : 'Crear envío en Envíopack'}</button>
                 </> : <p className="order-logistics-unavailable">La cotización no guardó opciones de transportista con costo interno. No se puede generar el envío hasta contar con una opción válida.</p>}
