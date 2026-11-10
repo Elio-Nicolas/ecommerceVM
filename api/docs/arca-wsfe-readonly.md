@@ -8,7 +8,7 @@ Operaciones habilitadas en esta etapa:
 
 - `FEParamGetPtosVenta`: consulta puntos de venta y su estado.
 - `FEParamGetTiposCbte`: consulta tipos de comprobante.
-- `FEParamGetCondicionIvaReceptor`: consulta condiciones de IVA del receptor; permite filtrar por clase A, B, C, M o 49.
+- `FEParamGetCondicionIvaReceptor`: consulta condiciones de IVA del receptor; permite filtrar por clase A, ALEY, B, C o 49.
 - `FECompUltimoAutorizado`: consulta el último número autorizado para un punto de venta y tipo de comprobante.
 
 No se implementan ni exponen `FECAESolicitar`, notas de crédito/débito ni ninguna operación que autorice comprobantes. Este módulo no crea facturas ni modifica pedidos o documentos fiscales.
@@ -26,6 +26,8 @@ El entorno se recibe explícitamente en cada función y debe coincidir con el en
 - `getArcaVoucherTypes(environment)`
 - `getArcaIvaReceiverConditions(environment, voucherClass?)`
 - `getArcaLastAuthorizedVoucher(environment, pointOfSale, voucherType)`
+
+El filtro opcional `voucherClass` acepta únicamente los valores documentados por WSFEv1 v4.1: `A`, `ALEY`, `B`, `C` y `49`.
 
 Las funciones validan parámetros locales, aplican timeout a la llamada SOAP y convierten errores SOAP/WSFE en excepciones sin registrar token, firma ni contenido de autenticación.
 
