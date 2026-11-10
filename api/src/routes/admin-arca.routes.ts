@@ -10,6 +10,7 @@ import { getArcaAccessTicket } from '../services/arca-wsaa'
 import { getArcaIvaReceiverConditions, getArcaLastAuthorizedVoucher, getArcaPointsOfSale, getArcaVoucherTypes } from '../services/arca-wsfe-readonly'
 import { buildArcaInvoiceCRequestPayload, requestArcaInvoiceC } from '../services/arca-wsfe-issue'
 import { consultArcaVoucher } from '../services/arca-wsfe-consult'
+import { generateArcaInvoicePdf, assertArcaIssuerProfileConfigured } from '../services/arca-invoice-pdf'
 
 export const adminArcaRouter = Router()
 adminArcaRouter.use(requireAdmin)
@@ -419,5 +420,68 @@ adminArcaRouter.post('/documents/:documentId/reconcile', reconcileLimiter, async
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo conciliar el comprobante con ARCA.'
     res.status(500).json({ error: { code: 'ARCA_RECONCILIATION_FAILED', message } })
+  }
+})
+
+
+const invoicePdfLimiter = rateLimit({ windowMs: 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false })
+
+// Genera y conserva la representación impresa únicamente para comprobantes autorizados.
+adminArcaRouter.get('/documents/:documentId/pdf', invoicePdfLimiter, async (req, res) => {
+  const documentId = String(req.params.documentId)
+  const settings = await getSettings()
+  if (settings.environment !== 'HOMOLOGATION') {
+    res.status(409).json({ error: { code: 'ARCA_PDF_ENVIRONMENT', message: 'La descarga de comprobantes está habilitada únicamente para homologación.' } })
+    return
+  }
+  if (!env.ARCA_CUIT) {
+    res.status(409).json({ error: { code: 'ARCA_CUIT_MISSING', message: 'Falta configurar ARCA_CUIT en la API.' } })
+    return
+  }
+
+  try {
+    assertArcaIssuerProfileConfigured()
+    const document = await prisma.fiscalDocument.findUnique({ where: { id: documentId } })
+    if (!document || document.type !== FiscalDocumentType.INVOICE_C) {
+      res.status(404).json({ error: { code: 'ARCA_DOCUMENT_NOT_FOUND', message: 'No se encontró la Factura C solicitada.' } })
+      return
+    }
+    if (document.status !== FiscalDocumentStatus.AUTHORIZED || !document.cae || !document.caeExpiresAt ||
+      !document.pointOfSale || !document.voucherNumber || !document.issueDate || !document.receiverName) {
+      res.status(409).json({ error: { code: 'ARCA_INVOICE_NOT_AUTHORIZED', message: 'Solo se puede descargar una factura con autorización y CAE confirmados por ARCA.' } })
+      return
+    }
+
+    const pdf = document.pdf?.length
+      ? Buffer.from(document.pdf)
+      : await generateArcaInvoicePdf({
+          cuit: env.ARCA_CUIT,
+          pointOfSale: document.pointOfSale,
+          voucherType: document.voucherType,
+          voucherNumber: document.voucherNumber,
+          issueDate: document.issueDate,
+          receiverDocumentType: document.receiverDocumentType,
+          receiverDocumentNumber: document.receiverDocumentNumber,
+          receiverName: document.receiverName,
+          receiverAddress: document.receiverAddress,
+          currencyCode: document.currencyCode,
+          currencyRate: document.currencyRate ? Number(document.currencyRate) : 1,
+          totalAmountArs: document.totalAmountArs,
+          cae: document.cae,
+          caeExpiresAt: document.caeExpiresAt,
+          items: document.items,
+        })
+
+    if (!document.pdf?.length) {
+      await prisma.fiscalDocument.update({ where: { id: document.id }, data: { pdf } })
+    }
+    const filename = `factura-c-${String(document.pointOfSale).padStart(5, '0')}-${String(document.voucherNumber).padStart(8, '0')}.pdf`
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Content-Length', String(pdf.length))
+    res.send(pdf)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudo generar el PDF fiscal.'
+    res.status(409).json({ error: { code: 'ARCA_PDF_GENERATION_FAILED', message } })
   }
 })
