@@ -163,7 +163,7 @@ async function requestTicket(environment: ArcaEnvironment): Promise<ArcaAccessTi
 
 export async function getArcaAccessTicket(environment: ArcaEnvironment): Promise<ArcaAccessTicket> {
   const { cuit } = requiredConfig()
-  const cacheKey = \`\${environment}:wsfe:\${cuit}\`
+  const cacheKey = environment + ':wsfe:' + cuit
   const cached = ticketCache.get(cacheKey)
   const now = Date.now()
 
