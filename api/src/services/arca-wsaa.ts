@@ -219,6 +219,10 @@ export async function getArcaAccessTicket(environment: ArcaEnvironment): Promise
         })
         .finally(() => ticketRequests.delete(cacheKey))
 
+      // The first caller already received the still-valid cached ticket.
+      // Handle a background rejection to avoid an unhandledRejection; callers
+      // that join ticketRequests still receive the original promise and error.
+      void refresh.catch(() => undefined)
       ticketRequests.set(cacheKey, refresh)
     }
 
