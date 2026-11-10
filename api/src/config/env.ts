@@ -5,7 +5,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().url().default('http://localhost:5287'),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
-  ARCA_CUIT: z.string().regex(/^\\d{11}$/).optional(),
+  ARCA_CUIT: z.string().regex(/^\d{11}$/).optional(),
   ARCA_CERTIFICATE_PATH: z.string().min(1).optional(),
   ARCA_PRIVATE_KEY_PATH: z.string().min(1).optional(),
   ARCA_OPENSSL_PATH: z.string().min(1).default('openssl'),
