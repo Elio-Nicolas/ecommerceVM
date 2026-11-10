@@ -69,6 +69,20 @@ function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 
+function samePackageList(stored: unknown, incoming: EnviopackPackageInput[]): boolean {
+  if (!Array.isArray(stored) || stored.length !== incoming.length) return false
+  return stored.every((value, index) => {
+    const saved = asObject(value)
+    const current = incoming[index]
+    return Number(saved.alto) === current.alto
+      && Number(saved.ancho) === current.ancho
+      && Number(saved.largo) === current.largo
+      && Number(saved.peso) === current.peso
+      && String(saved.descripcion_primera_linea || '') === String(current.descripcion_primera_linea || 'Pedido ecommerceVM')
+      && String(saved.descripcion_segunda_linea || '') === String(current.descripcion_segunda_linea || '')
+  })
+}
+
 export type EnviopackPackageInput = { alto: number; ancho: number; largo: number; peso: number; descripcion_primera_linea?: string; descripcion_segunda_linea?: string }
 
 export async function createEnviopackShipment(orderId: string, carrierId: string, inputPackages: EnviopackPackageInput[]) {
@@ -164,7 +178,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
   if (pendingShipment && !order.enviopackPackages) {
     throw new EnviopackShipmentError('Ya existe un envío pendiente en Envíopack sin un registro local de sus bultos. Revisá ese envío en Envíopack antes de continuar para evitar duplicados o datos de embalaje incorrectos.')
   }
-  if (pendingShipment && order.enviopackPackages && JSON.stringify(order.enviopackPackages) !== JSON.stringify(packages)) {
+  if (pendingShipment && order.enviopackPackages && !samePackageList(order.enviopackPackages, packages)) {
     throw new EnviopackShipmentError('Envíopack ya tiene un envío pendiente con otros bultos. Para evitar inconsistencias, recuperá los datos guardados del intento anterior.')
   }
   // Si Envíopack confirma que todavía no existe un envío asociado, se pueden corregir
