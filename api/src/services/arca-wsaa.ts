@@ -163,10 +163,25 @@ async function requestTicket(environment: ArcaEnvironment): Promise<ArcaAccessTi
 
 export async function getArcaAccessTicket(environment: ArcaEnvironment): Promise<ArcaAccessTicket> {
   const { cuit } = requiredConfig()
-  const cacheKey = `${environment}:wsfe:${cuit}`
+  const cacheKey = \`\${environment}:wsfe:\${cuit}\`
   const cached = ticketCache.get(cacheKey)
+  const now = Date.now()
 
-  if (cached && cached.expiresAt.getTime() - Date.now() > 5 * 60 * 1000) {
+  if (cached && cached.expiresAt.getTime() > now) {
+    // Keep serving a valid ticket immediately; refresh it in the background
+    // once it enters the five-minute renewal window.
+    if (cached.expiresAt.getTime() - now <= 5 * 60 * 1000 && !ticketRequests.has(cacheKey)) {
+      const refresh = requestTicket(environment)
+        .then((ticket) => {
+          ticketCache.set(cacheKey, ticket)
+          return ticket
+        })
+        .catch(() => cached)
+        .finally(() => ticketRequests.delete(cacheKey))
+
+      ticketRequests.set(cacheKey, refresh)
+    }
+
     return cached
   }
 
@@ -177,13 +192,6 @@ export async function getArcaAccessTicket(environment: ArcaEnvironment): Promise
     .then((ticket) => {
       ticketCache.set(cacheKey, ticket)
       return ticket
-    })
-    .catch((error: unknown) => {
-      // A ticket remains usable until its actual expiration, even when refresh fails.
-      if (cached && cached.expiresAt.getTime() > Date.now()) {
-        return cached
-      }
-      throw error
     })
     .finally(() => ticketRequests.delete(cacheKey))
 
