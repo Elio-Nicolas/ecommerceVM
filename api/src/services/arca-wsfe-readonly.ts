@@ -178,8 +178,8 @@ export async function getArcaLastAuthorizedVoucher(
   pointOfSale: number,
   voucherType: number,
 ): Promise<ArcaLastAuthorized> {
-  if (!Number.isInteger(pointOfSale) || pointOfSale < 1 || pointOfSale > 99_999) {
-    throw new Error('El punto de venta debe ser un entero entre 1 y 99999')
+  if (!Number.isInteger(pointOfSale) || pointOfSale < 1 || pointOfSale > 99_998) {
+    throw new Error('El punto de venta debe ser un entero entre 1 y 99998')
   }
   if (!Number.isInteger(voucherType) || voucherType < 1) {
     throw new Error('El tipo de comprobante debe ser un entero positivo')
