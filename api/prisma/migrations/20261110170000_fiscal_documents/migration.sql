@@ -23,6 +23,7 @@ CREATE TABLE "FiscalDocument" (
   "issueDate" TIMESTAMP(3),
   "receiverDocumentType" INTEGER,
   "receiverDocumentNumber" TEXT,
+  "receiverVatConditionId" INTEGER,
   "receiverName" TEXT,
   "receiverAddress" TEXT,
   "currencyCode" TEXT NOT NULL DEFAULT 'PES',
