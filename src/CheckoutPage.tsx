@@ -25,6 +25,7 @@ type ShippingQuote = {
   expiresAt: string
 }
 type CreatedOrder = {
+  id: string
   code: string
   subtotalArs: number
   shippingCostArs: number | null
@@ -85,6 +86,37 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const localDeliveryAvailable = Boolean(deliveryMethods?.localDelivery.enabled && deliveryMethods.localDelivery.postalCodes.includes(postalCode))
   const selectedShippingPrice = deliveryMethod === 'PICKUP' ? 0 : deliveryMethod === 'LOCAL_DELIVERY' ? (deliveryMethods?.localDelivery.priceArs ?? 0) : (selectedOption?.priceArs ?? 0)
   const canSubmit = deliveryMethod === 'PICKUP' ? Boolean(deliveryMethods?.pickup.enabled) : deliveryMethod === 'LOCAL_DELIVERY' ? localDeliveryAvailable : Boolean(quote && selectedOption && !quoteExpired)
+
+  useEffect(() => {
+    if (!createdOrder || createdOrder.shippingCostArs !== null) return
+    const controller = new AbortController()
+    const refreshReceipt = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/v1/orders/${encodeURIComponent(createdOrder.id)}/receipt`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const payload = await response.json() as {
+          data?: { shippingCostArs: number | null; totalArs: number | null }
+        }
+        if (payload.data && payload.data.shippingCostArs !== null) {
+          setCreatedOrder((current) => current ? {
+            ...current,
+            shippingCostArs: payload.data!.shippingCostArs,
+            totalArs: payload.data!.totalArs,
+          } : current)
+        }
+      } catch {
+        // Se reintenta mientras el comprobante siga abierto.
+      }
+    }
+    const interval = window.setInterval(() => void refreshReceipt(), 5000)
+    return () => {
+      window.clearInterval(interval)
+      controller.abort()
+    }
+  }, [createdOrder?.id, createdOrder?.shippingCostArs])
 
   useEffect(() => {
     if (deliveryMethod === 'LOCAL_DELIVERY' && /^\d{4}$/.test(postalCode) && deliveryMethods?.localDelivery.enabled && !localDeliveryAvailable) {
@@ -215,6 +247,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-total"><span>Productos</span><strong>{formatPrice(createdOrder.subtotalArs)}</strong></div>
           <div className="checkout-success-total"><span>Envío</span><strong>{createdOrder.shippingCostArs === null ? 'A coordinar' : formatPrice(createdOrder.shippingCostArs)}</strong></div>
           <div className="checkout-success-total"><span>Total</span><strong>{createdOrder.totalArs === null ? 'A confirmar' : formatPrice(createdOrder.totalArs)}</strong></div>
+          {createdOrder.shippingCostArs === null && <p className="checkout-small">Estamos esperando que se registre el costo acordado. El envío y el total se actualizarán automáticamente en este comprobante.</p>}
           <p className="checkout-small">Este pedido quedó registrado, pero todavía no fue cobrado.</p>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
         </section>
@@ -245,7 +278,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <div className="checkout-fields">
               <label>Nombre y apellido<input required minLength={2} maxLength={120} autoComplete="name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
               <label>Teléfono / WhatsApp<input required type="tel" minLength={8} maxLength={30} autoComplete="tel" placeholder="Ej. 2657 123456" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} /></label>
-              <label className="checkout-field-full">Correo electrónico <span>(opcional)</span><input type="email" maxLength={160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
+              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'ENVIOPACK' ? <span>(obligatorio para el envío)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'ENVIOPACK'} maxLength={deliveryMethod === 'ENVIOPACK' ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
             </div>
           </section>
           <section className="checkout-card">
@@ -276,7 +309,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
               </label>}
               {deliveryMethods.enviopack.enabled && <label className={deliveryMethod === 'ENVIOPACK' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
                 <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'ENVIOPACK'} onChange={() => setDeliveryMethod('ENVIOPACK')} />
-                <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por Envíopack</strong><small>Cotización según el código postal de destino.</small></span>
+                <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por Envíopack</strong><small>Un único bulto consolidado con el peso y las dimensiones estimadas de todo el pedido.</small></span>
               </label>}
             </div>}
             {deliveryMethod === 'PICKUP' ? <p className="checkout-shipping-hint">El retiro no depende de tu localidad. Coordinaremos la entrega del pedido luego de confirmarlo.</p> : deliveryMethod === 'LOCAL_DELIVERY' ? <p className="checkout-shipping-hint">{localDeliveryAvailable ? 'La entrega local está disponible para tu destino.' : 'Ingresá un código postal cubierto por la entrega local.'}</p> : null}

@@ -116,6 +116,15 @@ model Order {
   deliveryMethod String @default("ENVIOPACK")
   shippingInternalCostArs Int?
   deliveryInstructions String?
+  provinceCode String?
+  enviopackOrderId String?
+  enviopackShipmentId String? @unique
+  enviopackShipmentStatus String?
+  enviopackTrackingNumber String?
+  enviopackProcessedAt DateTime?
+  enviopackPackages Json?
+  enviopackLabelPdf Bytes?
+  enviopackLabelSavedAt DateTime?
   items OrderItem[]
   history OrderStatusHistory[]
   createdAt DateTime @default(now())
@@ -123,6 +132,7 @@ model Order {
   @@index([status, createdAt])
   @@index([customerPhone])
   @@index([customerName])
+  @@index([enviopackOrderId])
 }
 model ShippingQuote {
   id String @id @default(uuid())
@@ -147,6 +157,10 @@ model OrderItem {
   unitPriceArs Int
   quantity Int
   lineTotalArs Int
+  weightGrams Int?
+  packageLengthCm Int?
+  packageWidthCm Int?
+  packageHeightCm Int?
   createdAt DateTime @default(now())
   @@index([orderId])
   @@index([productId])
@@ -162,4 +176,17 @@ model OrderStatusHistory {
   changedByAdmin AdminUser? @relation(fields: [changedByAdminId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   @@index([orderId, createdAt])
+}
+model EnviopackWebhookEvent {
+  id String @id @default(uuid())
+  shipmentId String
+  type String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  lastError String?
+  receivedAt DateTime @default(now())
+  lockedAt DateTime?
+  processedAt DateTime?
+  @@index([status, receivedAt])
+  @@index([shipmentId])
 }

@@ -48,9 +48,37 @@ class OrderConflictError extends Error {
   }
 }
 
+const receiptRefreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+})
+
+ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
+  const id = z.string().uuid().safeParse(req.params.id)
+  if (!id.success) {
+    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  const order = await prisma.order.findUnique({
+    where: { id: id.data },
+    select: { shippingCostArs: true, totalArs: true },
+  })
+  if (!order) {
+    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  res.setHeader('Cache-Control', 'no-store')
+  res.json({ data: order })
+})
+
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
   try {
+    if (input.deliveryMethod === 'ENVIOPACK' && (!input.customerEmail || input.customerEmail.length > 100)) {
+      throw new OrderConflictError('Para realizar un envío por Envíopack necesitamos un correo electrónico válido de hasta 100 caracteres.')
+    }
     const deliverySettings = await getShippingSettings()
     const order = await prisma.$transaction(async (tx) => {
       const now = new Date()
@@ -134,6 +162,10 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           unitPriceArs: product.priceArs,
           quantity: item.quantity,
           lineTotalArs: product.priceArs * item.quantity,
+          weightGrams: product.weightGrams,
+          packageLengthCm: product.packageLengthCm,
+          packageWidthCm: product.packageWidthCm,
+          packageHeightCm: product.packageHeightCm,
         }
       })
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
@@ -166,6 +198,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           addressLine: input.addressLine,
           city: input.city,
           province: input.province,
+          provinceCode: input.provinceCode || null,
           postalCode: input.postalCode,
           customerNotes: input.customerNotes,
           subtotalArs,
