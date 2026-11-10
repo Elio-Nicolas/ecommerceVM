@@ -56,12 +56,17 @@ function splitCustomerName(fullName: string) {
 }
 
 function splitStreet(addressLine: string) {
-  const match = addressLine.trim().match(/^(.+?)\s+(\d{1,5}[A-Za-z]?)(?:\s*[,;]\s*(.*)|\s+(.*))?$/)
-  if (!match) throw new EnviopackShipmentError('La dirección del pedido debe incluir calle y altura para generar la etiqueta. Corregí el domicilio antes de continuar.')
+  // La altura debe ser el último token numérico de la calle. El prefijo
+  // es greedy para no confundir números que forman parte del nombre:
+  // "Av. 9 de Julio 1234" => calle "Av. 9 de Julio", altura "1234".
+  // Las referencias adicionales deben separarse con coma o punto y coma.
+  const [streetAndNumber, ...referenceParts] = addressLine.trim().split(/[,;]/)
+  const match = streetAndNumber.trim().match(/^(.+)\s+(\d{1,5}[A-Za-z]?)$/)
+  if (!match) throw new EnviopackShipmentError('La dirección del pedido debe incluir calle y altura al final del domicilio. Si agregás una referencia, separala con una coma. Corregí el domicilio antes de continuar.')
   return {
-    calle: match[1].slice(0, 50),
+    calle: match[1].trim().slice(0, 50),
     numero: match[2].slice(0, 5),
-    referencia: (match[3] || match[4] || '').trim().slice(0, 30),
+    referencia: referenceParts.join(',').trim().slice(0, 30),
   }
 }
 
@@ -86,7 +91,11 @@ function samePackageList(stored: unknown, incoming: EnviopackPackageInput[]): bo
 export type EnviopackPackageInput = { alto: number; ancho: number; largo: number; peso: number; descripcion_primera_linea?: string; descripcion_segunda_linea?: string }
 
 export async function createEnviopackShipment(orderId: string, carrierId: string, inputPackages: EnviopackPackageInput[]) {
-  const order = await prisma.order.findUnique({
+  return prisma.$transaction(async (tx) => {
+    // Serializa la creación por pedido: las solicitudes concurrentes esperan
+    // y la segunda vuelve a leer el envío creado por la primera.
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`
+    const order = await tx.order.findUnique({
     where: { id: orderId },
     include: { items: true },
   })
@@ -146,7 +155,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
       if (!created.id) throw new EnviopackShipmentError('Envíopack creó el pedido pero no devolvió su identificador.')
       enviopackOrderId = String(created.id)
     }
-    await prisma.order.update({ where: { id: order.id }, data: { enviopackOrderId } })
+    await tx.order.update({ where: { id: order.id }, data: { enviopackOrderId } })
   }
 
   const packages = inputPackages.map((item) => ({
@@ -184,7 +193,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
   // Si Envíopack confirma que todavía no existe un envío asociado, se pueden corregir
   // los bultos de un intento anterior rechazado y persistir la nueva configuración.
   if (!pendingShipment) {
-    await prisma.order.update({ where: { id: order.id }, data: { enviopackPackages: packages } })
+    await tx.order.update({ where: { id: order.id }, data: { enviopackPackages: packages } })
   }
   const shipment = pendingShipment || await requestEnviopack<EnviopackResponse>('/envios', {
     method: 'POST',
@@ -211,7 +220,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
   if (!shipment.id || !['B', 'C', 'E', 'P'].includes(String(shipment.estado))) {
     throw new EnviopackShipmentError('Envíopack no devolvió un identificador y estado de envío válidos.')
   }
-  await prisma.order.update({
+  await tx.order.update({
     where: { id: order.id },
     data: {
       enviopackShipmentId: String(shipment.id),
@@ -222,6 +231,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
     },
   })
   return { shipmentId: String(shipment.id), status: String(shipment.estado) }
+  }, { maxWait: 10000, timeout: 120000 })
 }
 
 export async function refreshEnviopackShipment(shipmentId: string) {
