@@ -115,7 +115,7 @@ async function signTra(cmsInput: string): Promise<string> {
 }
 
 async function requestTicket(environment: ArcaEnvironment): Promise<ArcaAccessTicket> {
-  const { cuit } = requiredConfig()
+  requiredConfig()
   const cms = await signTra(createTra())
   const envelope = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -153,7 +153,7 @@ async function requestTicket(environment: ArcaEnvironment): Promise<ArcaAccessTi
     throw new Error('WSAA devolvió un ticket incompleto')
   }
 
-  const expiresAt = new Date(expiration)
+  const expiresAt = new Date(/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(expiration) ? expiration : `${expiration}-03:00`)
   if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
     throw new Error('WSAA devolvió un ticket vencido o con fecha inválida')
   }
