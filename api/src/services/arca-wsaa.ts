@@ -153,7 +153,7 @@ async function requestTicket(environment: ArcaEnvironment): Promise<ArcaAccessTi
     throw new Error('WSAA devolvió un ticket incompleto')
   }
 
-  const expiresAt = new Date(/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(expiration) ? expiration : `${expiration}-03:00`)
+  const expiresAt = new Date(/(?:Z|[+-][0-9]{2}:?[0-9]{2})$/i.test(expiration) ? expiration : `${expiration}-03:00`)
   if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
     throw new Error('WSAA devolvió un ticket vencido o con fecha inválida')
   }
