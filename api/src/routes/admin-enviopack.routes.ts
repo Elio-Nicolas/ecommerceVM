@@ -20,7 +20,7 @@ adminEnviopackRouter.post('/orders/:id/create', async (req, res) => {
       alto: z.number().int().min(1).max(300),
       ancho: z.number().int().min(1).max(300),
       largo: z.number().int().min(1).max(300),
-      peso: z.number().positive().max(1000),
+      peso: z.number().positive().max(1000).refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7, 'El peso admite hasta 2 decimales en kg.'),
       descripcion_primera_linea: z.string().trim().max(50).optional(),
       descripcion_segunda_linea: z.string().trim().max(50).optional(),
     })).min(1).max(20),
