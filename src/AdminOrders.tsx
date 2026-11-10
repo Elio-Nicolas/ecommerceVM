@@ -222,7 +222,7 @@ export default function AdminOrders() {
       setError('Ingresá un tipo de documento válido según ARCA.')
       return
     }
-    if (!/^\\d{1,20}$/.test(invoiceDocumentNumber.trim())) {
+    if (!/^\d{1,20}$/.test(invoiceDocumentNumber.trim())) {
       setError('Ingresá el número de documento del receptor. Para consumidor final sin identificar, usá el tipo y número que correspondan según ARCA.')
       return
     }
@@ -344,7 +344,7 @@ export default function AdminOrders() {
                   <td>{formatDate(order.createdAt)}</td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
                   <td className="admin-price">{order.totalArs === null ? 'Pendiente de envío' : formatPrice(order.totalArs)}</td>
                   <td><span className={`admin-status order-status ${order.status.toLowerCase()}`}>{statusLabels[order.status]}</span></td>
-                  <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote(''); setPackageCount(order.enviopackPackages?.length || 1) }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
+                  <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote(''); setPackageCount(order.enviopackPackages?.length || 1); setInvoiceReceiverName(''); setInvoiceReceiverAddress(''); setInvoicePaymentConfirmed(false) }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
                 </tr>)}
               </tbody></table></div>
             )}
