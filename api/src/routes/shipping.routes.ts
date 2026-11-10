@@ -60,7 +60,9 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
   const byId = new Map(products.map((product) => [product.id, product]))
   let subtotalArs = 0
   let weightGrams = 0
-  const packages: Array<{ lengthCm: number; widthCm: number; heightCm: number }> = []
+  let consolidatedLengthCm = 0
+  let consolidatedWidthCm = 0
+  let consolidatedHeightCm = 0
   for (const item of input.items) {
     const product = byId.get(item.productId)!
     if (product.stock < item.quantity) {
@@ -73,19 +75,26 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
     }
     subtotalArs += product.priceArs * item.quantity
     weightGrams += product.weightGrams * item.quantity
-    for (let count = 0; count < item.quantity; count += 1) {
-      packages.push({
-        lengthCm: product.packageLengthCm,
-        widthCm: product.packageWidthCm,
-        heightCm: product.packageHeightCm,
-      })
-    }
+
+    // Cotización: un único bulto consolidado por pedido.
+    // Se apilan las unidades: mayor largo, mayor ancho y suma de alturas.
+    consolidatedLengthCm = Math.max(consolidatedLengthCm, product.packageLengthCm)
+    consolidatedWidthCm = Math.max(consolidatedWidthCm, product.packageWidthCm)
+    consolidatedHeightCm += product.packageHeightCm * item.quantity
   }
 
-  if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000 || weightGrams < 1) {
-    res.status(422).json({ error: { code: 'SHIPPING_PACKAGE_INVALID', message: 'Los datos de peso o importe del carrito no son válidos.' } })
+  if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000
+    || !Number.isSafeInteger(weightGrams) || weightGrams < 1 || weightGrams > 1_000_000
+    || consolidatedLengthCm < 1 || consolidatedWidthCm < 1 || consolidatedHeightCm < 1
+    || consolidatedLengthCm > 300 || consolidatedWidthCm > 300 || consolidatedHeightCm > 300) {
+    res.status(422).json({ error: { code: 'SHIPPING_PACKAGE_INVALID', message: 'El peso total o las dimensiones del bulto consolidado superan los límites admitidos para cotizar. Revisá los datos de embalaje de los productos.' } })
     return
   }
+  const packages = [{
+    lengthCm: consolidatedLengthCm,
+    widthCm: consolidatedWidthCm,
+    heightCm: consolidatedHeightCm,
+  }]
 
   try {
     const credentials = await getEnviopackCredentials()
