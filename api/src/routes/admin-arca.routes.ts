@@ -9,6 +9,7 @@ import { requireAdmin } from '../middleware/require-admin'
 import { getArcaAccessTicket } from '../services/arca-wsaa'
 import { getArcaIvaReceiverConditions, getArcaLastAuthorizedVoucher, getArcaPointsOfSale, getArcaVoucherTypes } from '../services/arca-wsfe-readonly'
 import { buildArcaInvoiceCRequestPayload, requestArcaInvoiceC } from '../services/arca-wsfe-issue'
+import { consultArcaVoucher } from '../services/arca-wsfe-consult'
 
 export const adminArcaRouter = Router()
 adminArcaRouter.use(requireAdmin)
@@ -327,5 +328,96 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
       data: updated,
       message: 'No se pudo confirmar la respuesta de ARCA. El comprobante quedó bloqueado para evitar una emisión duplicada; requiere conciliación antes de reintentar.',
     })
+  }
+})
+
+
+const reconcileLimiter = rateLimit({ windowMs: 60 * 1000, limit: 2, standardHeaders: 'draft-8', legacyHeaders: false })
+
+// Consulta el comprobante exacto en ARCA. Nunca vuelve a emitirlo.
+adminArcaRouter.post('/documents/:documentId/reconcile', reconcileLimiter, async (req, res) => {
+  const documentId = String(req.params.documentId)
+  const settings = await getSettings()
+  if (settings.environment !== 'HOMOLOGATION') {
+    res.status(409).json({ error: { code: 'ARCA_RECONCILIATION_ENVIRONMENT', message: 'La conciliación está habilitada únicamente en homologación.' } })
+    return
+  }
+  if (!env.ARCA_CUIT || !env.ARCA_CERTIFICATE_PATH || !env.ARCA_PRIVATE_KEY_PATH) {
+    res.status(409).json({ error: { code: 'ARCA_CREDENTIALS_MISSING', message: 'Falta configurar CUIT, certificado y clave privada en la API.' } })
+    return
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`arca-reconcile-${documentId}`}, 0))`
+      const document = await tx.fiscalDocument.findUnique({ where: { id: documentId } })
+      if (!document || document.type !== FiscalDocumentType.INVOICE_C) {
+        return { status: 404 as const, message: 'No se encontró la Factura C solicitada.', data: null }
+      }
+      if (document.status === FiscalDocumentStatus.AUTHORIZED) {
+        return { status: 200 as const, message: 'El comprobante ya figura autorizado en el sistema.', data: document }
+      }
+      if (document.status !== FiscalDocumentStatus.PENDING && document.status !== FiscalDocumentStatus.ISSUING && document.status !== FiscalDocumentStatus.UNKNOWN) {
+        return { status: 409 as const, message: 'Este comprobante no está pendiente de conciliación.', data: document }
+      }
+      if (!document.pointOfSale || !document.voucherNumber) {
+        return { status: 409 as const, message: 'El registro no tiene punto de venta y número reservados para consultar en ARCA.', data: document }
+      }
+
+      try {
+        const lookup = await consultArcaVoucher('HOMOLOGATION', {
+          pointOfSale: document.pointOfSale,
+          voucherType: document.voucherType,
+          voucherNumber: document.voucherNumber,
+        })
+        const updated = await tx.fiscalDocument.update({
+          where: { id: document.id },
+          data: lookup.outcome === 'AUTHORIZED'
+            ? {
+                status: FiscalDocumentStatus.AUTHORIZED,
+                cae: lookup.cae,
+                caeExpiresAt: lookup.caeExpiresAt,
+                authorizedAt: new Date(),
+                responsePayload: lookup.responsePayload as Prisma.InputJsonValue,
+                lastErrorCode: null,
+                lastErrorMessage: null,
+              }
+            : {
+                status: FiscalDocumentStatus.REJECTED,
+                cae: null,
+                caeExpiresAt: null,
+                authorizedAt: null,
+                responsePayload: lookup.responsePayload as Prisma.InputJsonValue,
+                lastErrorCode: 'ARCA_VOUCHER_NOT_FOUND',
+                lastErrorMessage: lookup.message,
+              },
+        })
+        return { status: 200 as const, message: lookup.message, data: updated }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'No se pudo obtener una respuesta concluyente de ARCA.'
+        const updated = await tx.fiscalDocument.update({
+          where: { id: document.id },
+          data: {
+            status: FiscalDocumentStatus.UNKNOWN,
+            lastErrorCode: 'ARCA_RECONCILIATION_INCONCLUSIVE',
+            lastErrorMessage: message.slice(0, 1000),
+          },
+        })
+        return {
+          status: 202 as const,
+          message: 'ARCA no devolvió una respuesta concluyente. El comprobante sigue bloqueado para evitar duplicados; podés volver a consultar más tarde.',
+          data: updated,
+        }
+      }
+    }, { maxWait: 10_000, timeout: 35_000 })
+
+    if (!result.data) {
+      res.status(result.status).json({ error: { code: 'ARCA_DOCUMENT_NOT_FOUND', message: result.message } })
+      return
+    }
+    res.status(result.status).json({ data: result.data, message: result.message })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudo conciliar el comprobante con ARCA.'
+    res.status(500).json({ error: { code: 'ARCA_RECONCILIATION_FAILED', message } })
   }
 })

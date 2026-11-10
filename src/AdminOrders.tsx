@@ -263,6 +263,29 @@ export default function AdminOrders() {
     }
   }
 
+
+  async function reconcileInvoiceC(order: Order, documentId: string) {
+    if (!token || invoiceIssuing) return
+    if (!window.confirm(`Se consultará en ARCA homologación la Factura C reservada para el pedido ${order.code}. No se enviará una nueva emisión. ¿Continuar?`)) return
+    setInvoiceIssuing(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await request<{ data: { status: string }; message: string }>(
+        `/admin/arca/documents/${documentId}/reconcile`,
+        token,
+        { method: 'POST' },
+      )
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo consultar el comprobante en ARCA.')
+      await loadOrders(token)
+    } finally {
+      setInvoiceIssuing(false)
+    }
+  }
+
   async function changeStatus(order: Order, next: OrderStatus) {
     if (!token || updating) return
     setUpdating(true)
@@ -366,6 +389,7 @@ export default function AdminOrders() {
                 <div><strong>{document.status === 'AUTHORIZED' ? 'Autorizada' : document.status === 'REJECTED' ? 'Rechazada' : document.status === 'UNKNOWN' ? 'Pendiente de conciliación' : 'Emisión en curso'}</strong><small>{document.pointOfSale ? `Punto de venta ${document.pointOfSale}` : ''}{document.voucherNumber ? ` · Comprobante ${String(document.voucherNumber).padStart(8, '0')}` : ''}</small></div>
                 {document.cae && <div><span>CAE</span><strong>{document.cae}</strong><small>Vencimiento: {document.caeExpiresAt ? formatDate(document.caeExpiresAt) : 'No informado'}</small></div>}
                 {document.lastErrorMessage && <p>{document.lastErrorMessage}</p>}
+                {['ISSUING', 'UNKNOWN', 'PENDING'].includes(document.status) && <button type="button" className="admin-quiet-button" disabled={invoiceIssuing} onClick={() => void reconcileInvoiceC(activeOrder, document.id)}>{invoiceIssuing ? 'Consultando ARCA...' : 'Conciliar con ARCA'}</button>}
               </div>)}
               {!(activeOrder.fiscalDocuments || []).some((document) => document.type === 'INVOICE_C' && ['AUTHORIZED', 'ISSUING', 'UNKNOWN', 'PENDING'].includes(document.status)) && activeOrder.status !== 'PENDING' && activeOrder.status !== 'CANCELLED' && (
                 <form className="order-fiscal-form" onSubmit={(event) => void issueInvoiceC(activeOrder, event)}>
