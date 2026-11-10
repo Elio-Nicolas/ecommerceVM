@@ -19,6 +19,7 @@ type Order = {
   enviopackOrderId: string | null; enviopackShipmentId: string | null; enviopackShipmentStatus: string | null
   enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null; enviopackPackages: EnviopackPackage[] | null; enviopackLabelSavedAt: string | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
+  fiscalDocuments?: { id: string; type: 'INVOICE_C' | 'CREDIT_NOTE_C' | 'DEBIT_NOTE_C'; status: 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'; pointOfSale: number | null; voucherType: number; voucherNumber: number | null; cae: string | null; caeExpiresAt: string | null; lastErrorMessage: string | null; createdAt: string }[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
 
@@ -77,6 +78,13 @@ export default function AdminOrders() {
   const [printSelection, setPrintSelection] = useState<string[]>([])
   const [printOrders, setPrintOrders] = useState<Order[]>([])
   const [printKind, setPrintKind] = useState<'receipt' | 'prep' | null>(null)
+  const [invoiceDocumentType, setInvoiceDocumentType] = useState('99')
+  const [invoiceDocumentNumber, setInvoiceDocumentNumber] = useState('0')
+  const [invoiceVatCondition, setInvoiceVatCondition] = useState('')
+  const [invoiceReceiverName, setInvoiceReceiverName] = useState('')
+  const [invoiceReceiverAddress, setInvoiceReceiverAddress] = useState('')
+  const [invoicePaymentConfirmed, setInvoicePaymentConfirmed] = useState(false)
+  const [invoiceIssuing, setInvoiceIssuing] = useState(false)
 
   const loadOrders = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -201,6 +209,60 @@ export default function AdminOrders() {
     } finally { setShippingSaving(false) }
   }
 
+  async function issueInvoiceC(order: Order, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token || invoiceIssuing) return
+    if (!invoicePaymentConfirmed) {
+      setError('Confirmá que verificaste el cobro antes de emitir la factura.')
+      return
+    }
+    const documentType = Number(invoiceDocumentType)
+    const vatCondition = Number(invoiceVatCondition)
+    if (!Number.isInteger(documentType) || documentType < 1 || documentType > 99) {
+      setError('Ingresá un tipo de documento válido según ARCA.')
+      return
+    }
+    if (!/^\\d{1,20}$/.test(invoiceDocumentNumber.trim())) {
+      setError('Ingresá el número de documento del receptor. Para consumidor final sin identificar, usá el tipo y número que correspondan según ARCA.')
+      return
+    }
+    if (!Number.isInteger(vatCondition) || vatCondition < 1) {
+      setError('Ingresá la condición frente al IVA del receptor usando el ID informado por ARCA.')
+      return
+    }
+    if (!window.confirm(`Vas a solicitar una Factura C de prueba en ARCA homologación para el pedido ${order.code}. Verificá que el pago esté efectivamente cobrado. ¿Continuar?`)) return
+
+    setInvoiceIssuing(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await request<{ data: { status: string; voucherNumber: number | null; cae: string | null }; message: string }>(
+        `/admin/arca/orders/${order.id}/invoice-c`,
+        token,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            requestKey: crypto.randomUUID(),
+            paymentConfirmed: true,
+            receiverDocumentType: documentType,
+            receiverDocumentNumber: invoiceDocumentNumber.trim(),
+            receiverVatConditionId: vatCondition,
+            receiverName: invoiceReceiverName.trim() || order.customerName,
+            receiverAddress: invoiceReceiverAddress.trim() || [order.addressLine, order.city, order.province, order.postalCode].filter(Boolean).join(', '),
+          }),
+        },
+      )
+      setNotice(result.message)
+      setInvoicePaymentConfirmed(false)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo emitir la Factura C.')
+      await loadOrders(token)
+    } finally {
+      setInvoiceIssuing(false)
+    }
+  }
+
   async function changeStatus(order: Order, next: OrderStatus) {
     if (!token || updating) return
     setUpdating(true)
@@ -298,6 +360,30 @@ export default function AdminOrders() {
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
             <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de coordinación' : `Envío: ${formatPrice(activeOrder.shippingCostArs)}`}</small><span>Total del pedido</span><strong>{activeOrder.totalArs === null ? 'Pendiente de coordinación' : formatPrice(activeOrder.totalArs)}</strong></div>
+            <section className="order-fiscal-card">
+              <div className="order-fiscal-heading"><div><span className="admin-kicker">ARCA · HOMOLOGACIÓN</span><h3>Factura C</h3></div><small>Emisión manual de prueba</small></div>
+              {(activeOrder.fiscalDocuments || []).filter((document) => document.type === 'INVOICE_C').map((document) => <div className={`order-fiscal-document ${document.status.toLowerCase()}`} key={document.id}>
+                <div><strong>{document.status === 'AUTHORIZED' ? 'Autorizada' : document.status === 'REJECTED' ? 'Rechazada' : document.status === 'UNKNOWN' ? 'Pendiente de conciliación' : 'Emisión en curso'}</strong><small>{document.pointOfSale ? `Punto de venta ${document.pointOfSale}` : ''}{document.voucherNumber ? ` · Comprobante ${String(document.voucherNumber).padStart(8, '0')}` : ''}</small></div>
+                {document.cae && <div><span>CAE</span><strong>{document.cae}</strong><small>Vencimiento: {document.caeExpiresAt ? formatDate(document.caeExpiresAt) : 'No informado'}</small></div>}
+                {document.lastErrorMessage && <p>{document.lastErrorMessage}</p>}
+              </div>)}
+              {!(activeOrder.fiscalDocuments || []).some((document) => document.type === 'INVOICE_C' && ['AUTHORIZED', 'ISSUING', 'UNKNOWN', 'PENDING'].includes(document.status)) && activeOrder.status !== 'PENDING' && activeOrder.status !== 'CANCELLED' && (
+                <form className="order-fiscal-form" onSubmit={(event) => void issueInvoiceC(activeOrder, event)}>
+                  <p>Emití solo después de verificar el cobro. La prueba se realiza en homologación y no genera una factura fiscal válida para el comprador.</p>
+                  <div className="order-fiscal-grid">
+                    <label>Tipo de documento ARCA<input type="number" min="1" max="99" value={invoiceDocumentType} onChange={(event) => setInvoiceDocumentType(event.target.value)} required /></label>
+                    <label>Número de documento<input inputMode="numeric" value={invoiceDocumentNumber} onChange={(event) => setInvoiceDocumentNumber(event.target.value)} required /></label>
+                    <label>Condición IVA receptor (ID ARCA)<input type="number" min="1" value={invoiceVatCondition} onChange={(event) => setInvoiceVatCondition(event.target.value)} placeholder="Consultar en ARCA" required /></label>
+                    <label>Nombre receptor<input value={invoiceReceiverName || activeOrder.customerName} onChange={(event) => setInvoiceReceiverName(event.target.value)} maxLength={200} /></label>
+                    <label className="order-fiscal-full">Domicilio receptor<input value={invoiceReceiverAddress || [activeOrder.addressLine, activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(', ')} onChange={(event) => setInvoiceReceiverAddress(event.target.value)} maxLength={300} /></label>
+                  </div>
+                  <label className="order-fiscal-confirm"><input type="checkbox" checked={invoicePaymentConfirmed} onChange={(event) => setInvoicePaymentConfirmed(event.target.checked)} /> Confirmo que verifiqué que este pedido está cobrado.</label>
+                  <button className="admin-primary" disabled={invoiceIssuing || !invoicePaymentConfirmed}>{invoiceIssuing ? 'Solicitando autorización...' : 'Emitir Factura C de prueba'}</button>
+                </form>
+              )}
+              {(activeOrder.fiscalDocuments || []).some((document) => document.type === 'INVOICE_C' && ['ISSUING', 'UNKNOWN', 'PENDING'].includes(document.status)) && <p className="order-fiscal-warning">Hay una solicitud sin resultado concluyente. La emisión está bloqueada para evitar duplicados; primero hay que consultar y conciliar el comprobante con ARCA.</p>}
+              {activeOrder.status === 'PENDING' && <p className="order-fiscal-help">Primero confirmá el pedido y verificá el pago.</p>}
+            </section>
             {activeOrder.deliveryMethod !== 'PICKUP' && activeOrder.shippingCarrier && <div className="order-shipping-meta"><span>OPERADOR</span><strong>{activeOrder.shippingCarrier}</strong>{activeOrder.shippingService && <><span>SERVICIO</span><strong>{activeOrder.shippingService}</strong></>}{activeOrder.shippingEstimatedHours && <><span>PLAZO ESTIMADO</span><strong>{Math.ceil(activeOrder.shippingEstimatedHours / 24)} días</strong></>}{activeOrder.trackingCode && <><span>SEGUIMIENTO</span><strong>{activeOrder.trackingCode}</strong></>}</div>}
             {activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingInternalCostArs !== null && <section className="order-logistics-breakdown"><div><span className="admin-kicker">INFORMACIÓN INTERNA · SOLO ADMINISTRACIÓN</span><h3>Costo estimado de entrega local</h3></div><div className="order-logistics-summary"><span>Costo interno estimado</span><strong>{formatPrice(activeOrder.shippingInternalCostArs)}</strong><small>Importe configurado para esta modalidad; no es una liquidación definitiva.</small></div></section>}
             {activeOrder.shippingCostOptions && <section className="order-logistics-breakdown">
