@@ -231,7 +231,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
     },
   })
   return { shipmentId: String(shipment.id), status: String(shipment.estado) }
-  }, { maxWait: 10000, timeout: 120000 })
+  }, { maxWait: 10000, timeout: 180000 })
 }
 
 export async function refreshEnviopackShipment(shipmentId: string) {
