@@ -56,9 +56,13 @@ function splitCustomerName(fullName: string) {
 }
 
 function splitStreet(addressLine: string) {
-  const match = addressLine.trim().match(/^(.+?)\s+(\d{1,5}[A-Za-z]?)(?:\s*[,;].*|\s+.*)?$/)
+  const match = addressLine.trim().match(/^(.+?)\s+(\d{1,5}[A-Za-z]?)(?:\s*[,;]\s*(.*)|\s+(.*))?$/)
   if (!match) throw new EnviopackShipmentError('La dirección del pedido debe incluir calle y altura para generar la etiqueta. Corregí el domicilio antes de continuar.')
-  return { calle: match[1].slice(0, 50), numero: match[2].slice(0, 5) }
+  return {
+    calle: match[1].slice(0, 50),
+    numero: match[2].slice(0, 5),
+    referencia: (match[3] || match[4] || '').trim().slice(0, 30),
+  }
 }
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -94,7 +98,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
       throw new EnviopackShipmentError('Cada bulto debe tener dimensiones enteras entre 1 y 300 cm y peso mayor a 0 y hasta 1000 kg.')
     }
   }
-  const { calle, numero } = splitStreet(order.addressLine)
+  const { calle, numero, referencia } = splitStreet(order.addressLine)
   const name = splitCustomerName(order.customerName)
 
   let enviopackOrderId = order.enviopackOrderId
@@ -175,11 +179,13 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
       observaciones: order.customerNotes || undefined,
       confirmado: true,
       paquetes: packages,
+      despacho: String(carrier.fulfillmentMode || 'D'),
       modalidad: 'D',
       servicio: String(selected.serviceCode),
       correo: carrierId,
       calle,
       numero,
+      referencia_domicilio: referencia || undefined,
       codigo_postal: Number(order.postalCode),
       provincia: order.provinceCode,
       localidad: order.city.slice(0, 50),
