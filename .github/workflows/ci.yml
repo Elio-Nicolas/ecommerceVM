@@ -2,7 +2,7 @@ name: ecommerceVM CI
 
 on:
   pull_request:
-    branches: [main, fix/admin-shipping-method-guard]
+    branches: [main, fix/admin-shipping-method-guard, feature/arca-invoicing-foundation]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   push:
