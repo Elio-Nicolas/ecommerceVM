@@ -6,6 +6,7 @@ import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
 import { getArcaAccessTicket } from '../services/arca-wsaa'
+import { getArcaIvaReceiverConditions, getArcaLastAuthorizedVoucher, getArcaPointsOfSale, getArcaVoucherTypes } from '../services/arca-wsfe-readonly'
 
 export const adminArcaRouter = Router()
 adminArcaRouter.use(requireAdmin)
@@ -80,5 +81,53 @@ adminArcaRouter.post('/settings/test', testLimiter, async (_req, res) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo verificar la conexión con ARCA.'
     res.status(502).json({ error: { code: 'ARCA_CONNECTION_FAILED', message } })
+  }
+})
+
+
+const diagnosticsLimiter = rateLimit({ windowMs: 60 * 1000, limit: 2, standardHeaders: 'draft-8', legacyHeaders: false })
+
+// Consulta únicamente información de homologación. Nunca autoriza comprobantes.
+adminArcaRouter.get('/diagnostics', diagnosticsLimiter, async (_req, res) => {
+  const settings = await getSettings()
+  if (!settings.pointOfSale) {
+    res.status(409).json({
+      error: { code: 'ARCA_POINT_OF_SALE_MISSING', message: 'Guardá el punto de venta antes de consultar los datos de ARCA.' },
+    })
+    return
+  }
+  if (!env.ARCA_CUIT || !env.ARCA_CERTIFICATE_PATH || !env.ARCA_PRIVATE_KEY_PATH) {
+    res.status(409).json({
+      error: { code: 'ARCA_CREDENTIALS_MISSING', message: 'Falta configurar el CUIT, el certificado y la clave privada en la API.' },
+    })
+    return
+  }
+
+  try {
+    const [pointsOfSale, voucherTypes, ivaReceiverConditions] = await Promise.all([
+      getArcaPointsOfSale('HOMOLOGATION'),
+      getArcaVoucherTypes('HOMOLOGATION'),
+      getArcaIvaReceiverConditions('HOMOLOGATION', 'C'),
+    ])
+    const selectedPoint = pointsOfSale.find((point) => point.number === settings.pointOfSale)
+    const lastAuthorized = selectedPoint && !selectedPoint.blocked
+      ? await getArcaLastAuthorizedVoucher('HOMOLOGATION', settings.pointOfSale, 11)
+      : null
+
+    res.json({
+      data: {
+        pointOfSale: settings.pointOfSale,
+        pointsOfSale,
+        selectedPointFound: Boolean(selectedPoint),
+        lastAuthorized,
+        voucherTypes,
+        ivaReceiverConditions,
+        queriedAt: new Date().toISOString(),
+      },
+      message: 'Consultas de solo lectura completadas en ARCA homologación.',
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudieron consultar los datos de ARCA.'
+    res.status(502).json({ error: { code: 'ARCA_DIAGNOSTICS_FAILED', message } })
   }
 })
