@@ -139,6 +139,7 @@ const issueInvoiceLimiter = rateLimit({ windowMs: 60 * 1000, limit: 1, standardH
 
 const invoiceCInputSchema = z.object({
   requestKey: z.string().uuid(),
+  paymentConfirmed: z.literal(true),
   receiverDocumentType: z.number().int().min(1).max(99),
   receiverDocumentNumber: z.string().trim().regex(/^\\d{1,20}$/),
   receiverVatConditionId: z.number().int().min(1).max(999),
@@ -253,12 +254,28 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
         tributeAmountArs: 0,
         totalAmountArs,
         items: itemsSnapshot as Prisma.InputJsonValue,
-        requestPayload: buildArcaInvoiceCRequestPayload(request) as Prisma.InputJsonValue,
+        requestPayload: { ...buildArcaInvoiceCRequestPayload(request), paymentConfirmedByAdmin: true } as Prisma.InputJsonValue,
         attempts: 1,
       },
     })
     return { document, alreadyExists: false as const }
-  }, { maxWait: 10_000, timeout: 60_000 })
+  }, { maxWait: 10_000, timeout: 60_000 }).catch((error: unknown) => {
+    const code = error instanceof Error ? error.message : ''
+    const conflicts: Record<string, { status: number; message: string }> = {
+      ORDER_NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
+      ORDER_NOT_READY_FOR_INVOICE: { status: 409, message: 'El pedido debe estar confirmado y no cancelado antes de facturarlo.' },
+      ORDER_ALREADY_HAS_INVOICE: { status: 409, message: 'Este pedido ya tiene una factura autorizada o pendiente de conciliación.' },
+      ARCA_ISSUANCE_RECONCILIATION_REQUIRED: { status: 409, message: 'Hay una emisión anterior pendiente de conciliación en este punto de venta. No se emitirán más comprobantes hasta resolverla.' },
+      INVALID_ORDER_TOTAL: { status: 409, message: 'El pedido no tiene un total válido para facturar.' },
+      INVALID_ARCA_VOUCHER_NUMBER: { status: 409, message: 'ARCA devolvió un número de comprobante fuera del rango permitido.' },
+    }
+    const conflict = conflicts[code]
+    if (!conflict) throw error
+    res.status(conflict.status).json({ error: { code, message: conflict.message } })
+    return null
+  })
+
+  if (!reserved) return
 
   if (reserved.alreadyExists) {
     res.status(200).json({
