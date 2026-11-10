@@ -21,9 +21,9 @@
 @media print{
   @page{size:A4;margin:12mm}
   body{background:#fff!important}
-  body *{visibility:hidden!important}
-  .order-print-area,.order-print-area *{visibility:visible!important}
-  .order-print-area{display:block!important;position:absolute;inset:0;width:100%;color:#111827;background:#fff;font:11px Arial,sans-serif}
+  .printing-orders *{visibility:hidden!important}
+  .printing-orders .order-print-area,.printing-orders .order-print-area *{visibility:visible!important}
+  .printing-orders .order-print-area{display:block!important;position:absolute;inset:0;width:100%;color:#111827;background:#fff;font:11px Arial,sans-serif}
   .print-sheet{display:block;min-height:250mm;padding:8mm 4mm;page-break-after:always;break-after:page}
   .print-sheet:last-child{page-break-after:auto;break-after:auto}
   .print-sheet header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0f172a;padding-bottom:12px}
