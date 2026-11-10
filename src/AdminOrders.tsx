@@ -86,6 +86,7 @@ export default function AdminOrders() {
       if (search.trim()) params.set('q', search.trim())
       const result = await request<ApiResponse<Order[]>>(`/admin/orders?${params.toString()}`, authToken)
       setOrders(result.data)
+      setPrintSelection((current) => current.filter((id) => result.data.some((order) => order.id === id)))
       setTotal(result.pagination?.total ?? result.data.length)
       setTotalPages(result.pagination?.totalPages ?? 1)
       setError('')
@@ -244,7 +245,7 @@ export default function AdminOrders() {
   const activeOrder = orders.find((order) => order.id === selected) || null
 
   return (
-    <div className="admin-layout">
+    <div className={`admin-layout${printKind ? ' printing-orders' : ''}`}>
       <aside className="admin-sidebar">
         <a className="admin-brand" href="/"><span className="admin-brand-mark">eV</span><span>ecommerce<span>VM</span></span></a>
         <div className="admin-nav-label">GESTIÓN</div>
