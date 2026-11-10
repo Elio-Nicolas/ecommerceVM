@@ -25,6 +25,7 @@ type ShippingQuote = {
   expiresAt: string
 }
 type CreatedOrder = {
+  id: string
   code: string
   subtotalArs: number
   shippingCostArs: number | null
@@ -85,6 +86,37 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const localDeliveryAvailable = Boolean(deliveryMethods?.localDelivery.enabled && deliveryMethods.localDelivery.postalCodes.includes(postalCode))
   const selectedShippingPrice = deliveryMethod === 'PICKUP' ? 0 : deliveryMethod === 'LOCAL_DELIVERY' ? (deliveryMethods?.localDelivery.priceArs ?? 0) : (selectedOption?.priceArs ?? 0)
   const canSubmit = deliveryMethod === 'PICKUP' ? Boolean(deliveryMethods?.pickup.enabled) : deliveryMethod === 'LOCAL_DELIVERY' ? localDeliveryAvailable : Boolean(quote && selectedOption && !quoteExpired)
+
+  useEffect(() => {
+    if (!createdOrder || createdOrder.shippingCostArs !== null) return
+    const controller = new AbortController()
+    const refreshReceipt = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/v1/orders/${encodeURIComponent(createdOrder.id)}/receipt`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const payload = await response.json() as {
+          data?: { shippingCostArs: number | null; totalArs: number | null }
+        }
+        if (payload.data && payload.data.shippingCostArs !== null) {
+          setCreatedOrder((current) => current ? {
+            ...current,
+            shippingCostArs: payload.data!.shippingCostArs,
+            totalArs: payload.data!.totalArs,
+          } : current)
+        }
+      } catch {
+        // Se reintenta mientras el comprobante siga abierto.
+      }
+    }
+    const interval = window.setInterval(() => void refreshReceipt(), 5000)
+    return () => {
+      window.clearInterval(interval)
+      controller.abort()
+    }
+  }, [createdOrder?.id, createdOrder?.shippingCostArs])
 
   useEffect(() => {
     if (deliveryMethod === 'LOCAL_DELIVERY' && /^\d{4}$/.test(postalCode) && deliveryMethods?.localDelivery.enabled && !localDeliveryAvailable) {
