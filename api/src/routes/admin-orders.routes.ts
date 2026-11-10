@@ -43,6 +43,7 @@ adminOrdersRouter.get('/', async (req, res) => {
   const [data, total] = await prisma.$transaction([
     prisma.order.findMany({
       where,
+      omit: { enviopackLabelPdf: true },
       include: orderInclude,
       orderBy: { createdAt: 'desc' },
       skip: (query.page - 1) * query.limit,
@@ -54,7 +55,7 @@ adminOrdersRouter.get('/', async (req, res) => {
 })
 
 adminOrdersRouter.get('/:id', async (req, res) => {
-  const order = await prisma.order.findUnique({ where: { id: req.params.id }, include: orderInclude })
+  const order = await prisma.order.findUnique({ where: { id: req.params.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
@@ -102,7 +103,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
           changedByAdminId: req.admin?.id || null,
         },
       })
-      return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
+      return tx.order.findUnique({ where: { id: existing.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
     })
     res.json({ data: updated, message: 'Costo de entrega local registrado.' })
     return
@@ -145,7 +146,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
         changedByAdminId: req.admin?.id || null,
       },
     })
-    return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
+    return tx.order.findUnique({ where: { id: existing.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
   })
 
   res.json({ data: updated, message: 'Datos de envío actualizados.' })
@@ -166,6 +167,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }
   if (input.status === 'CONFIRMED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
     res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Primero registrá el costo acordado de entrega local. Después podrás confirmar el costo y continuar con el pedido.' } })
+    return
+  }
+  if (input.status === 'CANCELLED' && existing.deliveryMethod === 'ENVIOPACK' && existing.enviopackShipmentId) {
+    res.status(409).json({ error: { code: 'ENVIOPACK_SHIPMENT_ALREADY_CREATED', message: 'No se puede cancelar este pedido porque ya tiene un envío creado en Envíopack. Gestioná primero la cancelación con el transportista.' } })
     return
   }
   if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ENVIOPACK' && existing.enviopackShipmentStatus !== 'P') {
@@ -214,7 +219,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
           changedByAdminId: req.admin?.id || null,
         },
       })
-      return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
+      return tx.order.findUnique({ where: { id: existing.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
     })
     res.json({ data: updated })
   } catch (error) {
