@@ -85,7 +85,7 @@ adminEnviopackRouter.post('/orders/:id/refresh', async (req, res) => {
 
 export const enviopackWebhookRouter = Router()
 const enviopackWebhookLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false })
-enviopackWebhookRouter.get('/', enviopackWebhookLimiter, (req, res) => {
+enviopackWebhookRouter.get('/', enviopackWebhookLimiter, async (req, res) => {
   const input = z.object({
     id: z.string().trim().min(1).max(80),
     tipo: z.enum(['envio-procesado', 'envio-cambio-condicion']),
