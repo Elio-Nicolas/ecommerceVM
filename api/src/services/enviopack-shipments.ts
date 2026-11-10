@@ -178,6 +178,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
       destinatario: order.customerName.slice(0, 50),
       observaciones: order.customerNotes || undefined,
       confirmado: true,
+      tiene_fulfillment: false,
       paquetes: packages,
       despacho: String(carrier.fulfillmentMode || 'D'),
       modalidad: 'D',
