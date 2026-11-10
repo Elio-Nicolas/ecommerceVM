@@ -141,7 +141,7 @@ const invoiceCInputSchema = z.object({
   requestKey: z.string().uuid(),
   paymentConfirmed: z.literal(true),
   receiverDocumentType: z.number().int().min(1).max(99),
-  receiverDocumentNumber: z.string().trim().regex(/^\\d{1,20}$/),
+  receiverDocumentNumber: z.string().trim().regex(/^\d{1,20}$/),
   receiverVatConditionId: z.number().int().min(1).max(999),
   receiverName: z.string().trim().min(2).max(200).optional(),
   receiverAddress: z.string().trim().max(300).optional(),
@@ -307,7 +307,7 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
         lastErrorMessage: result.outcome === 'AUTHORIZED' ? null : result.message,
       },
     })
-    res.status(result.outcome === 'AUTHORIZED' ? 201 : result.outcome === 'REJECTED' ? 422 : 202).json({
+    res.status(result.outcome === 'AUTHORIZED' ? 201 : result.outcome === 'REJECTED' ? 200 : 202).json({
       data: updated,
       message: result.message,
     })
