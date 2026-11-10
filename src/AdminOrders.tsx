@@ -36,6 +36,7 @@ const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
+  if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'ENVIOPACK' && order.enviopackShipmentStatus !== 'P') return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
@@ -132,7 +133,7 @@ export default function AdminOrders() {
           trackingCode: String(formData.get('trackingCode') || '').trim() || null,
         }),
       })
-      setNotice(`Envío del pedido ${order.code} actualizado. Total: ${formatPrice(order.subtotalArs + shippingCostArs)}.`)
+      setNotice(`Costo de entrega del pedido ${order.code} registrado. Total actualizado: ${formatPrice(order.subtotalArs + shippingCostArs)}. Ahora confirmá el costo para continuar.`)
       await loadOrders(token)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el envío.')
@@ -245,11 +246,11 @@ export default function AdminOrders() {
               </select>
             </div>
             {loading ? <div className="admin-table-empty">Cargando pedidos...</div> : orders.length === 0 ? <div className="admin-table-empty">Todavía no hay pedidos para mostrar.</div> : (
-              <div className="admin-table-scroll"><table className="admin-table order-table"><thead><tr><th>PEDIDO</th><th>CLIENTE</th><th>FECHA</th><th>ARTÍCULOS</th><th>SUBTOTAL</th><th>ESTADO</th><th>DETALLE</th></tr></thead><tbody>
+              <div className="admin-table-scroll"><table className="admin-table order-table"><thead><tr><th>PEDIDO</th><th>CLIENTE</th><th>FECHA</th><th>ARTÍCULOS</th><th>TOTAL</th><th>ESTADO</th><th>DETALLE</th></tr></thead><tbody>
                 {orders.map((order) => <tr key={order.id}>
                   <td><strong>{order.code}</strong></td><td><strong>{order.customerName}</strong><small className="order-phone">{order.customerPhone}</small></td>
                   <td>{formatDate(order.createdAt)}</td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
-                  <td className="admin-price">{formatPrice(order.subtotalArs)}</td>
+                  <td className="admin-price">{order.totalArs === null ? 'Pendiente de envío' : formatPrice(order.totalArs)}</td>
                   <td><span className={`admin-status order-status ${order.status.toLowerCase()}`}>{statusLabels[order.status]}</span></td>
                   <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote(''); setPackageCount(order.enviopackPackages?.length || 1) }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
                 </tr>)}
@@ -266,7 +267,7 @@ export default function AdminOrders() {
               <div><span>NOTAS</span><strong>{activeOrder.customerNotes || 'Sin indicaciones adicionales'}</strong></div>
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
-            <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de cotización · Total final: pendiente' : `Envío: ${formatPrice(activeOrder.shippingCostArs)} · Total: ${formatPrice(activeOrder.totalArs ?? activeOrder.subtotalArs + activeOrder.shippingCostArs)}`}</small></div>
+            <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de coordinación' : `Envío: ${formatPrice(activeOrder.shippingCostArs)}`}</small><span>Total del pedido</span><strong>{activeOrder.totalArs === null ? 'Pendiente de coordinación' : formatPrice(activeOrder.totalArs)}</strong></div>
             {activeOrder.deliveryMethod !== 'PICKUP' && activeOrder.shippingCarrier && <div className="order-shipping-meta"><span>OPERADOR</span><strong>{activeOrder.shippingCarrier}</strong>{activeOrder.shippingService && <><span>SERVICIO</span><strong>{activeOrder.shippingService}</strong></>}{activeOrder.shippingEstimatedHours && <><span>PLAZO ESTIMADO</span><strong>{Math.ceil(activeOrder.shippingEstimatedHours / 24)} días</strong></>}{activeOrder.trackingCode && <><span>SEGUIMIENTO</span><strong>{activeOrder.trackingCode}</strong></>}</div>}
             {activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingInternalCostArs !== null && <section className="order-logistics-breakdown"><div><span className="admin-kicker">INFORMACIÓN INTERNA · SOLO ADMINISTRACIÓN</span><h3>Costo estimado de entrega local</h3></div><div className="order-logistics-summary"><span>Costo interno estimado</span><strong>{formatPrice(activeOrder.shippingInternalCostArs)}</strong><small>Importe configurado para esta modalidad; no es una liquidación definitiva.</small></div></section>}
             {activeOrder.shippingCostOptions && <section className="order-logistics-breakdown">
@@ -342,7 +343,7 @@ export default function AdminOrders() {
               </form> : <p>Para generar el envío, primero pasá el pedido a En preparación.</p>}
             </section>}
             <div className="order-history"><h3>Historial de estados</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{statusLabels[entry.toStatus]}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
-            {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
+            {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingService === 'A coordinar' && activeOrder.status === 'PENDING' && next === 'CONFIRMED' ? 'Confirmar costo y continuar' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
           </section>}
           <p className="admin-footnote">Los pedidos pueden registrarse con retiro, entrega local o Envíopack. El pago todavía no está habilitado.</p>
         </section>
