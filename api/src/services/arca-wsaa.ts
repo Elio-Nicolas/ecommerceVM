@@ -17,6 +17,8 @@ export interface ArcaAccessTicket {
 
 const ticketCache = new Map<string, ArcaAccessTicket>()
 const ticketRequests = new Map<string, Promise<ArcaAccessTicket>>()
+const ticketRetryAfter = new Map<string, number>()
+const WSAA_RETRY_COOLDOWN_MS = 60_000
 
 const WSAA_URLS: Record<ArcaEnvironment, string> = {
   HOMOLOGATION: 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
@@ -140,7 +142,8 @@ async function requestTicket(environment: ArcaEnvironment): Promise<ArcaAccessTi
   }
 
   const fault = readTag(responseXml, 'faultstring')
-  if (fault) throw new Error(`WSAA rechazó la autenticación: ${fault}`)
+  const faultCode = readTag(responseXml, 'faultcode')
+  if (fault) throw new Error(`WSAA rechazó la autenticación: ${faultCode ? `${faultCode}: ` : ''}${fault}`)
 
   const ticketXml = readTag(responseXml, 'loginCmsReturn')
   if (!ticketXml) throw new Error('WSAA devolvió una respuesta sin loginCmsReturn')
@@ -161,6 +164,38 @@ async function requestTicket(environment: ArcaEnvironment): Promise<ArcaAccessTi
   return { token, sign, expiresAt }
 }
 
+function assertRetryAllowed(cacheKey: string): void {
+  const retryAt = ticketRetryAfter.get(cacheKey)
+  if (retryAt === undefined) return
+
+  if (retryAt === Number.POSITIVE_INFINITY) {
+    throw new Error('WSAA rechazó la autorización (coe.notAuthorized). Corregí la asociación del certificado al servicio WSFE y reiniciá la API.')
+  }
+
+  if (retryAt > Date.now()) {
+    throw new Error('WSAA rechazó o no pudo procesar la autenticación recientemente. Esperá al menos 60 segundos antes de reintentar.')
+  }
+
+  ticketRetryAfter.delete(cacheKey)
+}
+
+function requestAndCacheTicket(environment: ArcaEnvironment, cacheKey: string): Promise<ArcaAccessTicket> {
+  return requestTicket(environment)
+    .then((ticket) => {
+      ticketCache.set(cacheKey, ticket)
+      ticketRetryAfter.delete(cacheKey)
+      return ticket
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : ''
+      ticketRetryAfter.set(
+        cacheKey,
+        /coe\\.notAuthorized/i.test(message) ? Number.POSITIVE_INFINITY : Date.now() + WSAA_RETRY_COOLDOWN_MS,
+      )
+      throw error
+    })
+}
+
 export async function getArcaAccessTicket(environment: ArcaEnvironment): Promise<ArcaAccessTicket> {
   const { cuit } = requiredConfig()
   const cacheKey = environment + ':wsfe:' + cuit
@@ -171,11 +206,12 @@ export async function getArcaAccessTicket(environment: ArcaEnvironment): Promise
     // Keep serving a valid ticket immediately; refresh it in the background
     // once it enters the five-minute renewal window.
     if (cached.expiresAt.getTime() - now <= 5 * 60 * 1000 && !ticketRequests.has(cacheKey)) {
-      const refresh = requestTicket(environment)
-        .then((ticket) => {
-          ticketCache.set(cacheKey, ticket)
-          return ticket
-        })
+      try {
+        assertRetryAllowed(cacheKey)
+      } catch {
+        return cached
+      }
+      const refresh = requestAndCacheTicket(environment, cacheKey)
         .catch((error: unknown) => {
           // Never hand out a ticket that expired while the refresh was running.
           if (cached.expiresAt.getTime() > Date.now()) return cached
@@ -192,11 +228,8 @@ export async function getArcaAccessTicket(environment: ArcaEnvironment): Promise
   const pending = ticketRequests.get(cacheKey)
   if (pending) return pending
 
-  const request = requestTicket(environment)
-    .then((ticket) => {
-      ticketCache.set(cacheKey, ticket)
-      return ticket
-    })
+  assertRetryAllowed(cacheKey)
+  const request = requestAndCacheTicket(environment, cacheKey)
     .finally(() => ticketRequests.delete(cacheKey))
 
   ticketRequests.set(cacheKey, request)
