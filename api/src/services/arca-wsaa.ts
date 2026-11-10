@@ -176,7 +176,7 @@ function assertRetryAllowed(cacheKey: string): void {
   }
 
   if (retryAt > Date.now()) {
-    throw new Error('WSAA rechazó o no pudo procesar la autenticación recientemente. Esperá al menos 60 segundos antes de reintentar.')
+    throw new Error(`WSAA indicó que todavía no se puede reintentar. Volvé a intentar en aproximadamente ${Math.ceil((retryAt - Date.now()) / 60_000)} minuto(s).`)
   }
 
   ticketRetryAfter.delete(cacheKey)
