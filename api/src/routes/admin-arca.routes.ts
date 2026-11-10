@@ -16,7 +16,7 @@ adminArcaRouter.use(requireAdmin)
 const settingsResponse = (settings: { enabled: boolean; environment: ArcaEnvironment; pointOfSale: number | null }) => ({
   enabled: settings.enabled,
   environment: settings.environment,
-  pointOfSale: settings.pointOfSale,
+  pointOfSale,
   cuitConfigured: Boolean(env.ARCA_CUIT),
   certificateConfigured: Boolean(env.ARCA_CERTIFICATE_PATH && env.ARCA_PRIVATE_KEY_PATH),
   credentialsConfigured: Boolean(env.ARCA_CUIT && env.ARCA_CERTIFICATE_PATH && env.ARCA_PRIVATE_KEY_PATH),
@@ -163,7 +163,9 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
     return
   }
 
-  const lockKey = `arca-wsfe-${settings.pointOfSale}-11`
+  const pointOfSale = settings.pointOfSale
+  const orderId = Array.isArray(req.params.orderId) ? req.params.orderId[0] : req.params.orderId
+  const lockKey = `arca-wsfe-${pointOfSale}-11`
   const reserved = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
 
@@ -172,7 +174,7 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
 
     const blockedDocument = await tx.fiscalDocument.findFirst({
       where: {
-        pointOfSale: settings.pointOfSale,
+        pointOfSale,
         voucherType: 11,
         status: { in: [FiscalDocumentStatus.PENDING, FiscalDocumentStatus.ISSUING, FiscalDocumentStatus.UNKNOWN] },
       },
@@ -183,7 +185,7 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
     }
 
     const order = await tx.order.findUnique({
-      where: { id: req.params.orderId },
+      where: { id: orderId },
       include: { items: true },
     })
     if (!order) throw new Error('ORDER_NOT_FOUND')
@@ -203,7 +205,7 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
     const totalAmountArs = order.totalArs ?? (order.subtotalArs + (order.shippingCostArs ?? 0))
     if (!Number.isSafeInteger(totalAmountArs) || totalAmountArs <= 0) throw new Error('INVALID_ORDER_TOTAL')
 
-    const lastAuthorized = await getArcaLastAuthorizedVoucher(settings.environment, settings.pointOfSale, 11)
+    const lastAuthorized = await getArcaLastAuthorizedVoucher(settings.environment, pointOfSale, 11)
     const voucherNumber = lastAuthorized.lastVoucherNumber + 1
     if (!Number.isSafeInteger(voucherNumber) || voucherNumber < 1 || voucherNumber > 99_999_999) {
       throw new Error('INVALID_ARCA_VOUCHER_NUMBER')
@@ -213,7 +215,7 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
     const receiverName = input.receiverName || order.customerName
     const receiverAddress = input.receiverAddress || [order.addressLine, order.city, order.province, order.postalCode].filter(Boolean).join(', ')
     const request = {
-      pointOfSale: settings.pointOfSale,
+      pointOfSale,
       voucherNumber,
       issueDate,
       receiverDocumentType: input.receiverDocumentType,
