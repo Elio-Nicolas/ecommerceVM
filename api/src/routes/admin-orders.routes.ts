@@ -164,6 +164,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
+  if (input.status === 'CONFIRMED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
+    res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Primero registrá el costo acordado de entrega local. Después podrás confirmar el costo y continuar con el pedido.' } })
+    return
+  }
   if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ENVIOPACK' && existing.enviopackShipmentStatus !== 'P') {
     res.status(409).json({ error: { code: 'ENVIOPACK_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando Envíopack confirme el procesamiento y la etiqueta esté disponible.' } })
     return
