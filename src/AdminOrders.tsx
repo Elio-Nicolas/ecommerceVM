@@ -74,6 +74,9 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [printSelection, setPrintSelection] = useState<string[]>([])
+  const [printOrders, setPrintOrders] = useState<Order[]>([])
+  const [printKind, setPrintKind] = useState<'receipt' | 'prep' | null>(null)
 
   const loadOrders = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -83,6 +86,7 @@ export default function AdminOrders() {
       if (search.trim()) params.set('q', search.trim())
       const result = await request<ApiResponse<Order[]>>(`/admin/orders?${params.toString()}`, authToken)
       setOrders(result.data)
+      setPrintSelection((current) => current.filter((id) => result.data.some((order) => order.id === id)))
       setTotal(result.pagination?.total ?? result.data.length)
       setTotalPages(result.pagination?.totalPages ?? 1)
       setError('')
@@ -111,6 +115,13 @@ export default function AdminOrders() {
   useEffect(() => {
     if (!checking && token) void loadOrders(token)
   }, [checking, token, loadOrders])
+
+  useEffect(() => {
+    if (!printKind) return
+    const clearPrint = () => setPrintKind(null)
+    window.addEventListener('afterprint', clearPrint)
+    return () => window.removeEventListener('afterprint', clearPrint)
+  }, [printKind])
 
   async function saveShipping(event: FormEvent<HTMLFormElement>, order: Order) {
     event.preventDefault()
@@ -211,12 +222,30 @@ export default function AdminOrders() {
     }
   }
 
+  function togglePrintSelection(id: string) {
+    setPrintSelection((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+  }
+
+  function printCurrentOrder(order: Order, kind: 'receipt' | 'prep') {
+    setPrintOrders([order])
+    setPrintKind(kind)
+    window.setTimeout(() => window.print(), 100)
+  }
+
+  function printSelectedOrders() {
+    const selectedOrders = orders.filter((order) => printSelection.includes(order.id))
+    if (!selectedOrders.length) return
+    setPrintOrders(selectedOrders)
+    setPrintKind('prep')
+    window.setTimeout(() => window.print(), 100)
+  }
+
   if (checking) return <div className="admin-loading">Verificando sesión...</div>
 
   const activeOrder = orders.find((order) => order.id === selected) || null
 
   return (
-    <div className="admin-layout">
+    <div className={`admin-layout${printKind ? ' printing-orders' : ''}`}>
       <aside className="admin-sidebar">
         <a className="admin-brand" href="/"><span className="admin-brand-mark">eV</span><span>ecommerce<span>VM</span></span></a>
         <div className="admin-nav-label">GESTIÓN</div>
@@ -239,16 +268,17 @@ export default function AdminOrders() {
           {error && <div className="admin-alert error">{error}</div>}
           <div className="admin-table-card">
             <div className="admin-table-toolbar">
-              <label className="admin-search"><span>⌕</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Buscar por código, cliente o teléfono..." /></label>
-              <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }} aria-label="Filtrar por estado">
+              <label className="admin-search"><span>⌕</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); setPrintSelection([]) }} placeholder="Buscar por código, cliente o teléfono..." /></label>
+              <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); setPrintSelection([]) }} aria-label="Filtrar por estado">
                 <option value="ALL">Todos los estados</option>
                 {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
+            {printSelection.length > 0 && <div className="order-print-toolbar"><span>{printSelection.length} pedido(s) seleccionados</span><button className="admin-primary" type="button" onClick={printSelectedOrders}>Imprimir preparación por lote</button><button className="admin-quiet-button" type="button" onClick={() => setPrintSelection([])}>Limpiar selección</button></div>}
             {loading ? <div className="admin-table-empty">Cargando pedidos...</div> : orders.length === 0 ? <div className="admin-table-empty">Todavía no hay pedidos para mostrar.</div> : (
-              <div className="admin-table-scroll"><table className="admin-table order-table"><thead><tr><th>PEDIDO</th><th>CLIENTE</th><th>FECHA</th><th>ARTÍCULOS</th><th>TOTAL</th><th>ESTADO</th><th>DETALLE</th></tr></thead><tbody>
+              <div className="admin-table-scroll"><table className="admin-table order-table"><thead><tr><th>IMPRIMIR</th><th>PEDIDO</th><th>CLIENTE</th><th>FECHA</th><th>ARTÍCULOS</th><th>TOTAL</th><th>ESTADO</th><th>DETALLE</th></tr></thead><tbody>
                 {orders.map((order) => <tr key={order.id}>
-                  <td><strong>{order.code}</strong></td><td><strong>{order.customerName}</strong><small className="order-phone">{order.customerPhone}</small></td>
+                  <td><input aria-label={`Seleccionar ${order.code} para impresión por lote`} type="checkbox" checked={printSelection.includes(order.id)} onChange={() => togglePrintSelection(order.id)} /></td><td><strong>{order.code}</strong></td><td><strong>{order.customerName}</strong><small className="order-phone">{order.customerPhone}</small></td>
                   <td>{formatDate(order.createdAt)}</td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
                   <td className="admin-price">{order.totalArs === null ? 'Pendiente de envío' : formatPrice(order.totalArs)}</td>
                   <td><span className={`admin-status order-status ${order.status.toLowerCase()}`}>{statusLabels[order.status]}</span></td>
@@ -256,11 +286,11 @@ export default function AdminOrders() {
                 </tr>)}
               </tbody></table></div>
             )}
-            <div className="admin-table-footer order-pagination"><span>Mostrando {orders.length} de {total} pedidos</span><div><button disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)}>Anterior</button><span>{page} / {totalPages}</span><button disabled={page >= totalPages || loading} onClick={() => setPage((value) => value + 1)}>Siguiente</button></div></div>
+            <div className="admin-table-footer order-pagination"><span>Mostrando {orders.length} de {total} pedidos</span><div><button disabled={page <= 1 || loading} onClick={() => { setPrintSelection([]); setPage((value) => value - 1) }}>Anterior</button><span>{page} / {totalPages}</span><button disabled={page >= totalPages || loading} onClick={() => { setPrintSelection([]); setPage((value) => value + 1) }}>Siguiente</button></div></div>
           </div>
 
           {activeOrder && <section className="order-detail-card">
-            <div className="admin-form-heading"><div><span className="admin-kicker">PEDIDO {activeOrder.code}</span><h2>Detalle del pedido</h2></div><button className="admin-quiet-button" onClick={() => setSelected(null)}>Cerrar</button></div>
+            <div className="admin-form-heading"><div><span className="admin-kicker">PEDIDO {activeOrder.code}</span><h2>Detalle del pedido</h2></div><div className="admin-category-actions"><button type="button" className="admin-quiet-button" onClick={() => printCurrentOrder(activeOrder, 'receipt')}>Imprimir ticket</button><button type="button" className="admin-quiet-button" onClick={() => printCurrentOrder(activeOrder, 'prep')}>Etiqueta de preparación</button><button className="admin-quiet-button" onClick={() => setSelected(null)}>Cerrar</button></div></div>
             <div className="order-detail-grid">
               <div><span>CLIENTE</span><strong>{activeOrder.customerName}</strong><small>{activeOrder.customerPhone}</small><small>{activeOrder.customerEmail || 'Sin correo informado'}</small></div>
               <div><span>MODALIDAD DE ENTREGA</span><strong>{activeOrder.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : 'Envíopack'}</strong><small>{activeOrder.deliveryInstructions || [activeOrder.addressLine, activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(' · ')}</small></div>
@@ -348,6 +378,17 @@ export default function AdminOrders() {
           <p className="admin-footnote">Los pedidos pueden registrarse con retiro, entrega local o Envíopack. El pago todavía no está habilitado.</p>
         </section>
       </main>
+      {printKind && printOrders.length > 0 && <section className={`order-print-area ${printKind === 'receipt' ? 'receipt-print' : 'prep-print'}`} aria-hidden="true">
+        {printOrders.map((order) => <article className="print-sheet" key={order.id}>
+          <header><strong>ecommerceVM</strong><span>{printKind === 'receipt' ? 'COMPROBANTE DE PEDIDO' : 'PREPARACIÓN DE PEDIDO'}</span></header>
+          <div className="print-order-code"><strong>{order.code}</strong><span>{formatDate(order.createdAt)}</span></div>
+          <section><h2>{order.customerName}</h2><p>{order.customerPhone}{order.customerEmail ? ` · ${order.customerEmail}` : ''}</p><p>{[order.addressLine, order.city, order.province, order.postalCode].filter(Boolean).join(' · ')}</p></section>
+          {order.customerNotes && <section className="print-notes"><strong>Observaciones del comprador</strong><p>{order.customerNotes}</p></section>}
+          <table><thead><tr><th>CANT.</th><th>PRODUCTO</th><th>SKU</th>{printKind === 'receipt' && <th>IMPORTE</th>}</tr></thead><tbody>{order.items.map((item) => <tr key={item.id}><td>{item.quantity}</td><td>{item.productName}</td><td>{item.productSku}</td>{printKind === 'receipt' && <td>{formatPrice(item.lineTotalArs)}</td>}</tr>)}</tbody></table>
+          {printKind === 'receipt' ? <div className="print-totals"><p>Subtotal: <strong>{formatPrice(order.subtotalArs)}</strong></p><p>Entrega: <strong>{order.shippingCostArs === null ? 'A coordinar' : formatPrice(order.shippingCostArs)}</strong></p><p className="print-grand-total">TOTAL: <strong>{order.totalArs === null ? 'Pendiente de coordinación' : formatPrice(order.totalArs)}</strong></p></div> : <div className="print-checklist"><strong>CONTROL DE PREPARACIÓN</strong>{order.items.map((item) => <p key={item.id}>□ {item.quantity} × {item.productName} <span>SKU: {item.productSku}</span></p>)}</div>}
+          <footer>{order.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : order.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : 'Envíopack'} · Estado: {statusLabels[order.status]}{order.trackingCode ? ` · Seguimiento: ${order.trackingCode}` : ''}</footer>
+        </article>)}
+      </section>}
     </div>
   )
 }
