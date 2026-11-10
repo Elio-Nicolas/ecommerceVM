@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import { z } from 'zod'
-import { ArcaEnvironment } from '@prisma/client'
+import type { ArcaEnvironment } from '@prisma/client'
 import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
