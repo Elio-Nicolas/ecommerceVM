@@ -115,6 +115,13 @@ export default function AdminOrders() {
     if (!checking && token) void loadOrders(token)
   }, [checking, token, loadOrders])
 
+  useEffect(() => {
+    if (!printKind) return
+    const clearPrint = () => setPrintKind(null)
+    window.addEventListener('afterprint', clearPrint)
+    return () => window.removeEventListener('afterprint', clearPrint)
+  }, [printKind])
+
   async function saveShipping(event: FormEvent<HTMLFormElement>, order: Order) {
     event.preventDefault()
     if (!token || shippingSaving) return
@@ -260,8 +267,8 @@ export default function AdminOrders() {
           {error && <div className="admin-alert error">{error}</div>}
           <div className="admin-table-card">
             <div className="admin-table-toolbar">
-              <label className="admin-search"><span>⌕</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Buscar por código, cliente o teléfono..." /></label>
-              <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1) }} aria-label="Filtrar por estado">
+              <label className="admin-search"><span>⌕</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); setPrintSelection([]) }} placeholder="Buscar por código, cliente o teléfono..." /></label>
+              <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); setPrintSelection([]) }} aria-label="Filtrar por estado">
                 <option value="ALL">Todos los estados</option>
                 {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
@@ -278,7 +285,7 @@ export default function AdminOrders() {
                 </tr>)}
               </tbody></table></div>
             )}
-            <div className="admin-table-footer order-pagination"><span>Mostrando {orders.length} de {total} pedidos</span><div><button disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)}>Anterior</button><span>{page} / {totalPages}</span><button disabled={page >= totalPages || loading} onClick={() => setPage((value) => value + 1)}>Siguiente</button></div></div>
+            <div className="admin-table-footer order-pagination"><span>Mostrando {orders.length} de {total} pedidos</span><div><button disabled={page <= 1 || loading} onClick={() => { setPrintSelection([]); setPage((value) => value - 1) }}>Anterior</button><span>{page} / {totalPages}</span><button disabled={page >= totalPages || loading} onClick={() => { setPrintSelection([]); setPage((value) => value + 1) }}>Siguiente</button></div></div>
           </div>
 
           {activeOrder && <section className="order-detail-card">
