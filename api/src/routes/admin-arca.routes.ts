@@ -16,7 +16,7 @@ adminArcaRouter.use(requireAdmin)
 const settingsResponse = (settings: { enabled: boolean; environment: ArcaEnvironment; pointOfSale: number | null }) => ({
   enabled: settings.enabled,
   environment: settings.environment,
-  pointOfSale,
+  pointOfSale: settings.pointOfSale,
   cuitConfigured: Boolean(env.ARCA_CUIT),
   certificateConfigured: Boolean(env.ARCA_CERTIFICATE_PATH && env.ARCA_PRIVATE_KEY_PATH),
   credentialsConfigured: Boolean(env.ARCA_CUIT && env.ARCA_CERTIFICATE_PATH && env.ARCA_PRIVATE_KEY_PATH),
