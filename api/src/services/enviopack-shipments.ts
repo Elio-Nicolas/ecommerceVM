@@ -105,7 +105,7 @@ export async function createEnviopackShipment(orderId: string, carrierId: string
   if (!order.customerEmail) throw new EnviopackShipmentError('El pedido necesita un correo electrónico para registrarse en Envíopack.')
   if (!order.provinceCode || !order.postalCode) throw new EnviopackShipmentError('Faltan provincia o código postal en el pedido.')
   if (order.enviopackShipmentId) throw new EnviopackShipmentError('Este pedido ya tiene un envío asociado en Envíopack.')
-  const origin = await prisma.shippingOrigin.findFirst({ where: { isActive: true, isDefault: true } })
+  const origin = await tx.shippingOrigin.findFirst({ where: { isActive: true, isDefault: true } })
   if (!origin?.enviopackAddressId) throw new EnviopackShipmentError('Configurá el ID del depósito de Envíopack en Administración > Depósitos de despacho.')
   const selected = asObject(order.shippingCostOptions)
   const sellerOptions = Array.isArray(selected.sellerOptions) ? selected.sellerOptions.map(asObject) : []
