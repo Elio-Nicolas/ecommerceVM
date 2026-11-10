@@ -111,7 +111,7 @@ export async function quoteHomeDelivery(input: {
 
   const buyerUrl = new URL('https://api.enviopack.com/cotizar/precio/a-domicilio')
   baseParams(buyerUrl)
-  const buyerQuotes = await getQuotePayload(buyerUrl)
+  const buyerQuotes = (await getQuotePayload(buyerUrl)).filter((quote) => (quote.servicio || 'N') !== 'R')
 
   const sellerCostsByService = new Map<string, SellerShippingOption[]>()
   const serviceCodes = [...new Set(buyerQuotes.map((quote) => quote.servicio || 'N'))]
