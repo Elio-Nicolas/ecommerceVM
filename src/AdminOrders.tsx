@@ -74,6 +74,9 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [printSelection, setPrintSelection] = useState<string[]>([])
+  const [printOrders, setPrintOrders] = useState<Order[]>([])
+  const [printKind, setPrintKind] = useState<'receipt' | 'prep' | null>(null)
 
   const loadOrders = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -211,6 +214,24 @@ export default function AdminOrders() {
     }
   }
 
+  function togglePrintSelection(id: string) {
+    setPrintSelection((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
+  }
+
+  function printCurrentOrder(order: Order, kind: 'receipt' | 'prep') {
+    setPrintOrders([order])
+    setPrintKind(kind)
+    window.setTimeout(() => window.print(), 100)
+  }
+
+  function printSelectedOrders() {
+    const selectedOrders = orders.filter((order) => printSelection.includes(order.id))
+    if (!selectedOrders.length) return
+    setPrintOrders(selectedOrders)
+    setPrintKind('prep')
+    window.setTimeout(() => window.print(), 100)
+  }
+
   if (checking) return <div className="admin-loading">Verificando sesión...</div>
 
   const activeOrder = orders.find((order) => order.id === selected) || null
@@ -245,8 +266,8 @@ export default function AdminOrders() {
                 {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
-            {loading ? <div className="admin-table-empty">Cargando pedidos...</div> : orders.length === 0 ? <div className="admin-table-empty">Todavía no hay pedidos para mostrar.</div> : (
-              <div className="admin-table-scroll"><table className="admin-table order-table"><thead><tr><th>PEDIDO</th><th>CLIENTE</th><th>FECHA</th><th>ARTÍCULOS</th><th>TOTAL</th><th>ESTADO</th><th>DETALLE</th></tr></thead><tbody>
+            {printSelection.length > 0 && <div className="order-print-toolbar"><span>{printSelection.length} pedido(s) seleccionados</span><button className="admin-primary" type="button" onClick={printSelectedOrders}>Imprimir preparación por lote</button><button className="admin-quiet-button" type="button" onClick={() => setPrintSelection([])}>Limpiar selección</button></div>}\n            {loading ? <div className="admin-table-empty">Cargando pedidos...</div> : orders.length === 0 ? <div className="admin-table-empty">Todavía no hay pedidos para mostrar.</div> : (
+              <div className="admin-table-scroll"><table className="admin-table order-table"><thead><tr><th>IMPRIMIR</th><th>PEDIDO</th><th>CLIENTE</th><th>FECHA</th><th>ARTÍCULOS</th><th>TOTAL</th><th>ESTADO</th><th>DETALLE</th></tr></thead><tbody>
                 {orders.map((order) => <tr key={order.id}>
                   <td><strong>{order.code}</strong></td><td><strong>{order.customerName}</strong><small className="order-phone">{order.customerPhone}</small></td>
                   <td>{formatDate(order.createdAt)}</td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
@@ -260,7 +281,7 @@ export default function AdminOrders() {
           </div>
 
           {activeOrder && <section className="order-detail-card">
-            <div className="admin-form-heading"><div><span className="admin-kicker">PEDIDO {activeOrder.code}</span><h2>Detalle del pedido</h2></div><button className="admin-quiet-button" onClick={() => setSelected(null)}>Cerrar</button></div>
+            <div className="admin-form-heading"><div><span className="admin-kicker">PEDIDO {activeOrder.code}</span><h2>Detalle del pedido</h2></div><div className="admin-category-actions"><button type="button" className="admin-quiet-button" onClick={() => printCurrentOrder(activeOrder, 'receipt')}>Imprimir ticket</button><button type="button" className="admin-quiet-button" onClick={() => printCurrentOrder(activeOrder, 'prep')}>Etiqueta de preparación</button><button className="admin-quiet-button" onClick={() => setSelected(null)}>Cerrar</button></div>
             <div className="order-detail-grid">
               <div><span>CLIENTE</span><strong>{activeOrder.customerName}</strong><small>{activeOrder.customerPhone}</small><small>{activeOrder.customerEmail || 'Sin correo informado'}</small></div>
               <div><span>MODALIDAD DE ENTREGA</span><strong>{activeOrder.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : 'Envíopack'}</strong><small>{activeOrder.deliveryInstructions || [activeOrder.addressLine, activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(' · ')}</small></div>
