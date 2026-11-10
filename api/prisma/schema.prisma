@@ -176,3 +176,16 @@ model OrderStatusHistory {
   createdAt DateTime @default(now())
   @@index([orderId, createdAt])
 }
+model EnviopackWebhookEvent {
+  id String @id @default(uuid())
+  shipmentId String
+  type String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  lastError String?
+  receivedAt DateTime @default(now())
+  lockedAt DateTime?
+  processedAt DateTime?
+  @@index([status, receivedAt])
+  @@index([shipmentId])
+}
