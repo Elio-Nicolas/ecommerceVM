@@ -10,6 +10,7 @@ export interface ArcaInvoicePdfInput {
   issueDate: Date
   receiverDocumentType: number | null
   receiverDocumentNumber: string | null
+  receiverVatConditionId: number | null
   receiverName: string
   receiverAddress: string | null
   currencyCode: string
@@ -51,8 +52,10 @@ export async function generateArcaInvoicePdf(input: ArcaInvoicePdfInput): Promis
     codAut: Number(input.cae),
   }
   if (input.receiverDocumentType !== null && input.receiverDocumentNumber) {
+    const receiverNumber = Number(input.receiverDocumentNumber)
+    if (!Number.isSafeInteger(receiverNumber)) throw new Error('El documento del receptor supera el rango numérico seguro para el QR de ARCA.')
     qrPayload.tipoDocRec = input.receiverDocumentType
-    qrPayload.nroDocRec = Number(input.receiverDocumentNumber)
+    qrPayload.nroDocRec = receiverNumber
   }
   const encoded = Buffer.from(JSON.stringify(qrPayload), 'utf8').toString('base64')
   const qrUrl = `https://www.arca.gob.ar/fe/qr/?p=${encoded}`
@@ -81,12 +84,13 @@ export async function generateArcaInvoicePdf(input: ArcaInvoicePdfInput): Promis
   pdf.text(`Punto de venta: ${String(input.pointOfSale).padStart(5, '0')}`, 46, 184)
   pdf.text(`Comprobante N°: ${String(input.voucherNumber).padStart(8, '0')}`, 46, 198)
   pdf.text(`Fecha de emisión: ${issueDate.split('-').reverse().join('/')}`, 46, 212)
-  pdf.text(`CUIT receptor: ${input.receiverDocumentNumber ?? 'No informado'}`, 310, 184)
+  pdf.text(`Documento receptor: ${input.receiverDocumentNumber ?? 'No informado'}`, 310, 184)
   pdf.text(`Tipo de documento: ${input.receiverDocumentType ?? 'No informado'}`, 310, 198)
-  pdf.text(`Receptor: ${input.receiverName}`, 310, 212, { width: 238 })
-  if (input.receiverAddress) pdf.text(`Domicilio: ${input.receiverAddress}`, 310, 226, { width: 238 })
+  pdf.text(`Condición IVA receptor (ID): ${input.receiverVatConditionId ?? 'No informada'}`, 310, 212)
+  pdf.text(`Receptor: ${input.receiverName}`, 310, 226, { width: 238 })
+  if (input.receiverAddress) pdf.text(`Domicilio: ${input.receiverAddress}`, 310, 240, { width: 238 })
 
-  const tableY = 264
+  const tableY = 278
   pdf.rect(46, tableY, 502, 24).fill('#edf1f4')
   pdf.font('Helvetica-Bold').fontSize(8).fillColor('#273440')
   pdf.text('DESCRIPCIÓN', 54, tableY + 8)
