@@ -173,6 +173,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           addressLine: input.addressLine,
           city: input.city,
           province: input.province,
+          provinceCode: input.provinceCode || null,
           postalCode: input.postalCode,
           customerNotes: input.customerNotes,
           subtotalArs,
