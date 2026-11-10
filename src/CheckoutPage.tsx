@@ -276,7 +276,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
               </label>}
               {deliveryMethods.enviopack.enabled && <label className={deliveryMethod === 'ENVIOPACK' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
                 <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'ENVIOPACK'} onChange={() => setDeliveryMethod('ENVIOPACK')} />
-                <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por Envíopack</strong><small>Cotización según el código postal de destino.</small></span>
+                <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por Envíopack</strong><small>Un único bulto consolidado con el peso y las dimensiones estimadas de todo el pedido.</small></span>
               </label>}
             </div>}
             {deliveryMethod === 'PICKUP' ? <p className="checkout-shipping-hint">El retiro no depende de tu localidad. Coordinaremos la entrega del pedido luego de confirmarlo.</p> : deliveryMethod === 'LOCAL_DELIVERY' ? <p className="checkout-shipping-hint">{localDeliveryAvailable ? 'La entrega local está disponible para tu destino.' : 'Ingresá un código postal cubierto por la entrega local.'}</p> : null}
