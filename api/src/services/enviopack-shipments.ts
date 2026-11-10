@@ -217,18 +217,24 @@ export async function refreshEnviopackShipment(shipmentId: string) {
         enviopackTrackingNumber: shipment.tracking_number ? String(shipment.tracking_number) : order.enviopackTrackingNumber,
         trackingCode: shipment.tracking_number ? String(shipment.tracking_number) : order.trackingCode,
         ...(processed ? { enviopackProcessedAt: order.enviopackProcessedAt || new Date() } : {}),
-        ...(processed && order.status === 'PREPARING' ? { status: 'SHIPPED' } : {}),
       },
     })
-    if (processed && order.status === 'PREPARING') {
-      await tx.orderStatusHistory.create({
-        data: {
-          orderId: order.id,
-          fromStatus: 'PREPARING',
-          toStatus: 'SHIPPED',
-          note: 'Envíopack confirmó el procesamiento del envío. Etiqueta disponible.',
-        },
+    if (processed) {
+      // No resucitar un pedido cancelado/entregado si el webhook llega tarde.
+      const changed = await tx.order.updateMany({
+        where: { id: order.id, status: 'PREPARING' },
+        data: { status: 'SHIPPED' },
       })
+      if (changed.count === 1) {
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: order.id,
+            fromStatus: 'PREPARING',
+            toStatus: 'SHIPPED',
+            note: 'Envíopack confirmó el procesamiento del envío. Etiqueta disponible.',
+          },
+        })
+      }
     }
   })
   let labelSaved = Boolean(order.enviopackLabelPdf)
