@@ -11,6 +11,16 @@ type ArcaSettings = {
   credentialsConfigured: boolean
 }
 
+type ArcaDiagnostics = {
+  pointOfSale: number
+  pointsOfSale: { number: number; emissionType: string; blocked: boolean; deactivationDate: string | null }[]
+  selectedPointFound: boolean
+  lastAuthorized: { pointOfSale: number; voucherType: number; lastVoucherNumber: number } | null
+  voucherTypes: { id: number; description: string }[]
+  ivaReceiverConditions: { id: number; description: string; voucherClass: string }[]
+  queriedAt: string
+}
+
 const defaults: ArcaSettings = {
   enabled: false,
   environment: 'HOMOLOGATION',
@@ -26,6 +36,8 @@ export default function ArcaSettingsPanel({ token }: { token: string }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [diagnosing, setDiagnosing] = useState(false)
+  const [diagnostics, setDiagnostics] = useState<ArcaDiagnostics | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -58,6 +70,7 @@ export default function ArcaSettingsPanel({ token }: { token: string }) {
     setSaving(true)
     setError('')
     setNotice('')
+    setDiagnostics(null)
     const parsedPointOfSale = pointOfSale.trim() ? Number(pointOfSale) : null
     if (parsedPointOfSale !== null && (!Number.isInteger(parsedPointOfSale) || parsedPointOfSale < 1 || parsedPointOfSale > 99_998)) {
       setError('El punto de venta debe ser un entero entre 1 y 99998.')
@@ -97,7 +110,26 @@ export default function ArcaSettingsPanel({ token }: { token: string }) {
     }
   }
 
+  async function loadDiagnostics() {
+    if (diagnosing) return
+    setDiagnosing(true)
+    setError('')
+    setNotice('')
+    setDiagnostics(null)
+    try {
+      const result = await request<{ data: ArcaDiagnostics; message: string }>('/admin/arca/diagnostics')
+      setDiagnostics(result.data)
+      setNotice(result.message)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudieron consultar los datos de ARCA.')
+    } finally {
+      setDiagnosing(false)
+    }
+  }
+
   if (loading) return <section className="admin-category-card"><div className="admin-table-empty">Cargando configuración de ARCA...</div></section>
+
+  const selectedPoint = diagnostics?.pointsOfSale.find((point) => point.number === diagnostics.pointOfSale)
 
   return (
     <section className="admin-category-card arca-settings-card">
@@ -138,12 +170,36 @@ export default function ArcaSettingsPanel({ token }: { token: string }) {
             <button type="button" className="admin-quiet-button" onClick={() => void testConnection()} disabled={testing || !settings.credentialsConfigured || !settings.pointOfSale}>
               {testing ? 'Probando conexión...' : 'Probar conexión con ARCA'}
             </button>
+            <button type="button" className="admin-primary" onClick={() => void loadDiagnostics()} disabled={diagnosing || !settings.credentialsConfigured || !settings.pointOfSale}>
+              {diagnosing ? 'Consultando ARCA...' : 'Consultar datos de homologación'}
+            </button>
           </div>
         </section>
         <div className="admin-category-actions shipping-settings-actions">
           <button className="admin-primary" disabled={saving}>{saving ? 'Guardando...' : 'Guardar configuración de ARCA'}</button>
         </div>
       </form>
+
+      {diagnostics && (
+        <section className="arca-diagnostics">
+          <div className="arca-diagnostics-heading">
+            <div><span className="admin-kicker">LECTURA WSFEV1</span><h3>Datos recibidos de ARCA</h3></div>
+            <small>Consultado {new Date(diagnostics.queriedAt).toLocaleString('es-AR')}</small>
+          </div>
+          <div className="arca-diagnostics-summary">
+            <div><span>PUNTO DE VENTA CONFIGURADO</span><strong>{diagnostics.pointOfSale}</strong></div>
+            <div><span>ESTADO DEL PUNTO</span><strong>{!diagnostics.selectedPointFound ? 'No encontrado' : selectedPoint?.blocked ? 'Bloqueado' : 'Habilitado'}</strong></div>
+            <div><span>ÚLTIMA FACTURA C AUTORIZADA</span><strong>{diagnostics.lastAuthorized ? diagnostics.lastAuthorized.lastVoucherNumber : 'Sin dato'}</strong></div>
+          </div>
+          {!diagnostics.selectedPointFound && <div className="admin-alert error">El punto de venta configurado no aparece en la respuesta de ARCA.</div>}
+          {selectedPoint && <p className="shipping-settings-help">Tipo de emisión: {selectedPoint.emissionType || 'No informado'}{selectedPoint.deactivationDate ? ` · Fecha de baja: ${selectedPoint.deactivationDate}` : ''}</p>}
+          <div className="arca-diagnostics-grid">
+            <div><h4>Puntos de venta ({diagnostics.pointsOfSale.length})</h4><div className="arca-diagnostics-list">{diagnostics.pointsOfSale.map((point) => <div key={point.number}><strong>{point.number}</strong><span>{point.emissionType || 'Emisión no informada'}</span><small>{point.blocked ? 'Bloqueado' : point.deactivationDate ? `Baja ${point.deactivationDate}` : 'Activo'}</small></div>)}</div></div>
+            <div><h4>Tipos de comprobante ({diagnostics.voucherTypes.length})</h4><div className="arca-diagnostics-list">{diagnostics.voucherTypes.map((item) => <div key={item.id}><strong>{item.id}</strong><span>{item.description}</span></div>)}</div></div>
+            <div><h4>Condiciones IVA receptor ({diagnostics.ivaReceiverConditions.length})</h4><div className="arca-diagnostics-list">{diagnostics.ivaReceiverConditions.map((item) => <div key={item.id}><strong>{item.id}</strong><span>{item.description}</span></div>)}</div></div>
+          </div>
+        </section>
+      )}
     </section>
   )
 }

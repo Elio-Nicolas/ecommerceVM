@@ -127,6 +127,8 @@ async function callWsfe(
   })
 
   const responseXml = await response.text()
+  const soapFault = readTag(responseXml, 'faultstring')
+  if (soapFault) throw new Error(`WSFE rechazó ${operation}: ${soapFault}`)
   if (!response.ok) throw new Error(`WSFE respondió HTTP ${response.status} en ${operation}`)
   assertWsfeResponse(responseXml, operation)
   return responseXml
