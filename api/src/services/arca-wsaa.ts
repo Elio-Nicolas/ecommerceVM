@@ -190,7 +190,7 @@ function requestAndCacheTicket(environment: ArcaEnvironment, cacheKey: string): 
       const message = error instanceof Error ? error.message : ''
       ticketRetryAfter.set(
         cacheKey,
-        /coe\\.notAuthorized/i.test(message) ? Number.POSITIVE_INFINITY : Date.now() + WSAA_RETRY_COOLDOWN_MS,
+        /coe\.notAuthorized/i.test(message) ? Number.POSITIVE_INFINITY : Date.now() + WSAA_RETRY_COOLDOWN_MS,
       )
       throw error
     })
