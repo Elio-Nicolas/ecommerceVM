@@ -68,7 +68,7 @@ export default function ArcaSettingsPanel({ token }: { token: string }) {
       const result = await request<{ data: ArcaSettings; message: string }>('/admin/arca/settings', {
         method: 'PUT',
         body: JSON.stringify({
-          enabled: settings.enabled,
+          enabled: settings.enabled && parsedPointOfSale !== null && settings.credentialsConfigured,
           environment: 'HOMOLOGATION',
           pointOfSale: parsedPointOfSale,
         }),
@@ -135,7 +135,7 @@ export default function ArcaSettingsPanel({ token }: { token: string }) {
           </div>
           {!settings.credentialsConfigured && <p className="shipping-settings-help">Las rutas del certificado y la clave privada se configuran como variables de entorno en la API. Los archivos deben permanecer fuera del repositorio. No pegues certificados ni claves en este formulario.</p>}
           <div className="admin-category-actions">
-            <button type="button" className="admin-quiet-button" onClick={() => void testConnection()} disabled={testing || !settings.credentialsConfigured}>
+            <button type="button" className="admin-quiet-button" onClick={() => void testConnection()} disabled={testing || !settings.credentialsConfigured || !settings.pointOfSale}>
               {testing ? 'Probando conexión...' : 'Probar conexión con ARCA'}
             </button>
           </div>
