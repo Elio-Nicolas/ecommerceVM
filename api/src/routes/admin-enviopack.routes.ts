@@ -69,7 +69,7 @@ adminEnviopackRouter.get('/orders/:id/label', async (req, res) => {
 })
 
 adminEnviopackRouter.post('/orders/:id/refresh', async (req, res) => {
-  const order = await prisma.order.findUnique({ where: { id: req.params.id } })
+  const order = await prisma.order.findUnique({ where: { id: req.params.id }, select: { enviopackShipmentId: true } })
   if (!order?.enviopackShipmentId) {
     res.status(404).json({ error: { code: 'ENVIOPACK_SHIPMENT_NOT_FOUND', message: 'El pedido todavía no tiene un envío creado en Envíopack.' } })
     return
