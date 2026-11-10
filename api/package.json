@@ -27,7 +27,9 @@
     "jsonwebtoken": "^9.0.2",
     "express-rate-limit": "^8.2.1",
     "@supabase/supabase-js": "^2.57.4",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "pdfkit": "^0.17.2",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -38,6 +40,8 @@
     "typescript": "~5.8.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
-    "@types/bcryptjs": "^2.4.6"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/pdfkit": "^0.17.3",
+    "@types/qrcode": "^1.5.5"
   }
 }

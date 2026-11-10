@@ -85,6 +85,7 @@ export default function AdminOrders() {
   const [invoiceReceiverAddress, setInvoiceReceiverAddress] = useState('')
   const [invoicePaymentConfirmed, setInvoicePaymentConfirmed] = useState(false)
   const [invoiceIssuing, setInvoiceIssuing] = useState(false)
+  const [invoiceDownloadingId, setInvoiceDownloadingId] = useState<string | null>(null)
 
   const loadOrders = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -286,6 +287,34 @@ export default function AdminOrders() {
     }
   }
 
+  async function downloadInvoicePdf(orderCode: string, documentId: string) {
+    if (!token || invoiceDownloadingId) return
+    setInvoiceDownloadingId(documentId)
+    setError('')
+    try {
+      const response = await fetch(`${API_URL}/api/v1/admin/arca/documents/${documentId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error?.message || 'No se pudo descargar la factura.')
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `factura-c-${orderCode}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo descargar la factura.')
+    } finally {
+      setInvoiceDownloadingId(null)
+    }
+  }
+
   async function changeStatus(order: Order, next: OrderStatus) {
     if (!token || updating) return
     setUpdating(true)
@@ -388,6 +417,7 @@ export default function AdminOrders() {
               {(activeOrder.fiscalDocuments || []).filter((document) => document.type === 'INVOICE_C').map((document) => <div className={`order-fiscal-document ${document.status.toLowerCase()}`} key={document.id}>
                 <div><strong>{document.status === 'AUTHORIZED' ? 'Autorizada' : document.status === 'REJECTED' ? 'Rechazada' : document.status === 'UNKNOWN' ? 'Pendiente de conciliación' : 'Emisión en curso'}</strong><small>{document.pointOfSale ? `Punto de venta ${document.pointOfSale}` : ''}{document.voucherNumber ? ` · Comprobante ${String(document.voucherNumber).padStart(8, '0')}` : ''}</small></div>
                 {document.cae && <div><span>CAE</span><strong>{document.cae}</strong><small>Vencimiento: {document.caeExpiresAt ? formatDate(document.caeExpiresAt) : 'No informado'}</small></div>}
+                {document.status === 'AUTHORIZED' && <button type="button" className="admin-quiet-button" disabled={invoiceDownloadingId === document.id || invoiceDownloadingId !== null} onClick={() => void downloadInvoicePdf(activeOrder.code, document.id)}>{invoiceDownloadingId === document.id ? 'Generando PDF...' : 'Descargar factura PDF'}</button>}
                 {document.lastErrorMessage && <p>{document.lastErrorMessage}</p>}
                 {['ISSUING', 'UNKNOWN', 'PENDING'].includes(document.status) && <button type="button" className="admin-quiet-button" disabled={invoiceIssuing} onClick={() => void reconcileInvoiceC(activeOrder, document.id)}>{invoiceIssuing ? 'Consultando ARCA...' : 'Conciliar con ARCA'}</button>}
               </div>)}

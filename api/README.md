@@ -60,3 +60,15 @@ El checkout ofrece tres modalidades:
 La configuración operativa se administra desde Administración > Configuración de envíos. Allí se habilitan las modalidades, se definen códigos postales, tarifas, costos internos, domicilio e instrucciones de retiro y credenciales de Envíopack. Los cambios se guardan en la tabla `ShippingSettings` y se aplican inmediatamente, sin reiniciar la API.
 
 La ruta protegida `GET/PUT /api/v1/admin/shipping-settings` permite administrar estos valores. La ruta pública `GET /api/v1/shipping/methods` solo expone los datos necesarios para el checkout; nunca expone credenciales.
+
+
+## PDF de Factura C autorizada
+
+La descarga protegida `GET /api/v1/admin/arca/documents/:documentId/pdf` solo está disponible para comprobantes con estado `AUTHORIZED`, CAE y vencimiento confirmados. El PDF se conserva en el registro fiscal y contiene el QR conforme a la especificación oficial de ARCA.
+
+Para generar el PDF se deben completar en el entorno de la API los datos legales del emisor:
+- `ARCA_ISSUER_NAME`: nombre o razón social.
+- `ARCA_ISSUER_ADDRESS`: domicilio fiscal.
+- `ARCA_ISSUER_VAT_CONDITION`: condición frente al IVA.
+
+Si falta alguno, la API no genera una representación fiscal incompleta. El QR utiliza los datos persistidos del comprobante autorizado y el verificador oficial de ARCA.
