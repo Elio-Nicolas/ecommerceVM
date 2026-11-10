@@ -25,6 +25,7 @@ const transitions: Record<OrderStatus, OrderStatus[]> = {
 
 const orderInclude = {
   items: true,
+  fiscalDocuments: { orderBy: { createdAt: 'desc' as const }, select: { id: true, type: true, status: true, pointOfSale: true, voucherType: true, voucherNumber: true, cae: true, caeExpiresAt: true, lastErrorMessage: true, createdAt: true } },
   history: { orderBy: { createdAt: 'desc' as const }, include: { changedByAdmin: { select: { email: true } } } },
 }
 
