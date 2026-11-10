@@ -137,13 +137,16 @@ async function requestTicket(environment: ArcaEnvironment): Promise<ArcaAccessTi
   })
   const responseXml = await response.text()
 
-  if (!response.ok) {
-    throw new Error(`WSAA respondió HTTP ${response.status}`)
-  }
-
+  // SOAP 1.1 faults commonly arrive with HTTP 500. Inspect the SOAP body
+  // first so authorization faults (for example coe.notAuthorized) are not
+  // hidden behind the generic HTTP status.
   const fault = readTag(responseXml, 'faultstring')
   const faultCode = readTag(responseXml, 'faultcode')
   if (fault) throw new Error(`WSAA rechazó la autenticación: ${faultCode ? `${faultCode}: ` : ''}${fault}`)
+
+  if (!response.ok) {
+    throw new Error(`WSAA respondió HTTP ${response.status}`)
+  }
 
   const ticketXml = readTag(responseXml, 'loginCmsReturn')
   if (!ticketXml) throw new Error('WSAA devolvió una respuesta sin loginCmsReturn')
