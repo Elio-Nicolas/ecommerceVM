@@ -132,6 +132,7 @@ model Order {
   @@index([status, createdAt])
   @@index([customerPhone])
   @@index([customerName])
+  @@index([enviopackOrderId])
 }
 model ShippingQuote {
   id String @id @default(uuid())
