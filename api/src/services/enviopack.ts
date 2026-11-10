@@ -104,14 +104,15 @@ export async function quoteHomeDelivery(input: {
     url.searchParams.set('access_token', token)
     url.searchParams.set('provincia', input.provinceCode)
     url.searchParams.set('codigo_postal', input.postalCode)
-    url.searchParams.set('peso', (input.weightGrams / 1000).toFixed(2))
+    // Envíopack admite hasta 2 decimales en kg; redondeamos hacia arriba para no declarar menos peso real.
+    url.searchParams.set('peso', (Math.ceil(input.weightGrams / 10) / 100).toFixed(2))
     url.searchParams.set('paquetes', packages)
     if (input.originAddressId) url.searchParams.set('direccion_envio', input.originAddressId)
   }
 
   const buyerUrl = new URL('https://api.enviopack.com/cotizar/precio/a-domicilio')
   baseParams(buyerUrl)
-  const buyerQuotes = (await getQuotePayload(buyerUrl)).filter((quote) => (quote.servicio || 'N') !== 'R')
+  const buyerQuotes = (await getQuotePayload(buyerUrl)).filter((quote) => (quote.modalidad || 'D') === 'D' && (quote.servicio || 'N') !== 'R')
 
   const sellerCostsByService = new Map<string, SellerShippingOption[]>()
   const serviceCodes = [...new Set(buyerQuotes.map((quote) => quote.servicio || 'N'))]
@@ -128,7 +129,9 @@ export async function quoteHomeDelivery(input: {
       sellerCostsByService.set(serviceCode, [])
       return
     }
-    const sellerOptions = sellerQuotes.flatMap((quote) => {
+    const sellerOptions = sellerQuotes
+      .filter((quote) => (quote.modalidad || 'D') === 'D' && (quote.despacho || 'D') === 'D' && (quote.servicio || 'N') === serviceCode)
+      .flatMap((quote) => {
       const cost = Number(quote.valor)
       const carrierId = quote.correo?.id
       if (!carrierId || !Number.isFinite(cost) || cost < 0) return []
