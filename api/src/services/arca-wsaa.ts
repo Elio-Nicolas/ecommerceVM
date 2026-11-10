@@ -99,7 +99,7 @@ async function signTra(cmsInput: string): Promise<string> {
     await chmod(directory, 0o700)
     await writeFile(traPath, cmsInput, { encoding: 'utf8', mode: 0o600 })
     await execFile(env.ARCA_OPENSSL_PATH, [
-      'cms', '-sign', '-binary',
+      'cms', '-sign', '-binary', '-md', 'sha1',
       '-in', traPath,
       '-signer', certificatePath,
       '-inkey', privateKeyPath,
@@ -172,7 +172,7 @@ function assertRetryAllowed(cacheKey: string): void {
   if (retryAt === undefined) return
 
   if (retryAt === Number.POSITIVE_INFINITY) {
-    throw new Error('WSAA rechazó la autorización (coe.notAuthorized). Corregí la asociación del certificado al servicio WSFE y reiniciá la API.')
+    throw new Error('WSAA devolvió un error permanente. Corregí la causa indicada por ARCA y reiniciá la API para volver a intentar.')
   }
 
   if (retryAt > Date.now()) {
@@ -191,9 +191,14 @@ function requestAndCacheTicket(environment: ArcaEnvironment, cacheKey: string): 
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : ''
+      const faultCodeMatch = message.match(/WSAA rechazó la autenticación: ([^:]+):/)
+      const faultCode = faultCodeMatch?.[1]?.trim() ?? ''
+      const normalizedFaultCode = faultCode.toLowerCase()
+      const retryableFault = normalizedFaultCode.startsWith('wsaa.') || normalizedFaultCode === 'wsn.unavailable'
+
       ticketRetryAfter.set(
         cacheKey,
-        /coe\.notAuthorized/i.test(message) ? Number.POSITIVE_INFINITY : Date.now() + WSAA_RETRY_COOLDOWN_MS,
+        faultCode && !retryableFault ? Number.POSITIVE_INFINITY : Date.now() + WSAA_RETRY_COOLDOWN_MS,
       )
       throw error
     })
