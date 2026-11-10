@@ -178,6 +178,13 @@ export async function getArcaAccessTicket(environment: ArcaEnvironment): Promise
       ticketCache.set(cacheKey, ticket)
       return ticket
     })
+    .catch((error: unknown) => {
+      // A ticket remains usable until its actual expiration, even when refresh fails.
+      if (cached && cached.expiresAt.getTime() > Date.now()) {
+        return cached
+      }
+      throw error
+    })
     .finally(() => ticketRequests.delete(cacheKey))
 
   ticketRequests.set(cacheKey, request)
