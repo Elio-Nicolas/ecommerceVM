@@ -171,6 +171,7 @@ model FiscalDocument {
   issueDate DateTime?
   receiverDocumentType Int?
   receiverDocumentNumber String?
+  receiverVatConditionId Int?
   receiverName String?
   receiverAddress String?
   currencyCode String @default("PES")
