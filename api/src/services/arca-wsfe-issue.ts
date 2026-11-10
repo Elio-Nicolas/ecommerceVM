@@ -54,7 +54,7 @@ function arcaDate(date: Date): string {
 }
 
 function parseArcaDate(value: string | null): Date | null {
-  if (!value || !/^\\d{8}$/.test(value)) return null
+  if (!value || !/^\d{8}$/.test(value)) return null
   return new Date(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}T00:00:00-03:00`)
 }
 
