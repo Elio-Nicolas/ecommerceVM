@@ -19,6 +19,7 @@ type Order = {
   enviopackOrderId: string | null; enviopackShipmentId: string | null; enviopackShipmentStatus: string | null
   enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null; enviopackPackages: EnviopackPackage[] | null; enviopackLabelSavedAt: string | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
+  paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'REFUNDED' | 'PARTIALLY_REFUNDED'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
   fiscalDocuments?: { id: string; type: 'INVOICE_C' | 'CREDIT_NOTE_C' | 'DEBIT_NOTE_C'; status: 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'; pointOfSale: number | null; voucherType: number; voucherNumber: number | null; cae: string | null; caeExpiresAt: string | null; lastErrorMessage: string | null; createdAt: string }[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
@@ -37,6 +38,11 @@ const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
+  const mpStatuses = (order.paymentAttempts || []).filter((payment) => payment.provider === 'MERCADO_PAGO').map((payment) => payment.status)
+  if (order.status === 'PENDING' && mpStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
+  if (mpStatuses.includes('PARTIALLY_REFUNDED')) return []
+  if (mpStatuses.includes('REFUNDED')) return nextStatuses[order.status].includes('CANCELLED') ? ['CANCELLED'] : []
+  if (mpStatuses.includes('APPROVED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'ENVIOPACK' && order.enviopackShipmentStatus !== 'P') return ['CANCELLED']
@@ -86,6 +92,7 @@ export default function AdminOrders() {
   const [invoicePaymentConfirmed, setInvoicePaymentConfirmed] = useState(false)
   const [invoiceIssuing, setInvoiceIssuing] = useState(false)
   const [invoiceDownloadingId, setInvoiceDownloadingId] = useState<string | null>(null)
+  const [paymentReconcilingId, setPaymentReconcilingId] = useState<string | null>(null)
 
   const loadOrders = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -131,6 +138,22 @@ export default function AdminOrders() {
     window.addEventListener('afterprint', clearPrint)
     return () => window.removeEventListener('afterprint', clearPrint)
   }, [printKind])
+
+  async function reconcilePayment(order: Order, attemptId: string) {
+    if (!token || paymentReconcilingId) return
+    setPaymentReconcilingId(attemptId)
+    setError('')
+    setNotice('')
+    try {
+      await request(`/payments/admin/orders/${order.id}/attempts/${attemptId}/reconcile`, token, { method: 'POST' })
+      setNotice(`Estado del pago del pedido ${order.code} actualizado desde Mercado Pago.`)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo consultar el pago en Mercado Pago.')
+    } finally {
+      setPaymentReconcilingId(null)
+    }
+  }
 
   async function saveShipping(event: FormEvent<HTMLFormElement>, order: Order) {
     event.preventDefault()
@@ -412,6 +435,17 @@ export default function AdminOrders() {
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
             <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de coordinación' : `Envío: ${formatPrice(activeOrder.shippingCostArs)}`}</small><span>Total del pedido</span><strong>{activeOrder.totalArs === null ? 'Pendiente de coordinación' : formatPrice(activeOrder.totalArs)}</strong></div>
+            <section className="order-payment-card">
+              <div className="order-payment-heading"><div><span className="admin-kicker">COBROS ONLINE</span><h3>Mercado Pago</h3></div><small>Estado verificado por Webhook</small></div>
+              {(activeOrder.paymentAttempts || []).map((payment) => <div className="order-payment-attempt" key={payment.id}>
+                <div><strong>{payment.status === 'APPROVED' ? 'Pago aprobado' : payment.status === 'REJECTED' ? 'Pago rechazado' : payment.status === 'CANCELLED' ? 'Pago cancelado' : payment.status === 'REFUNDED' ? 'Pago reembolsado' : payment.status === 'PARTIALLY_REFUNDED' ? 'Reembolso parcial' : payment.status === 'UNKNOWN' ? 'Resultado incierto' : payment.status === 'CREATING' ? 'Creando pago' : 'Pago pendiente'}</strong><small>{payment.statusDetail || 'Sin detalle informado'} · {formatDate(payment.createdAt)}</small></div>
+                <strong>{formatPrice(payment.amountArs)}</strong>
+                {payment.providerOrderId && <small className="order-payment-reference">Orden Mercado Pago: {payment.providerOrderId}</small>}
+                {payment.approvedAt && <small className="order-payment-reference">Aprobado: {formatDate(payment.approvedAt)}</small>}
+                {payment.providerOrderId && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status) && <button type="button" className="admin-quiet-button" disabled={paymentReconcilingId !== null} onClick={() => void reconcilePayment(activeOrder, payment.id)}>{paymentReconcilingId === payment.id ? 'Consultando Mercado Pago...' : 'Conciliar pago'}</button>}
+              </div>)}
+              {!(activeOrder.paymentAttempts || []).length && <p className="order-payment-empty">Este pedido no tiene intentos de pago online registrados.</p>}
+            </section>
             <section className="order-fiscal-card">
               <div className="order-fiscal-heading"><div><span className="admin-kicker">ARCA · HOMOLOGACIÓN</span><h3>Factura C</h3></div><small>Emisión manual de prueba</small></div>
               {(activeOrder.fiscalDocuments || []).filter((document) => document.type === 'INVOICE_C').map((document) => <div className={`order-fiscal-document ${document.status.toLowerCase()}`} key={document.id}>

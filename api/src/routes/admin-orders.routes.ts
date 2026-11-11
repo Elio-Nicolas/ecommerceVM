@@ -25,6 +25,7 @@ const transitions: Record<OrderStatus, OrderStatus[]> = {
 
 const orderInclude = {
   items: true,
+  paymentAttempts: { orderBy: { createdAt: 'desc' as const }, select: { id: true, provider: true, providerOrderId: true, status: true, statusDetail: true, amountArs: true, approvedAt: true, createdAt: true } },
   fiscalDocuments: { orderBy: { createdAt: 'desc' as const }, select: { id: true, type: true, status: true, pointOfSale: true, voucherType: true, voucherNumber: true, cae: true, caeExpiresAt: true, lastErrorMessage: true, createdAt: true } },
   history: { orderBy: { createdAt: 'desc' as const }, include: { changedByAdmin: { select: { email: true } } } },
 }
@@ -160,10 +161,26 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }).parse(req.body)
   const existing = await prisma.order.findUnique({
     where: { id: req.params.id },
-    include: { items: true },
+    include: { items: true, paymentAttempts: { select: { status: true, provider: true } } },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (input.status !== existing.status && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'REFUNDED') && input.status !== 'CANCELLED') {
+    res.status(409).json({ error: { code: 'PAYMENT_REFUNDED', message: 'El pago fue reembolsado por completo. Cancelá el pedido antes de continuar con la preparación o el despacho.' } })
+    return
+  }
+  if (input.status !== existing.status && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'PARTIALLY_REFUNDED')) {
+    res.status(409).json({ error: { code: 'PAYMENT_PARTIALLY_REFUNDED', message: 'El pago tuvo un reembolso parcial. Revisá la operación en Mercado Pago antes de cambiar el estado del pedido.' } })
+    return
+  }
+  if (input.status === 'CANCELLED' && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status))) {
+    res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'No se puede cancelar el pedido mientras exista un pago de Mercado Pago pendiente, incierto o aprobado. Primero resolvé el cobro o gestioná la devolución correspondiente.' } })
+    return
+  }
+  if (input.status === 'CONFIRMED' && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) {
+    res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'Este pedido tiene un pago de Mercado Pago pendiente o sin resultado concluyente. Verificá el estado del pago antes de confirmarlo manualmente.' } })
     return
   }
   if (input.status === 'CONFIRMED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {

@@ -117,3 +117,42 @@ Todos requieren sesión administrativa (Bearer token):
 - `POST /api/v1/admin/arca/orders/:orderId/invoice-c`: solicitar una Factura C de prueba.
 - `POST /api/v1/admin/arca/documents/:documentId/reconcile`: consultar en ARCA el resultado de una emisión pendiente.
 - `GET /api/v1/admin/arca/documents/:documentId/pdf`: descargar el PDF de una factura autorizada.
+
+
+## Pagos online con Mercado Pago Checkout Pro (Orders API)
+
+La integración utiliza la API moderna de Orders para Checkout Pro. El servidor crea una orden de pago por pedido con clave de idempotencia; el comprador es redirigido al checkout alojado por Mercado Pago. El sistema registra cada intento, valida el importe y la referencia externa, y solo confirma el pedido cuando consulta la orden en Mercado Pago y verifica que esté procesada y pagada por el total exacto.
+
+### Variables de entorno
+
+Configurar en el entorno de la API, nunca en el frontend:
+
+- `MP_ACCESS_TOKEN`: Access Token privado de la aplicación (usar primero credenciales de prueba).
+- `MP_WEBHOOK_SECRET`: firma secreta de Webhooks de la misma aplicación.
+- `PUBLIC_APP_URL`: URL pública HTTPS del storefront.
+- `PUBLIC_API_URL`: URL pública HTTPS de la API.
+
+Los pagos se habilitan únicamente cuando están presentes las cuatro variables. No guardar el Access Token ni la firma secreta en Git, en el navegador ni en mensajes.
+
+### Webhook
+
+En Mercado Pago > Tus integraciones > aplicación > Configuración de Webhooks:
+
+1. Configurar el entorno de prueba.
+2. Usar como URL `https://TU_API/api/v1/payments/webhook`.
+3. Seleccionar el evento **Order (Mercado Pago)**.
+4. Guardar y copiar la firma secreta a `MP_WEBHOOK_SECRET`.
+
+El servidor valida `x-signature` mediante HMAC-SHA256 y consulta `GET /v1/orders/:id` antes de modificar el pedido. Los parámetros de retorno del navegador nunca se consideran prueba de pago. Los pedidos con costo de entrega pendiente no pueden cobrarse hasta que el total quede definido.
+
+### Endpoints
+
+- `GET /api/v1/payments/config`: informa si el checkout online está habilitado.
+- `POST /api/v1/payments/orders/:orderId`: crea o recupera un intento idempotente y devuelve `checkoutUrl`.
+- `GET /api/v1/payments/orders/:orderId/status`: consulta el estado público del pago.
+- `POST /api/v1/payments/webhook`: recibe y valida eventos Order de Mercado Pago.
+- `POST /api/v1/payments/admin/orders/:orderId/attempts/:attemptId/reconcile`: permite al administrador consultar el estado actual directamente en Mercado Pago cuando un Webhook no llegó.
+
+Los reembolsos se inician desde el panel de Mercado Pago. El Webhook sincroniza reembolsos totales y parciales; un pedido reembolsado no puede seguir preparándose y un reembolso parcial queda bloqueado para revisión manual.
+
+La integración de código no sustituye la prueba de extremo a extremo. Antes de cobrar a compradores reales, completar pruebas con credenciales de prueba, verificar notificaciones en el panel, configurar credenciales productivas y ejecutar una prueba controlada en producción.
