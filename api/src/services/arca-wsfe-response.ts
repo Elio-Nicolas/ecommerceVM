@@ -1,3 +1,9 @@
+export interface ArcaInvoiceCIdentity {
+  pointOfSale: number
+  voucherType: number
+  voucherNumber: number
+}
+
 export interface ArcaInvoiceCResult {
   outcome: 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'
   cae: string | null
@@ -16,17 +22,17 @@ function decodeXml(value: string): string {
 }
 
 function readTag(xml: string, tag: string): string | null {
-  const match = xml.match(new RegExp(`<(?:[\\w.-]+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${tag}\\s*>`, 'i'))
+  const match = xml.match(new RegExp(`<(?:[\\\\w.-]+:)?${tag}\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/(?:[\\\\w.-]+:)?${tag}\\\\s*>`, 'i'))
   return match ? decodeXml(match[1].trim()) : null
 }
 
 function readBlocks(xml: string, tag: string): string[] {
-  const matches = xml.matchAll(new RegExp(`<(?:[\\w.-]+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${tag}\\s*>`, 'gi'))
+  const matches = xml.matchAll(new RegExp(`<(?:[\\\\w.-]+:)?${tag}\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/(?:[\\\\w.-]+:)?${tag}\\\\s*>`, 'gi'))
   return Array.from(matches, (match) => match[1])
 }
 
 function parseArcaDate(value: string | null): Date | null {
-  if (!value || !/^\d{8}$/.test(value)) return null
+  if (!value || !/^\\d{8}$/.test(value)) return null
   const year = Number(value.slice(0, 4))
   const month = Number(value.slice(4, 6))
   const day = Number(value.slice(6, 8))
@@ -43,7 +49,21 @@ function readMessages(xml: string, group: 'Err' | 'Obs' | 'Evt'): string[] {
   })
 }
 
-export function parseArcaInvoiceCResponse(responseXml: string, httpStatus: number): ArcaInvoiceCResult {
+function readIdentity(detail: string): ArcaInvoiceCIdentity | null {
+  const pointOfSale = Number(readTag(detail, 'PtoVta'))
+  const voucherType = Number(readTag(detail, 'CbteTipo'))
+  const voucherNumber = Number(readTag(detail, 'CbteDesde'))
+  const voucherNumberTo = Number(readTag(detail, 'CbteHasta'))
+  if (![pointOfSale, voucherType, voucherNumber, voucherNumberTo].every(Number.isSafeInteger)) return null
+  if (pointOfSale < 1 || voucherType < 1 || voucherNumber < 1 || voucherNumber !== voucherNumberTo) return null
+  return { pointOfSale, voucherType, voucherNumber }
+}
+
+export function parseArcaInvoiceCResponse(
+  responseXml: string,
+  httpStatus: number,
+  expected: ArcaInvoiceCIdentity,
+): ArcaInvoiceCResult {
   const fault = readTag(responseXml, 'faultstring')
   if (fault) {
     return {
@@ -69,6 +89,7 @@ export function parseArcaInvoiceCResponse(responseXml: string, httpStatus: numbe
   const detail = readBlocks(readTag(result, 'FeDetResp') ?? '', 'FECAEDetResponse')[0] ?? ''
   const headerOutcome = readTag(header, 'Resultado')
   const detailOutcome = readTag(detail, 'Resultado')
+  const identity = readIdentity(detail)
   const cae = readTag(detail, 'CAE')
   const caeExpiresAt = parseArcaDate(readTag(detail, 'CAEFchVto'))
   const errors = readMessages(result, 'Err')
@@ -77,6 +98,8 @@ export function parseArcaInvoiceCResponse(responseXml: string, httpStatus: numbe
   const responsePayload = {
     headerOutcome,
     detailOutcome,
+    identity,
+    expectedIdentity: expected,
     errors,
     observations,
     events,
@@ -84,7 +107,20 @@ export function parseArcaInvoiceCResponse(responseXml: string, httpStatus: numbe
     caeExpiresAt: caeExpiresAt?.toISOString() ?? null,
   }
 
-  if ((headerOutcome === 'A' || headerOutcome === 'P') && detailOutcome === 'A' && cae && caeExpiresAt) {
+  if (!identity ||
+    identity.pointOfSale !== expected.pointOfSale ||
+    identity.voucherType !== expected.voucherType ||
+    identity.voucherNumber !== expected.voucherNumber) {
+    return {
+      outcome: 'UNKNOWN',
+      cae: null,
+      caeExpiresAt: null,
+      responsePayload,
+      message: 'La respuesta de ARCA no coincide con el punto de venta y número de comprobante solicitados. Requiere conciliación; no vuelvas a emitir.',
+    }
+  }
+
+  if ((headerOutcome === 'A' || headerOutcome === 'P') && detailOutcome === 'A' && cae && /^\\d{14}$/.test(cae) && caeExpiresAt) {
     return {
       outcome: 'AUTHORIZED',
       cae,
