@@ -75,7 +75,6 @@ async function createMercadoPagoOrder(input: {
   }
 
   const appUrl = env.PUBLIC_APP_URL.replace(/\/+$/, '')
-  const apiUrl = env.PUBLIC_API_URL.replace(/\/+$/, '')
   const body = {
     type: 'online',
     processing_mode: 'manual',
