@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Router } from 'express'
 import { PaymentAttemptStatus, Prisma } from '@prisma/client'
 import { rateLimit } from 'express-rate-limit'
@@ -7,6 +6,7 @@ import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
+import { verifyMercadoPagoWebhookSignature } from '../services/payment-webhook-signature'
 
 export const paymentsRouter = Router()
 
@@ -139,24 +139,6 @@ async function refreshMercadoPagoOrder(providerOrderId: string) {
   }
 }
 
-function verifyWebhookSignature(signature: string, requestId: string, dataId: string) {
-  if (!env.MP_WEBHOOK_SECRET) return false
-  const parts = new Map(signature.split(',').map((part) => {
-    const [key, ...rest] = part.trim().split('=')
-    return [key, rest.join('=')]
-  }))
-  const timestamp = parts.get('ts')
-  const receivedHash = parts.get('v1')
-  if (!timestamp || !receivedHash || !/^[a-f0-9]{64}$/i.test(receivedHash)) return false
-  const rawTimestamp = Number(timestamp)
-  if (!Number.isFinite(rawTimestamp)) return false
-  const timestampMs = rawTimestamp > 1_000_000_000_000 ? rawTimestamp : rawTimestamp * 1000
-  if (Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) return false
-  const manifest = 'id:' + dataId + ';request-id:' + requestId + ';ts:' + timestamp + ';'
-  const expectedHash = createHmac('sha256', env.MP_WEBHOOK_SECRET).update(manifest).digest()
-  const suppliedHash = Buffer.from(receivedHash, 'hex')
-  return suppliedHash.length === expectedHash.length && timingSafeEqual(suppliedHash, expectedHash)
-}
 
 async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<ReturnType<typeof refreshMercadoPagoOrder>>) {
   const attempt = await prisma.paymentAttempt.findUnique({
@@ -443,7 +425,7 @@ paymentsRouter.post('/webhook', webhookLimiter, async (req, res) => {
     res.status(400).send('Notificación inválida')
     return
   }
-  if (!signature || !requestId || !verifyWebhookSignature(signature, requestId, dataId.data)) {
+  if (!signature || !requestId || !verifyMercadoPagoWebhookSignature(signature, requestId, dataId.data, env.MP_WEBHOOK_SECRET || '')) {
     res.status(401).send('Firma inválida')
     return
   }
