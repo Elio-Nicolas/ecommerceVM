@@ -174,3 +174,17 @@ Este primer corte no cambia el checkout visible, no activa OCA y no requiere mig
 2. Separar la modalidad genérica de envío de la identificación histórica `ENVIOPACK` en el dominio de pedidos, con migración aditiva y compatibilidad de lectura.
 3. Adaptar configuración administrativa y checkout a un proveedor activo neutral.
 4. Incorporar OCA solo cuando estén confirmados usuario, operativa, servicios habilitados y contrato QA.
+
+### Segundo bloque implementado (11/11/2026)
+
+El contrato neutral ahora contempla también operaciones de ciclo de vida del envío:
+
+- `createShipment`: alta de admisión con selección de servicio y bultos expresados en unidades neutrales (cm/kg).
+- `getLabel`: recuperación de etiqueta como PDF.
+- `refreshShipment`: actualización de estado y disponibilidad de etiqueta.
+- El adaptador Envíopack traduce los bultos neutrales al formato que espera el servicio existente y encapsula sus errores.
+- Las rutas administrativas existentes delegan alta, descarga de etiqueta y actualización de seguimiento en el adaptador. Se conserva el formato de entrada usado por la pantalla actual y se mantienen los campos históricos Envíopack para leer/archivar sus envíos.
+
+La ruta de webhook sigue siendo específica de Envíopack porque el protocolo de notificación y la tabla de eventos actuales también lo son. No se simula que OCA tenga el mismo webhook; su seguimiento se integrará según las operaciones habilitadas por OCA.
+
+Este bloque tampoco requiere migración ni cambia el flujo de checkout. La administración todavía utiliza las rutas históricas de Envíopack; el próximo paso es normalizar persistencia/configuración y luego migrar la UI sin perder compatibilidad.
