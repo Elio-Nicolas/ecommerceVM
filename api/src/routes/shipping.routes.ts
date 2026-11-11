@@ -3,8 +3,9 @@ import { Prisma } from '@prisma/client'
 import { rateLimit } from 'express-rate-limit'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { getEnviopackCredentials, getShippingSettingsPublic } from '../services/shipping-settings'
-import { quoteHomeDelivery, ShippingProviderError } from '../services/enviopack'
+import { getShippingSettingsPublic } from '../services/shipping-settings'
+import { enviopackShippingProvider } from '../services/enviopack-provider'
+import { ShippingProviderError } from '../services/shipping-provider'
 import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 
 export const shippingRouter = Router()
@@ -97,18 +98,12 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
   }]
 
   try {
-    const credentials = await getEnviopackCredentials()
-    if (!credentials) {
-      res.status(503).json({ error: { code: 'SHIPPING_PROVIDER_NOT_CONFIGURED', message: 'Envíopack no está habilitado o todavía no tiene credenciales configuradas en Administración > Envíos.' } })
-      return
-    }
-    const options = await quoteHomeDelivery({
+    const options = await enviopackShippingProvider.quoteHomeDelivery({
       provinceCode: input.provinceCode,
       postalCode: input.postalCode,
       weightGrams,
       packages,
-      originAddressId: origin.enviopackAddressId,
-      credentials,
+      originReference: origin.enviopackAddressId,
     })
     if (options.length === 0) {
       res.status(422).json({ error: { code: 'SHIPPING_UNAVAILABLE', message: 'Envíopack no encontró servicios disponibles para ese código postal.' } })
@@ -136,7 +131,7 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
     })
   } catch (error) {
     if (error instanceof ShippingProviderError) {
-      const notConfigured = error.message.includes('todavía no está configurada')
+      const notConfigured = error.message.includes('no está habilitado') || error.message.includes('todavía no está configurada')
       res.status(notConfigured ? 503 : 502).json({
         error: {
           code: notConfigured ? 'SHIPPING_PROVIDER_NOT_CONFIGURED' : 'SHIPPING_PROVIDER_ERROR',
