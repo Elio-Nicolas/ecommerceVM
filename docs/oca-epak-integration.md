@@ -210,3 +210,43 @@ El adaptador actual ahora mantiene también el registro neutral al completar ope
 - Al actualizar el tracking, sincroniza el estado y agrega un evento neutral de tipo `STATUS_REFRESH`.
 
 Las columnas históricas de `Order` siguen siendo la fuente de compatibilidad para pedidos Envíopack existentes y la ruta de descarga histórica. La sincronización neutral es adicional. Los webhooks todavía se procesan con la cola histórica hasta trasladar y verificar su semántica de reintentos.
+
+
+## Contrato e-Pak verificado contra la documentación oficial (11/11/2026)
+
+Fuente: https://developers.oca.com.ar/epak.html
+
+### Entornos y operaciones publicadas
+
+| Operación | QA | Producción | Datos requeridos |
+|---|---|---|---|
+| Cotización | `https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/Tarifar_Envio_Corporativo` | `https://webservice.oca.com.ar/ePak_tracking/Oep_TrackEPak.asmx/Tarifar_Envio_Corporativo` | CUIT con guiones, operativa, peso total kg, volumen total m³, CP origen/destino, cantidad de paquetes y valor declarado |
+| Sucursales y servicios por CP | `https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP` | `https://webservice.oca.com.ar/ePak_tracking/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP` | Código postal |
+| Centros de costo | `https://integraciones.ocadev.com.ar/epak_tracking_test/GetCentroCostoPorOperativa` | `https://webservice.oca.com.ar/oep_tracking/Oep_Track.asmx/GetCentroCostoPorOperativa` | CUIT con guiones y operativa |
+| Admisión/retiro múltiple v2 | `https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/IngresoORMultiplesRetiros_v2` | `https://webservice.oca.com.ar/ePak_tracking/Oep_TrackEPak.asmx/IngresoORMultiplesRetiros_v2` | Usuario, contraseña, XML_Datos y ConfirmarRetiro |
+| Etiqueta PDF A4 | `https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/GetPdfDeEtiquetasPorOrdenOrNumeroEnvio` | `https://webservice.oca.com.ar/ePak_tracking/Oep_TrackEPak.asmx/GetPdfDeEtiquetasPorOrdenOrNumeroEnvio` | Orden de admisión o número de envío |
+| Etiqueta PDF 10×15 | `https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/GetPdfDeEtiquetasPorOrdenOrNumeroEnvioParaEtiquetadora` | `https://webservice.oca.com.ar/ePak_tracking/Oep_TrackEPak.asmx/GetPdfDeEtiquetasPorOrdenOrNumeroEnvioParaEtiquetadora` | Orden de admisión o número de envío |
+
+Los servicios aceptan GET, POST, SOAP y SOAP 1.2 según la documentación. El contrato WSDL se obtiene agregando `?wsdl` a la URL del Web Service.
+
+### Reglas de integración confirmadas
+
+- La cotización exige CUIT en formato `##-########-#`, operativa, peso en kg, volumen en m³, CP de origen y destino, cantidad de paquetes y valor declarado.
+- La consulta de sucursales devuelve servicios por sucursal. Solo una sucursal con **Admisión de Paquetes** puede ser origen; solo una con **Entrega de Paquetes** puede ser destino.
+- La admisión v2 recibe `usr`, `psw`, `XML_Datos` y `ConfirmarRetiro`. Con `false` queda en el carrito de e-Pak para confirmación manual; con `true` se confirma inmediatamente. No se debe elegir el valor hasta que OCA confirme la modalidad operativa de esta cuenta.
+- El XML de admisión requiere el número de cuenta habilitado por OCA en `cabecera@nrocuenta`, la operativa, remito y datos de origen/destinatario/paquetes.
+- El origen requiere calle, altura, CP, localidad y provincia. También exige centro de costo; para admisión en sucursal exige `idcentroimposicionorigen`. Para retiro a domicilio exige email y observaciones. Incluye franja horaria y fecha en formato AAAAMMDD.
+- Cada paquete declara alto/ancho/largo en cm, peso en kg y valor. La documentación indica valor cero para operativas sin seguro OCA; el tratamiento del valor declarado y seguro debe confirmarse con la operativa comercial asignada.
+- El método de etiqueta PDF devuelve el contenido binario codificado en Base64; la API debe decodificarlo, validar que sea un PDF y archivarlo antes de permitir la descarga.
+
+### Datos que no se deben inferir
+
+La documentación pública describe los métodos y la estructura general, pero no determina los datos habilitados para esta tienda. Antes de implementar admisión/cotización real deben confirmarse con OCA:
+
+1. CUIT registrado, usuario e-Pak, contraseña, número de cuenta corriente y operativas habilitadas.
+2. Si la admisión se hará por retiro en el domicilio de Villa Mercedes o depósito en una sucursal OCA; si es sucursal, el centro debe figurar habilitado para admisión.
+3. Centro de costo y franja horaria aplicable a la modalidad.
+4. Servicios destino permitidos (domicilio/sucursal), política de seguro/valor declarado y reglas de dimensiones/peso.
+5. Acceso QA, ejemplos de respuesta XML para cotización, sucursales, admisión, etiqueta y seguimiento.
+
+No usar las credenciales, CUIT, cuenta ni operativas de ejemplo publicadas en la página como si fueran datos comerciales de ecommerceVM. Son muestras de documentación y no acreditan habilitación para esta cuenta.
