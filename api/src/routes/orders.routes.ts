@@ -127,9 +127,6 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   }
 
   try {
-    if (input.deliveryMethod === 'ENVIOPACK' && (!input.customerEmail || input.customerEmail.length > 100)) {
-      throw new OrderConflictError('Para realizar un envío por Envíopack necesitamos un correo electrónico válido de hasta 100 caracteres.')
-    }
     const deliverySettings = await getShippingSettings()
     const order = await prisma.$transaction(async (tx) => {
       const now = new Date()
