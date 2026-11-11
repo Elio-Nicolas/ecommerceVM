@@ -166,7 +166,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
   const order = await prisma.order.findUnique({ where: { id: attempt.orderId }, select: { code: true } })
   if (!order) return false
 
-  const paidAmount = parseAmount(payload.total_paid_amount)
+  const paidAmount = parsePaymentAmount(payload.total_paid_amount)
   const totalAmount = parsePaymentAmount(payload.total_amount)
   const matchesOrder = payload.id === providerOrderId
     && payload.external_reference === order.code
