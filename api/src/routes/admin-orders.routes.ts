@@ -3,6 +3,7 @@ import { OrderStatus, Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
+import { wouldChangeOrderTotal } from '../services/shipping-total-consistency'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -95,10 +96,11 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
       const currentOrder = await tx.order.findUnique({
         where: { id: existing.id },
-        select: { subtotalArs: true, shippingCostArs: true },
+        select: { subtotalArs: true, shippingCostArs: true, totalArs: true },
       })
       if (!currentOrder) return null
-      if (input.shippingCostArs !== currentOrder.shippingCostArs) {
+      const nextTotalArs = currentOrder.subtotalArs + input.shippingCostArs
+      if (wouldChangeOrderTotal(currentOrder.subtotalArs, input.shippingCostArs, currentOrder.totalArs)) {
         const blockingPayment = await tx.paymentAttempt.findFirst({
           where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
           select: { id: true },
@@ -107,7 +109,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       }
       await tx.order.update({
         where: { id: existing.id },
-        data: { shippingCostArs: input.shippingCostArs, totalArs: currentOrder.subtotalArs + input.shippingCostArs },
+        data: { shippingCostArs: input.shippingCostArs, totalArs: nextTotalArs },
       })
       await tx.orderStatusHistory.create({
         data: {
@@ -146,10 +148,11 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
     const currentOrder = await tx.order.findUnique({
       where: { id: existing.id },
-      select: { subtotalArs: true, shippingCostArs: true },
+      select: { subtotalArs: true, shippingCostArs: true, totalArs: true },
     })
     if (!currentOrder) return null
-    if (input.shippingCostArs !== currentOrder.shippingCostArs) {
+    const nextTotalArs = currentOrder.subtotalArs + input.shippingCostArs
+    if (wouldChangeOrderTotal(currentOrder.subtotalArs, input.shippingCostArs, currentOrder.totalArs)) {
       const blockingPayment = await tx.paymentAttempt.findFirst({
         where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
         select: { id: true },
@@ -160,7 +163,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       where: { id: existing.id },
       data: {
         shippingCostArs: input.shippingCostArs,
-        totalArs: currentOrder.subtotalArs + input.shippingCostArs,
+        totalArs: nextTotalArs,
         shippingCarrier: input.shippingCarrier,
         trackingCode: input.trackingCode,
       },
