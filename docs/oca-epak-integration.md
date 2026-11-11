@@ -102,3 +102,55 @@ Separar el concepto de envío del proveedor:
 ## Decisión pendiente
 
 No se debe codificar a ciegas el XML de admisión ni activar cotizaciones hasta recibir de OCA la operativa, el tipo de cuenta y el acceso e-Pak. La documentación pública confirma las operaciones, pero no determina qué modalidad comercial se habilitará a esta tienda.
+
+
+## Inventario técnico ampliado y plan de migración
+
+### API y persistencia actuales
+
+La inspección del código confirma estas dependencias concretas:
+
+| Área | Implementación actual | Cambio previsto |
+|---|---|---|
+| Origen | `ShippingOrigin.enviopackAddressId` | Mantener el dato histórico; sumar configuración de origen OCA solo si el contrato exige un identificador distinto del CP |
+| Credenciales | `ShippingSettings.enviopackApiKeyEncrypted` / `enviopackSecretKeyEncrypted` | Incorporar usuario, contraseña, CUIT y operativa OCA cifrados; no reutilizar campos Envíopack |
+| Checkout | `POST /api/v1/shipping/quotes` | Seleccionar proveedor activo en backend; el cliente no decide qué proveedor invocar |
+| Cotización | `ShippingQuote.options` JSON | Persistir proveedor y servicio en cada opción; validar fingerprint, vencimiento y destino al crear pedido |
+| Pedido | `deliveryMethod`, `shippingCarrier`, `trackingCode`, `shippingCostOptions` | Mantener los campos comunes y agregar relación de envío normalizada, sin escribir IDs OCA en columnas Envíopack |
+| Admisión | `POST /api/v1/admin/enviopack/orders/:id/create` | Crear endpoint de transportista con validación de pedido PREPARING y bloqueo transaccional |
+| Etiqueta | `Order.enviopackLabelPdf` | Almacenar etiqueta del envío en entidad propia o storage privado, preservando el PDF histórico |
+| Tracking | `EnviopackWebhookEvent` + sincronización | Incorporar eventos por proveedor y consulta OCA; no asumir que OCA ofrece el mismo webhook |
+| Configuración | `/api/v1/admin/shipping-settings` | Mostrar configuración OCA y estado de conexión sin exponer secretos |
+
+### Modelo de datos recomendado
+
+No conviene seguir agregando columnas específicas a `Order` cada vez que cambia el transportista. La migración de OCA debería incorporar entidades neutrales:
+
+- `ShippingShipment`: una relación con `Order`, proveedor, estado interno, identificador de admisión, número de envío/guía, servicio/operativa, datos de bultos, fechas de creación/confirmación, error recuperable y etiqueta (o referencia a storage). Restricción única por pedido/proveedor para impedir duplicados.
+- `ShippingShipmentEvent`: proveedor, identificador externo del evento, tipo, estado recibido, payload sanitizado, fecha de recepción/procesamiento, intentos y último error. Índices por envío/estado/fecha y unicidad del identificador externo cuando OCA lo provea.
+- `ShippingSettings`: flags de proveedor y credenciales OCA cifradas separadas de Envíopack. La clave de cifrado debe seguir siendo exclusivamente backend.
+- `ShippingQuote`: agregar proveedor y código de servicio/operativa como campos consultables; el JSON conserva el detalle comercial completo de la opción.
+
+La relación debe ser opcional para los pedidos históricos. No crear registros retroactivos ficticios ni alterar el tracking o las etiquetas existentes de Envíopack. Si más adelante se decide retirar Envíopack, sus columnas y eventos se conservan al menos durante la ventana de retención acordada y hasta verificar que no hay consultas ni descargas que dependan de ellos.
+
+### Reglas de negocio que no se deben romper
+
+- `PICKUP` y `LOCAL_DELIVERY` siguen operando sin credenciales de transportista.
+- Solo los pedidos con modalidad de envío y estado `PREPARING` pueden iniciar una admisión.
+- Una respuesta de timeout después de enviar la solicitud no habilita un segundo alta ciega: primero se consulta por referencia/orden en OCA.
+- El pedido solo pasa a `SHIPPED` con confirmación de admisión/estado documentada por OCA; tener un número de orden no alcanza.
+- El costo cobrado al comprador y el costo real liquidado al comercio son importes distintos. No reemplazar el precio de checkout por el costo del vendedor.
+- Las dimensiones estimadas de checkout no sustituyen la declaración de bultos físicos que realiza administración al preparar.
+- Una etiqueta se descarga como PDF, se valida por tipo/contenido/tamaño y se conserva para reimpresión; no se genera una etiqueta propia simulando la del correo.
+- Las consultas de sucursales y cobertura deben distinguir CP de destino, centro de imposición y modalidad realmente habilitada por la cuenta.
+
+### Orden concreto para el próximo cambio de código
+
+1. Crear el modelo neutral de envío y la migración aditiva, sin eliminar ni renombrar columnas históricas.
+2. Introducir contratos internos `quote`, `createAdmission`, `getLabel` y `getTracking`, con tipos independientes de Envíopack/OCA.
+3. Adaptar primero las operaciones actuales de Envíopack al contrato neutral para comprobar que el desacoplamiento no cambia el comportamiento existente.
+4. Agregar el adaptador OCA usando exclusivamente el WSDL y las muestras XML que correspondan al entorno y operativa entregados por OCA.
+5. Migrar checkout y administración al contrato neutral, manteniendo las rutas antiguas como compatibilidad durante el despliegue.
+6. Probar los dos proveedores en QA y recién entonces retirar Envíopack de las opciones nuevas de checkout.
+
+No conviene ejecutar el paso 1 hasta terminar de revisar los consumidores de los campos de Envíopack en frontend, API, informes y tareas de sincronización. La migración debe ser aditiva, con backfill únicamente de envíos existentes que puedan identificarse sin ambigüedad.
