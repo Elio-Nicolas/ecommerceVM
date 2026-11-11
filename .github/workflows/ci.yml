@@ -21,8 +21,22 @@ jobs:
       - run: npm run build
 
   api:
-    name: API Prisma and TypeScript build
+    name: API migrations, Prisma and TypeScript build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ecommercevm
+          POSTGRES_PASSWORD: ecommercevm_dev
+          POSTGRES_DB: ecommercevm
+        ports:
+          - 5547:5432
+        options: >-
+          --health-cmd "pg_isready -U ecommercevm -d ecommercevm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: api
@@ -35,5 +49,6 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - run: npm run prisma:deploy
       - run: npm run prisma:generate
       - run: npm run build
