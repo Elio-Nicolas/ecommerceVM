@@ -182,10 +182,10 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
             <div>
               <span className="admin-kicker">TRANSPORTE NACIONAL</span>
               <h3>OCA e-Pak</h3>
-              <p>Prepará la cuenta de OCA. Las cuatro credenciales se cifran en el backend y nunca se muestran nuevamente.</p>
+              <p>Guardá los datos que OCA te entregue. Se cifran en el backend; guardarlos no verifica la conexión ni habilita cotizaciones o admisiones.</p>
             </div>
             <span className={settings.ocaConfigured && !clearOcaCredentials ? 'shipping-credential-status' : 'shipping-credential-status'}>
-              {settings.ocaConfigured && !clearOcaCredentials ? 'Cuenta configurada' : 'Cuenta pendiente'}
+              {settings.ocaConfigured && !clearOcaCredentials ? 'Datos guardados · sin verificar' : 'Datos pendientes'}
             </span>
           </div>
           <div className="admin-form-grid">
@@ -202,7 +202,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
             <label>Número de operativa<input value={ocaOperative} onChange={(event) => setOcaOperative(event.target.value)} placeholder="Operativa confirmada por OCA" /></label>
           </div>
           <div className="shipping-settings-help">
-            La integración no se habilita al guardar estos datos. Primero deben confirmarse con OCA la operativa, modalidad de despacho desde Villa Mercedes y acceso QA. No ingreses aquí credenciales de Envíopack.
+            La integración no se habilita al guardar estos datos. Primero deben confirmarse con OCA la operativa, modalidad de despacho desde Villa Mercedes, centro de costo y acceso QA. No ingreses aquí credenciales de Envíopack.
           </div>
           {settings.ocaConfigured && <div className="admin-category-actions"><button type="button" className="archive-action" onClick={() => { setClearOcaCredentials((value) => !value); setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative('') }}>{clearOcaCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales OCA'}</button></div>}
         </section>
