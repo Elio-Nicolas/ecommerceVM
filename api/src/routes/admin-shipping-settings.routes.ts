@@ -89,6 +89,8 @@ adminShippingSettingsRouter.put('/', async (req, res) => {
       data: {
         enviopackEnabled: settings.enviopackEnabled,
         enviopackConfigured: Boolean(settings.enviopackApiKeyEncrypted && settings.enviopackSecretKeyEncrypted),
+        ocaEnvironment: settings.ocaEnvironment,
+        ocaConfigured: Boolean(settings.ocaUsernameEncrypted && settings.ocaPasswordEncrypted && settings.ocaCuitEncrypted && settings.ocaOperativeEncrypted),
         pickupEnabled: settings.pickupEnabled,
         pickupAddress: settings.pickupAddress,
         pickupInstructions: settings.pickupInstructions,
