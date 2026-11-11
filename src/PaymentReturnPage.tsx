@@ -51,10 +51,12 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
       }
     }
     void run()
+    let pollCount = 0
     const interval = window.setInterval(() => {
-      if (payment?.payment?.status === 'APPROVED' || payment?.payment?.status === 'REJECTED' || payment?.payment?.status === 'CANCELLED') return
+      if (payment?.payment?.status === 'APPROVED' || payment?.payment?.status === 'REJECTED' || payment?.payment?.status === 'CANCELLED' || pollCount >= 20) return
+      pollCount += 1
       void refresh(controller.signal).catch(() => undefined)
-    }, 5000)
+    }, 15000)
     return () => {
       active = false
       controller.abort()
