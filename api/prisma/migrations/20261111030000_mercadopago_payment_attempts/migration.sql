@@ -4,7 +4,9 @@ CREATE TYPE "PaymentAttemptStatus" AS ENUM (
   'APPROVED',
   'REJECTED',
   'CANCELLED',
-  'UNKNOWN'
+  'UNKNOWN',
+  'REFUNDED',
+  'PARTIALLY_REFUNDED'
 );
 
 CREATE TABLE "PaymentAttempt" (
