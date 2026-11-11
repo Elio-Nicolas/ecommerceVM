@@ -45,13 +45,5 @@ const envSchema = z.object({
   LOCAL_DELIVERY_FEE_ARS: z.coerce.number().int().min(0).max(2_000_000_000).default(0),
   LOCAL_DELIVERY_INTERNAL_COST_ARS: z.coerce.number().int().min(0).max(2_000_000_000).optional(),
   LOCAL_DELIVERY_COORDINATE: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
-}).superRefine((value, ctx) => {
-  if (value.NODE_ENV === 'production' && !value.SHIPPING_ENCRYPTION_KEY) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['SHIPPING_ENCRYPTION_KEY'],
-      message: 'SHIPPING_ENCRYPTION_KEY es obligatorio en producción para cifrar credenciales de integraciones.',
-    })
-  }
 })
 export const env = envSchema.parse(process.env)
