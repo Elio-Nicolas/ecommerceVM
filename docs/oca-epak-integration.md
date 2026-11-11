@@ -156,3 +156,21 @@ La relación debe ser opcional para los pedidos históricos. No crear registros 
 6. Probar los dos proveedores en QA y recién entonces retirar Envíopack de las opciones nuevas de checkout.
 
 No conviene ejecutar el paso 1 hasta terminar de revisar los consumidores de los campos de Envíopack en frontend, API, informes y tareas de sincronización. La migración debe ser aditiva, con backfill únicamente de envíos existentes que puedan identificarse sin ambigüedad.
+
+
+## Avance de implementación (11/11/2026)
+
+Se inició el desacoplamiento real sin modificar el contrato HTTP que consume el checkout:
+
+- Se agregó `api/src/services/shipping-provider.ts` con tipos neutrales para proveedor, paquete, solicitud de cotización, opción y contrato de proveedor.
+- Se agregó `api/src/services/enviopack-provider.ts` como adaptador del proveedor actual. La obtención de credenciales y la traducción de la solicitud específica de Envíopack quedaron dentro del adaptador.
+- `api/src/routes/shipping.routes.ts` dejó de invocar directamente el cliente Envíopack y ahora solicita la cotización a través del adaptador. Se conservaron validaciones de carrito, stock, peso/dimensiones, fingerprint, vencimiento y formato de respuesta.
+
+Este primer corte no cambia el checkout visible, no activa OCA y no requiere migración. Los campos y credenciales históricos de Envíopack siguen intactos.
+
+### Siguiente bloque de trabajo
+
+1. Llevar admisión, etiqueta y seguimiento al mismo límite de proveedor, manteniendo las rutas actuales compatibles.
+2. Separar la modalidad genérica de envío de la identificación histórica `ENVIOPACK` en el dominio de pedidos, con migración aditiva y compatibilidad de lectura.
+3. Adaptar configuración administrativa y checkout a un proveedor activo neutral.
+4. Incorporar OCA solo cuando estén confirmados usuario, operativa, servicios habilitados y contrato QA.
