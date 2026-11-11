@@ -37,29 +37,40 @@ Enviar Authorization: Bearer <token>.
 
 Los tokens vencen a las 8 horas. Las contraseñas se almacenan con bcrypt. No existe registro público de administradores.
 
-## Cotización de envíos
+## Estado de logística y entregas
 
-La integración con Envíopack utiliza exclusivamente el servidor. Las credenciales se administran desde Administración > Configuración de envíos, se cifran antes de guardarse en PostgreSQL y nunca se envían al navegador. Si ya existía configuración en variables de entorno de una instalación anterior, se importa automáticamente una sola vez al crear el registro `ShippingSettings`; desde entonces, los valores operativos se administran en el panel. Cuando se configura `SHIPPING_ENCRYPTION_KEY`, las credenciales nuevas se cifran con esa clave independiente de `JWT_SECRET`, que debe persistir entre despliegues. Configurala en producción antes de guardar credenciales reales de OCA u otros proveedores. Si todavía no está definida, la API conserva temporalmente el mecanismo heredado para no bloquear instalaciones existentes. Los valores anteriores siguen siendo legibles; al reemplazarlos desde el panel con la clave dedicada configurada se guardan con el mecanismo nuevo. No cambies ni elimines `JWT_SECRET` hasta completar la rotación de credenciales heredadas.
+La logística nacional está en transición de Envíopack a OCA e-Pak. Envíopack se encuentra pausado para nuevos checkouts: no se ofrecen nuevas cotizaciones ni se aceptan nuevos pedidos con ese método. Se conservan los registros, etiquetas y operaciones históricas para consulta y administración.
 
-Cada producto publicado que se envíe debe tener peso y dimensiones del paquete completos. El checkout cotiza a domicilio con el endpoint de precio para comprador, conserva las opciones durante 10 minutos y exige seleccionar una opción vigente antes de crear el pedido. El costo y total se calculan nuevamente en el backend; no se acepta un importe enviado por el navegador.
+El backend ya dispone de un contrato neutral de proveedores, persistencia de envíos y eventos, procesamiento de eventos con bloqueo, y configuración segura de credenciales OCA. Esto constituye la base técnica, no una integración OCA operativa.
 
-- POST `/api/v1/shipping/quotes` (público, limitado por IP)
-- POST `/api/v1/orders` (Envíopack requiere una cotización vigente; retiro y entrega local usan la configuración persistida)
+### Qué está disponible
 
-La integración consulta dos endpoints distintos: `/cotizar/precio/a-domicilio` para el precio que paga el comprador y `/cotizar/costo` para los costos que paga la tienda por cada transportista. Son importes diferentes y no se deben intercambiar. El checkout recibe exclusivamente el precio del comprador; los costos de transportistas quedan guardados en el pedido y visibles solo en Administración, con una diferencia estimada entre ambos. El costo definitivo puede variar al generar la etiqueta.
+- `PICKUP`: retiro configurado por el vendedor, sin cargo.
+- `LOCAL_DELIVERY`: entrega local según los códigos postales y tarifas configurados.
+- Administración de orígenes de despacho.
+- Configuración OCA protegida: usuario, contraseña, CUIT y operativa se almacenan cifrados; el frontend solo recibe el estado de configuración y el entorno.
+- La clave dedicada `SHIPPING_ENCRYPTION_KEY` (mínimo 32 caracteres) permite separar el cifrado logístico de `JWT_SECRET`. Configurala antes de guardar credenciales reales. Los valores históricos cifrados con `JWT_SECRET` siguen siendo legibles durante la transición; no rotes ese secreto hasta completar la recodificación.
 
+### Qué falta para habilitar OCA
 
-## Modalidades de entrega
+1. Recibir de OCA la cuenta comercial, CUIT habilitado, usuario/contraseña de e-Pak y número de operativa.
+2. Confirmar si la admisión se hará en sucursal de Villa Mercedes o mediante retiro, y obtener los datos de origen/cuenta/centro de costo requeridos.
+3. Validar conectividad y respuestas reales en QA con datos de la cuenta asignada.
+4. Implementar y probar cotización, admisión idempotente, etiquetas PDF y seguimiento usando respuestas documentadas del proveedor.
+5. Habilitar el método en checkout solo después de pruebas de aceptación y confirmación del proceso operativo.
 
-El checkout ofrece tres modalidades:
+No cargues credenciales reales en Git, tickets ni chats. No se debe habilitar OCA en producción ni reactivar Envíopack para nuevos pedidos hasta completar estas verificaciones.
 
-- `PICKUP`: retiro por el domicilio del vendedor, sin cargo y sin depender del código postal del comprador.
-- `LOCAL_DELIVERY`: entrega local habilitada por lista de códigos postales.
-- `ENVIOPACK`: cotización a domicilio según el destino y los paquetes del carrito.
+### Endpoints públicos
 
-La configuración operativa se administra desde Administración > Configuración de envíos. Allí se habilitan las modalidades, se definen códigos postales, tarifas, costos internos, domicilio e instrucciones de retiro y credenciales de Envíopack. Los cambios se guardan en la tabla `ShippingSettings` y se aplican inmediatamente, sin reiniciar la API.
+- GET `/api/v1/shipping/methods`: informa modalidades disponibles.
+- POST `/api/v1/shipping/quotes`: responde temporalmente `503 SHIPPING_PROVIDER_MIGRATION_PENDING` para evitar ofrecer una logística nacional todavía no operativa.
+- POST `/api/v1/orders`: acepta únicamente modalidades habilitadas; los métodos de envío nacional están pausados.
 
-La ruta protegida `GET/PUT /api/v1/admin/shipping-settings` permite administrar estos valores. La ruta pública `GET /api/v1/shipping/methods` solo expone los datos necesarios para el checkout; nunca expone credenciales.
+### Configuración administrativa
+
+La configuración se administra desde Administración > Configuración de envíos. Las rutas protegidas `GET/PUT /api/v1/admin/shipping-settings` no exponen secretos. Las rutas `/api/v1/admin/shipping-origins` administran los orígenes de despacho.
+
 
 
 ## PDF de Factura C autorizada
