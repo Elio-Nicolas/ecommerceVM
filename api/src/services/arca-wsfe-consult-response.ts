@@ -22,12 +22,12 @@ function decodeXml(value: string): string {
 }
 
 function readTag(xml: string, tag: string): string | null {
-  const match = xml.match(new RegExp(`<(?:[\\w.-]+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${tag}\\s*>`, 'i'))
+  const match = xml.match(new RegExp(\`<(?:[\\\\w.-]+:)?\${tag}\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/(?:[\\\\w.-]+:)?\${tag}\\\\s*>\`, 'i'))
   return match ? decodeXml(match[1].trim()) : null
 }
 
 function readBlocks(xml: string, tag: string): string[] {
-  const matches = xml.matchAll(new RegExp(`<(?:[\\w.-]+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${tag}\\s*>`, 'gi'))
+  const matches = xml.matchAll(new RegExp(\`<(?:[\\\\w.-]+:)?\${tag}\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/(?:[\\\\w.-]+:)?\${tag}\\\\s*>\`, 'gi'))
   return Array.from(matches, (match) => match[1])
 }
 
@@ -36,7 +36,7 @@ function parseArcaDate(value: string | null): Date | null {
   const year = Number(value.slice(0, 4))
   const month = Number(value.slice(4, 6))
   const day = Number(value.slice(6, 8))
-  const date = new Date(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}T00:00:00-03:00`)
+  const date = new Date(\`\${value.slice(0, 4)}-\${value.slice(4, 6)}-\${value.slice(6, 8)}T00:00:00-03:00\`)
   if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== year ||
     date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) return null
   return date
@@ -48,9 +48,9 @@ export function parseArcaVoucherConsultResponse(
   expected: ArcaVoucherIdentity,
 ): ArcaVoucherLookup {
   const fault = readTag(responseXml, 'faultstring')
-  if (fault) throw new Error(`ARCA devolvió un error SOAP: ${fault}`)
+  if (fault) throw new Error(\`ARCA devolvió un error SOAP: \${fault}\`)
   if (httpStatus < 200 || httpStatus >= 300) {
-    throw new Error(`ARCA respondió HTTP ${httpStatus} al consultar el comprobante.`)
+    throw new Error(\`ARCA respondió HTTP \${httpStatus} al consultar el comprobante.\`)
   }
 
   const result = readTag(responseXml, 'FECompConsultarResult')
@@ -71,7 +71,7 @@ export function parseArcaVoucherConsultResponse(
     }
   }
   if (errors.length) {
-    throw new Error(`ARCA no pudo confirmar el comprobante: ${errors.map((error) => [error.code, error.message].filter(Boolean).join(' ')).join('; ')}`)
+    throw new Error(\`ARCA no pudo confirmar el comprobante: \${errors.map((error) => [error.code, error.message].filter(Boolean).join(' ')).join('; ')}\`)
   }
   if (!resultGet) throw new Error('ARCA no devolvió datos del comprobante; el resultado sigue siendo ambiguo.')
 
