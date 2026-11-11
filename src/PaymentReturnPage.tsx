@@ -100,7 +100,7 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
             ? 'Mercado Pago confirmó el pago. Tu pedido ya quedó confirmado.'
             : rejected
               ? 'No recibimos una aprobación del pago. Podés volver a intentarlo.'
-              : 'El resultado puede tardar unos instantes. No vuelvas a pagar mientras verificamos la operación.'}
+              : outcome === 'failure' ? 'Mercado Pago no confirmó el pago. Consultamos el estado para evitar duplicar un cobro.' : 'El resultado puede tardar unos instantes. No vuelvas a pagar mientras verificamos la operación.'}
         </p>
         {payment?.code && <div className="payment-return-code"><span>PEDIDO</span><strong>{payment.code}</strong></div>}
         {loading && <p className="payment-return-muted">Consultando el estado...</p>}
