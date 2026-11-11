@@ -33,7 +33,7 @@ adminEnviopackRouter.post('/orders/:id/create', async (req, res) => {
     res.status(201).json({ data: result, message: 'Envío creado. La etiqueta estará disponible cuando el transportista lo procese.' })
   } catch (error) {
     if (error instanceof ShippingProviderError) {
-      res.status(409).json({ error: { code: 'SHIPPING_PROVIDER_SHIPMENT_ERROR', message: error.message } })
+      res.status(409).json({ error: { code: 'ENVIOPACK_SHIPMENT_ERROR', message: error.message } })
       return
     }
     throw error
@@ -66,7 +66,7 @@ adminEnviopackRouter.get('/orders/:id/label', async (req, res) => {
     res.setHeader('Content-Length', pdf.length)
     res.send(pdf)
   } catch (error) {
-    const message = error instanceof EnviopackShipmentError ? error.message : 'No se pudo descargar la etiqueta.'
+    const message = error instanceof ShippingProviderError ? error.message : 'No se pudo descargar la etiqueta.'
     res.status(502).json({ error: { code: 'ENVIOPACK_LABEL_ERROR', message } })
   }
 })
@@ -81,7 +81,7 @@ adminEnviopackRouter.post('/orders/:id/refresh', async (req, res) => {
     const result = await enviopackShippingProvider.refreshShipment(order.enviopackShipmentId)
     res.json({ data: result })
   } catch (error) {
-    const message = error instanceof EnviopackShipmentError ? error.message : 'No se pudo consultar el estado del envío.'
+    const message = error instanceof ShippingProviderError ? error.message : 'No se pudo consultar el estado del envío.'
     res.status(502).json({ error: { code: 'SHIPPING_PROVIDER_REFRESH_ERROR', message } })
   }
 })
