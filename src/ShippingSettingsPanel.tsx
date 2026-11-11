@@ -109,6 +109,17 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
       setSaving(false)
       return
     }
+    const ocaValues = [ocaUsername.trim(), ocaPassword.trim(), ocaCuit.trim(), ocaOperative.trim()]
+    if (ocaValues.some(Boolean) && !ocaValues.every(Boolean)) {
+      setError('Para guardar OCA completá usuario, contraseña, CUIT y operativa.')
+      setSaving(false)
+      return
+    }
+    if (clearOcaCredentials && ocaValues.some(Boolean)) {
+      setError('No podés reemplazar y eliminar las credenciales OCA en la misma operación.')
+      setSaving(false)
+      return
+    }
     const postalCodes = [...new Set(postalCodesText.split(',').map((value) => value.trim()).filter(Boolean))]
     const payload = {
       ...settings,
@@ -136,7 +147,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
       setOcaCuit('')
       setOcaOperative('')
       setClearOcaCredentials(false)
-      setNotice('Configuración de envíos guardada. Los cambios ya están disponibles en el checkout.')
+      setNotice('Configuración de envíos guardada. OCA permanece pendiente de habilitación comercial y técnica.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.')
     } finally {
