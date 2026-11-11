@@ -87,6 +87,7 @@ export default function AdminOrders() {
   const [invoicePaymentConfirmed, setInvoicePaymentConfirmed] = useState(false)
   const [invoiceIssuing, setInvoiceIssuing] = useState(false)
   const [invoiceDownloadingId, setInvoiceDownloadingId] = useState<string | null>(null)
+  const [paymentReconcilingId, setPaymentReconcilingId] = useState<string | null>(null)
 
   const loadOrders = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -132,6 +133,22 @@ export default function AdminOrders() {
     window.addEventListener('afterprint', clearPrint)
     return () => window.removeEventListener('afterprint', clearPrint)
   }, [printKind])
+
+  async function reconcilePayment(order: Order, attemptId: string) {
+    if (!token || paymentReconcilingId) return
+    setPaymentReconcilingId(attemptId)
+    setError('')
+    setNotice('')
+    try {
+      await request(`/payments/admin/orders/${order.id}/attempts/${attemptId}/reconcile`, token, { method: 'POST' })
+      setNotice(`Estado del pago del pedido ${order.code} actualizado desde Mercado Pago.`)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo consultar el pago en Mercado Pago.')
+    } finally {
+      setPaymentReconcilingId(null)
+    }
+  }
 
   async function saveShipping(event: FormEvent<HTMLFormElement>, order: Order) {
     event.preventDefault()
@@ -420,6 +437,7 @@ export default function AdminOrders() {
                 <strong>{formatPrice(payment.amountArs)}</strong>
                 {payment.providerOrderId && <small className="order-payment-reference">Orden Mercado Pago: {payment.providerOrderId}</small>}
                 {payment.approvedAt && <small className="order-payment-reference">Aprobado: {formatDate(payment.approvedAt)}</small>}
+                {payment.providerOrderId && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status) && <button type="button" className="admin-quiet-button" disabled={paymentReconcilingId !== null} onClick={() => void reconcilePayment(activeOrder, payment.id)}>{paymentReconcilingId === payment.id ? 'Consultando Mercado Pago...' : 'Conciliar pago'}</button>}
               </div>)}
               {!(activeOrder.paymentAttempts || []).length && <p className="order-payment-empty">Este pedido no tiene intentos de pago online registrados.</p>}
             </section>
