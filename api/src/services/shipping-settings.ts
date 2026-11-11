@@ -12,7 +12,8 @@ function encryptSecret(value: string): string {
   const iv = randomBytes(12)
   const cipher = createCipheriv('aes-256-gcm', encryptionKey(), iv)
   const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()])
-  return ['v2', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join('.')
+  const payload = [iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join('.')
+  return env.SHIPPING_ENCRYPTION_KEY ? `v2.${payload}` : payload
 }
 
 function decryptSecret(value: string): string {
