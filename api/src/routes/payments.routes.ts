@@ -119,6 +119,8 @@ async function createMercadoPagoOrder(input: {
     external_reference?: string
     total_amount?: string | number
     currency?: string
+    status?: string
+    status_detail?: string
     message?: string
     error?: string
   } | null
@@ -330,8 +332,9 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
       ALREADY_PAID: { status: 409, message: 'Este pedido ya tiene un pago aprobado.' },
       ATTEMPT_CLOSED: { status: 409, message: 'El intento anterior quedó cerrado. Iniciá un nuevo intento de pago.' },
     }
-    const error = errors[prepared.error]
-    res.status(error.status).json({ error: { code: prepared.error, message: error.message } })
+    const errorCode = String(prepared.error || 'UNKNOWN')
+    const error = errors[errorCode] || { status: 500, message: 'No se pudo preparar el pago.' }
+    res.status(error.status).json({ error: { code: errorCode, message: error.message } })
     return
   }
 
