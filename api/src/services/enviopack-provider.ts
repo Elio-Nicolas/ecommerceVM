@@ -1,6 +1,6 @@
 import { getEnviopackCredentials } from './shipping-settings'
 import { quoteHomeDelivery } from './enviopack'
-import { createEnviopackShipment, downloadEnviopackLabel, EnviopackShipmentError, refreshEnviopackShipment } from './enviopack-shipments'
+import { createEnviopackShipment, downloadEnviopackLabel, refreshEnviopackShipment } from './enviopack-shipments'
 import {
   ShippingProviderError,
   type ShippingProvider,
