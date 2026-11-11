@@ -25,6 +25,7 @@ const transitions: Record<OrderStatus, OrderStatus[]> = {
 
 const orderInclude = {
   items: true,
+  paymentAttempts: { orderBy: { createdAt: 'desc' as const }, select: { id: true, provider: true, providerOrderId: true, status: true, statusDetail: true, amountArs: true, approvedAt: true, createdAt: true } },
   fiscalDocuments: { orderBy: { createdAt: 'desc' as const }, select: { id: true, type: true, status: true, pointOfSale: true, voucherType: true, voucherNumber: true, cae: true, caeExpiresAt: true, lastErrorMessage: true, createdAt: true } },
   history: { orderBy: { createdAt: 'desc' as const }, include: { changedByAdmin: { select: { email: true } } } },
 }
@@ -160,10 +161,14 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }).parse(req.body)
   const existing = await prisma.order.findUnique({
     where: { id: req.params.id },
-    include: { items: true },
+    include: { items: true, paymentAttempts: { select: { status: true, provider: true } } },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (input.status === 'CONFIRMED' && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) {
+    res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'Este pedido tiene un pago de Mercado Pago pendiente o sin resultado concluyente. Verificá el estado del pago antes de confirmarlo manualmente.' } })
     return
   }
   if (input.status === 'CONFIRMED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
