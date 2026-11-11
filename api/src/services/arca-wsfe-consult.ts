@@ -25,9 +25,9 @@ export async function consultArcaVoucher(
     '<?xml version="1.0" encoding="utf-8"?>',
     '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">',
     '<soap:Header/><soap:Body>',
-    \`<FECompConsultar xmlns="\${WSFE_NAMESPACE}">\`,
-    \`<Auth><Token>\${escapeXml(ticket.token)}</Token><Sign>\${escapeXml(ticket.sign)}</Sign><Cuit>\${cuit}</Cuit></Auth>\`,
-    \`<FeCompConsReq><CbteTipo>\${input.voucherType}</CbteTipo><CbteNro>\${input.voucherNumber}</CbteNro><PtoVta>\${input.pointOfSale}</PtoVta></FeCompConsReq>\`,
+    '<FECompConsultar xmlns="' + WSFE_NAMESPACE + '">',
+    '<Auth><Token>' + escapeXml(ticket.token) + '</Token><Sign>' + escapeXml(ticket.sign) + '</Sign><Cuit>' + cuit + '</Cuit></Auth>',
+    '<FeCompConsReq><CbteTipo>' + input.voucherType + '</CbteTipo><CbteNro>' + input.voucherNumber + '</CbteNro><PtoVta>' + input.pointOfSale + '</PtoVta></FeCompConsReq>',
     '</FECompConsultar></soap:Body></soap:Envelope>',
   ].join('')
 
@@ -35,7 +35,7 @@ export async function consultArcaVoucher(
     method: 'POST',
     headers: {
       'content-type': 'text/xml; charset=utf-8',
-      SOAPAction: \`"\${WSFE_NAMESPACE}FECompConsultar"\`,
+      SOAPAction: '"' + WSFE_NAMESPACE + 'FECompConsultar"',
     },
     body: xml,
     signal: AbortSignal.timeout(20_000),
