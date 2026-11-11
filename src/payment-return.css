@@ -1,0 +1,18 @@
+.payment-return-page{min-height:100vh;display:grid;place-items:center;padding:32px 18px;background:#f8fafc;color:#0f172a;font-family:inherit}
+.payment-return-card{width:min(100%,520px);padding:clamp(28px,5vw,48px);border:1px solid #e2e8f0;border-radius:24px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.08);text-align:center}
+.payment-return-kicker{display:block;color:#64748b;font-size:11px;font-weight:800;letter-spacing:.16em}
+.payment-return-mark{width:64px;height:64px;margin:26px auto 20px;display:grid;place-items:center;border-radius:50%;background:#eff6ff;color:#1d4ed8;font-size:30px;font-weight:800}
+.payment-return-mark.approved{background:#ecfdf5;color:#047857}
+.payment-return-mark.rejected{background:#fff1f2;color:#be123c}
+.payment-return-card h1{margin:0 0 12px;font-size:clamp(27px,5vw,36px);letter-spacing:-.04em}
+.payment-return-card p{margin:0 auto 20px;max-width:390px;color:#64748b;line-height:1.65}
+.payment-return-code{display:grid;gap:6px;margin:26px 0;padding:17px;border-radius:14px;background:#f8fafc}
+.payment-return-code span{font-size:10px;font-weight:800;letter-spacing:.14em;color:#64748b}
+.payment-return-code strong{font-size:20px;letter-spacing:.04em}
+.payment-return-muted{font-size:13px!important}
+.payment-return-error{padding:12px;border-radius:10px;background:#fff1f2;color:#be123c!important;font-size:13px}
+.payment-return-primary,.payment-return-secondary{width:100%;min-height:48px;border-radius:12px;font:inherit;font-weight:700;cursor:pointer}
+.payment-return-primary{margin-top:10px;border:0;background:#0f172a;color:white}
+.payment-return-primary:disabled{opacity:.6;cursor:wait}
+.payment-return-secondary{margin-top:10px;border:1px solid #e2e8f0;background:#fff;color:#0f172a}
+.payment-return-card small{display:block;margin-top:22px;color:#94a3b8;font-size:11px;line-height:1.5}
