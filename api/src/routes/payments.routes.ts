@@ -6,6 +6,7 @@ import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
+import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
 import { verifyMercadoPagoWebhookSignature } from '../services/payment-webhook-signature'
 
 export const paymentsRouter = Router()
@@ -143,36 +144,41 @@ async function refreshMercadoPagoOrder(providerOrderId: string) {
 async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<ReturnType<typeof refreshMercadoPagoOrder>>) {
   const attempt = await prisma.paymentAttempt.findUnique({
     where: { providerOrderId },
+    select: { id: true, orderId: true },
   })
   if (!attempt) return false
-  const order = await prisma.order.findUnique({ where: { id: attempt.orderId }, select: { code: true } })
-  if (!order) return false
-
-  const paidAmount = parsePaymentAmount(payload.total_paid_amount)
-  const totalAmount = parsePaymentAmount(payload.total_amount)
-  const matchesOrder = payload.id === providerOrderId
-    && payload.external_reference === order.code
-    && payload.currency === 'ARS'
-    && totalAmount === attempt.amountArs
-
-  let nextStatus: PaymentAttemptStatus = 'UNKNOWN'
-  if (matchesOrder && payload.status === 'processed' && payload.status_detail === 'partially_refunded') {
-    nextStatus = 'PARTIALLY_REFUNDED'
-  } else if (matchesOrder && payload.status === 'processed' && paidAmount === attempt.amountArs) {
-    nextStatus = 'APPROVED'
-  } else if (matchesOrder && payload.status === 'refunded') {
-    nextStatus = 'REFUNDED'
-  } else if (matchesOrder && payload.status === 'canceled') {
-    nextStatus = 'CANCELLED'
-  } else if (matchesOrder && payload.status === 'failed') {
-    nextStatus = 'REJECTED'
-  } else if (matchesOrder && ['created', 'processing'].includes(String(payload.status))) {
-    nextStatus = 'PENDING'
-  }
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', attempt.orderId)
     const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
-    if (!current) return
+    const currentOrder = await tx.order.findUnique({
+      where: { id: attempt.orderId },
+      select: { code: true, status: true, totalArs: true },
+    })
+    if (!current || !currentOrder) return
+
+    const paidAmount = parsePaymentAmount(payload.total_paid_amount)
+    const totalAmount = parsePaymentAmount(payload.total_amount)
+    const matchesOrder = payload.id === providerOrderId
+      && payload.external_reference === currentOrder.code
+      && payload.currency === 'ARS'
+      && paymentAmountsMatchCurrentOrder(totalAmount, current.amountArs, currentOrder.totalArs)
+
+    let nextStatus: PaymentAttemptStatus = 'UNKNOWN'
+    if (matchesOrder && payload.status === 'processed' && payload.status_detail === 'partially_refunded') {
+      nextStatus = 'PARTIALLY_REFUNDED'
+    } else if (matchesOrder && payload.status === 'processed' && paidAmount === current.amountArs && paidAmount === currentOrder.totalArs) {
+      nextStatus = 'APPROVED'
+    } else if (matchesOrder && payload.status === 'refunded') {
+      nextStatus = 'REFUNDED'
+    } else if (matchesOrder && payload.status === 'canceled') {
+      nextStatus = 'CANCELLED'
+    } else if (matchesOrder && payload.status === 'failed') {
+      nextStatus = 'REJECTED'
+    } else if (matchesOrder && ['created', 'processing'].includes(String(payload.status))) {
+      nextStatus = 'PENDING'
+    }
+
     const terminalPaymentStatuses: PaymentAttemptStatus[] = ['REFUNDED', 'CANCELLED', 'REJECTED']
     const effectiveStatus = current.status === 'REFUNDED'
       ? 'REFUNDED'
@@ -183,6 +189,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
           : terminalPaymentStatuses.includes(current.status) && ['PENDING', 'UNKNOWN'].includes(nextStatus)
             ? current.status
             : nextStatus
+
     await tx.paymentAttempt.update({
       where: { id: current.id },
       data: {
@@ -190,14 +197,13 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
         statusDetail: String(payload.status_detail || payload.status || 'Estado no informado').slice(0, 200),
         responsePayload: payload as Prisma.InputJsonValue,
         approvedAt: effectiveStatus === 'APPROVED' ? current.approvedAt || new Date() : current.approvedAt,
-        lastError: matchesOrder ? null : 'La respuesta de Mercado Pago no coincide con el pedido o su importe.',
+        lastError: matchesOrder ? null : 'La respuesta de Mercado Pago no coincide con el pedido o su importe actual. Requiere revisión manual.',
       },
     })
 
-    const currentOrder = await tx.order.findUnique({ where: { id: attempt.orderId }, select: { status: true } })
-    if (effectiveStatus === 'APPROVED' && currentOrder?.status === 'PENDING') {
+    if (matchesOrder && effectiveStatus === 'APPROVED' && currentOrder.status === 'PENDING') {
       const changed = await tx.order.updateMany({
-        where: { id: attempt.orderId, status: 'PENDING' },
+        where: { id: attempt.orderId, status: 'PENDING', totalArs: current.amountArs },
         data: { status: 'CONFIRMED' },
       })
       if (changed.count === 1) {
@@ -210,7 +216,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
           },
         })
       }
-    } else if (effectiveStatus === 'APPROVED' && currentOrder?.status === 'CANCELLED' && current.status !== 'APPROVED') {
+    } else if (effectiveStatus === 'APPROVED' && currentOrder.status === 'CANCELLED' && current.status !== 'APPROVED') {
       await tx.orderStatusHistory.create({
         data: {
           orderId: attempt.orderId,
