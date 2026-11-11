@@ -39,6 +39,14 @@ const quoteSchema = z.object({
 })
 
 shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
+  res.status(503).json({
+    error: {
+      code: 'SHIPPING_PROVIDER_MIGRATION_PENDING',
+      message: 'Los envíos nacionales están en proceso de migración a OCA. Por el momento podés elegir retiro o entrega local si están disponibles.',
+    },
+  })
+  return
+
   const input = quoteSchema.parse(req.body)
   const origin = await prisma.shippingOrigin.findFirst({ where: { isActive: true, isDefault: true } })
   if (!origin) {
