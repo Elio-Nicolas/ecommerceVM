@@ -103,7 +103,7 @@ La integración implementa autenticación WSAA, consultas WSFEv1, emisión manua
 - La integración está limitada a homologación. No se debe cambiar el entorno ni apuntar a producción.
 - El endpoint de emisión exige confirmación explícita del pago, reserva el número bajo bloqueo transaccional y usa una clave de solicitud idempotente.
 - Si la respuesta de ARCA no permite conocer el resultado con certeza, el documento queda en `UNKNOWN` y bloquea nuevas emisiones para ese punto de venta. Primero se debe usar **Conciliar con ARCA**; no se debe reintentar manualmente a ciegas.
-- El PDF solo se habilita cuando el comprobante figura `AUTHORIZED` y tiene CAE y vencimiento confirmados. El PDF no se genera para solicitudes rechazadas o inciertas.
+- El PDF solo se habilita cuando el comprobante figura `AUTHORIZED` y tiene CAE y vencimiento confirmados. El PDF no se genera para solicitudes rechazadas o inciertas. Si ARCA confirma que una solicitud fue rechazada o que el número no existe (error 602), el intento se conserva como `REJECTED` y el mismo número puede reutilizarse en un nuevo intento; los intentos rechazados no bloquean la unicidad de los comprobantes activos.
 - Los comprobantes emitidos en homologación son comprobantes de prueba: no son facturas fiscales válidas para entregar al comprador ni registran una venta real.
 - La habilitación de producción requiere un proceso separado: certificado productivo, punto de venta productivo, revisión fiscal/legal y pruebas de aceptación. Esta versión no ofrece esa activación.
 
