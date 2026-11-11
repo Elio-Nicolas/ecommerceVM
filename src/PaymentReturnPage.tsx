@@ -3,7 +3,7 @@ import './payment-return.css'
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 
-type PaymentStatus = 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN'
+type PaymentStatus = 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'REFUNDED' | 'PARTIALLY_REFUNDED'
 
 type PaymentStatusResponse = {
   data: {
@@ -95,6 +95,7 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
   const status = payment?.payment?.status
   const approved = status === 'APPROVED'
   const rejected = status === 'REJECTED' || status === 'CANCELLED'
+  const refunded = status === 'REFUNDED' || status === 'PARTIALLY_REFUNDED'
 
   return (
     <main className="payment-return-page">
@@ -103,19 +104,21 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
         <div className={approved ? 'payment-return-mark approved' : rejected ? 'payment-return-mark rejected' : 'payment-return-mark'}>
           {approved ? '✓' : rejected ? '!' : '…'}
         </div>
-        <h1>{approved ? 'Pago confirmado' : rejected ? 'El pago no se completó' : 'Estamos verificando tu pago'}</h1>
+        <h1>{approved ? 'Pago confirmado' : refunded ? (status === 'REFUNDED' ? 'Pago reembolsado' : 'Reembolso parcial') : rejected ? 'El pago no se completó' : 'Estamos verificando tu pago'}</h1>
         <p>
           {approved
             ? 'Mercado Pago confirmó el pago. Tu pedido ya quedó confirmado.'
-            : rejected
-              ? 'No recibimos una aprobación del pago. Podés volver a intentarlo.'
+            : refunded
+              ? 'Mercado Pago informó un reembolso. Si necesitás ayuda con el pedido, contactanos.'
+              : rejected
+                ? 'No recibimos una aprobación del pago. Podés volver a intentarlo.'
               : outcome === 'failure' ? 'Mercado Pago no confirmó el pago. Consultamos el estado para evitar duplicar un cobro.' : 'El resultado puede tardar unos instantes. No vuelvas a pagar mientras verificamos la operación.'}
         </p>
         {payment?.code && <div className="payment-return-code"><span>PEDIDO</span><strong>{payment.code}</strong></div>}
         {loading && <p className="payment-return-muted">Consultando el estado...</p>}
         {status === 'PENDING' && <p className="payment-return-muted">El pago sigue pendiente de acreditación.</p>}
         {error && <p className="payment-return-error" role="alert">{error}</p>}
-        {!approved && <button className="payment-return-primary" onClick={() => void retryPayment()} disabled={retrying || loading}>
+        {!approved && !refunded && <button className="payment-return-primary" onClick={() => void retryPayment()} disabled={retrying || loading}>
           {retrying ? 'Conectando con Mercado Pago...' : rejected ? 'Intentar pagar nuevamente' : 'Volver al pago'}
         </button>}
         <button className="payment-return-secondary" onClick={() => window.location.replace('/')}>Volver a la tienda</button>
