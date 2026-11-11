@@ -3,7 +3,7 @@ import test from 'node:test'
 import { parseArcaInvoiceCResponse, type ArcaInvoiceCIdentity } from '../src/services/arca-wsfe-response'
 
 const expected: ArcaInvoiceCIdentity = { pointOfSale: 4, voucherType: 11, voucherNumber: 123 }
-const envelope = (header: string, detail: string, extra = '') => `<soap:Envelope><soap:Body><FECAESolicitarResponse><FECAESolicitarResult><FeCabResp><Resultado>${header}</Resultado></FeCabResp><FeDetResp><FECAEDetResponse><PtoVta>4</PtoVta><CbteTipo>11</CbteTipo><CbteDesde>123</CbteDesde><CbteHasta>123</CbteHasta><Resultado>${detail}</Resultado><CAE>74123456789012</CAE><CAEFchVto>20261231</CAEFchVto></FECAEDetResponse></FeDetResp>${extra}</FECAESolicitarResult></FECAESolicitarResponse></soap:Body></soap:Envelope>`
+const envelope = (header: string, detail: string, extra = '') => `<soap:Envelope><soap:Body><FECAESolicitarResponse><FECAESolicitarResult><FeCabResp><PtoVta>4</PtoVta><CbteTipo>11</CbteTipo><Resultado>${header}</Resultado></FeCabResp><FeDetResp><FECAEDetResponse><CbteDesde>123</CbteDesde><CbteHasta>123</CbteHasta><Resultado>${detail}</Resultado><CAE>74123456789012</CAE><CAEFchVto>20261231</CAEFchVto></FECAEDetResponse></FeDetResp>${extra}</FECAESolicitarResult></FECAESolicitarResponse></soap:Body></soap:Envelope>`
 
 test('reconoce una factura autorizada solo para la identidad solicitada', () => {
   const result = parseArcaInvoiceCResponse(envelope('A', 'A'), 200, expected)
