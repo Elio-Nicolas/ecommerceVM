@@ -38,6 +38,8 @@ const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
+  if (order.status === 'PENDING' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) return []
+  if (order.status === 'CONFIRMED' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'APPROVED')) return ['PREPARING']
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'ENVIOPACK' && order.enviopackShipmentStatus !== 'P') return ['CANCELLED']
