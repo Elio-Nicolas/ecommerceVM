@@ -167,6 +167,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
+  if (input.status === 'CANCELLED' && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) {
+    res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'No se puede cancelar el pedido mientras Mercado Pago tenga un cobro pendiente o sin resultado concluyente. Primero resolvé o dejá vencer ese intento de pago.' } })
+    return
+  }
   if (input.status === 'CONFIRMED' && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) {
     res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'Este pedido tiene un pago de Mercado Pago pendiente o sin resultado concluyente. Verificá el estado del pago antes de confirmarlo manualmente.' } })
     return
