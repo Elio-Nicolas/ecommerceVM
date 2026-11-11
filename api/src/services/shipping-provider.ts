@@ -32,9 +32,33 @@ export type ShippingQuoteOption = {
   sellerCostStatus: 'AVAILABLE' | 'UNAVAILABLE'
 }
 
+export type ShippingParcel = {
+  heightCm: number
+  widthCm: number
+  lengthCm: number
+  weightKg: number
+  description?: string
+  reference?: string
+}
+
+export type ShipmentAdmissionResult = {
+  shipmentId: string
+  status: string
+}
+
+export type ShipmentRefreshResult = {
+  orderId: string
+  status: string | null
+  processed: boolean
+  labelSaved: boolean
+} | null
+
 export interface ShippingProvider {
   readonly id: ShippingProviderId
   quoteHomeDelivery(input: ShippingQuoteRequest): Promise<ShippingQuoteOption[]>
+  createShipment(orderId: string, serviceSelection: string, parcels: ShippingParcel[]): Promise<ShipmentAdmissionResult>
+  getLabel(shipmentReference: string): Promise<Buffer>
+  refreshShipment(shipmentReference: string): Promise<ShipmentRefreshResult>
 }
 
 export class ShippingProviderError extends Error {
