@@ -22,17 +22,17 @@ function decodeXml(value: string): string {
 }
 
 function readTag(xml: string, tag: string): string | null {
-  const match = xml.match(new RegExp(`<(?:[\\\\w.-]+:)?${tag}\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/(?:[\\\\w.-]+:)?${tag}\\\\s*>`, 'i'))
+  const match = xml.match(new RegExp(`<(?:[\\w.-]+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${tag}\\s*>`, 'i'))
   return match ? decodeXml(match[1].trim()) : null
 }
 
 function readBlocks(xml: string, tag: string): string[] {
-  const matches = xml.matchAll(new RegExp(`<(?:[\\\\w.-]+:)?${tag}\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/(?:[\\\\w.-]+:)?${tag}\\\\s*>`, 'gi'))
+  const matches = xml.matchAll(new RegExp(`<(?:[\\w.-]+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${tag}\\s*>`, 'gi'))
   return Array.from(matches, (match) => match[1])
 }
 
 function parseArcaDate(value: string | null): Date | null {
-  if (!value || !/^\\d{8}$/.test(value)) return null
+  if (!value || !/^\d{8}$/.test(value)) return null
   const year = Number(value.slice(0, 4))
   const month = Number(value.slice(4, 6))
   const day = Number(value.slice(6, 8))
