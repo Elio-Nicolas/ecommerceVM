@@ -200,3 +200,13 @@ Se agregó una migración aditiva para introducir:
 La relación con `Order` es opcional desde el lado del pedido y no se crean registros retroactivos. No se modifican ni eliminan las columnas `enviopack*`, la tabla `EnviopackWebhookEvent` ni etiquetas históricas. La migración no habilita OCA ni cambia el checkout: prepara el almacenamiento para adaptar el flujo actual sin pérdida de datos.
 
 La tabla de eventos neutral no reemplaza todavía la cola del webhook de Envíopack. Esa migración operativa se hará cuando el procesamiento existente pueda trasladarse y probarse sin perder reintentos ni eventos pendientes.
+
+### Adaptador Envíopack conectado a persistencia neutral
+
+El adaptador actual ahora mantiene también el registro neutral al completar operaciones que ya realiza correctamente Envíopack:
+
+- Al confirmar la admisión, crea/actualiza `ShippingShipment` con proveedor, referencia externa, estado, servicio y bultos reales.
+- Al recuperar la etiqueta, archiva el PDF también en el envío neutral.
+- Al actualizar el tracking, sincroniza el estado y agrega un evento neutral de tipo `STATUS_REFRESH`.
+
+Las columnas históricas de `Order` siguen siendo la fuente de compatibilidad para pedidos Envíopack existentes y la ruta de descarga histórica. La sincronización neutral es adicional. Los webhooks todavía se procesan con la cola histórica hasta trasladar y verificar su semántica de reintentos.
