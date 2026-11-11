@@ -38,10 +38,11 @@ const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
-  if (order.status === 'PENDING' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) return []
-  if (order.status === 'CONFIRMED' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'REFUNDED')) return ['CANCELLED']
-  if (order.status === 'CONFIRMED' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'PARTIALLY_REFUNDED')) return []
-  if (order.status === 'CONFIRMED' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'APPROVED')) return ['PREPARING']
+  const mpStatuses = (order.paymentAttempts || []).filter((payment) => payment.provider === 'MERCADO_PAGO').map((payment) => payment.status)
+  if (order.status === 'PENDING' && mpStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
+  if (mpStatuses.includes('PARTIALLY_REFUNDED')) return []
+  if (mpStatuses.includes('REFUNDED')) return nextStatuses[order.status].includes('CANCELLED') ? ['CANCELLED'] : []
+  if (mpStatuses.includes('APPROVED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'ENVIOPACK' && order.enviopackShipmentStatus !== 'P') return ['CANCELLED']
@@ -441,7 +442,7 @@ export default function AdminOrders() {
                 <strong>{formatPrice(payment.amountArs)}</strong>
                 {payment.providerOrderId && <small className="order-payment-reference">Orden Mercado Pago: {payment.providerOrderId}</small>}
                 {payment.approvedAt && <small className="order-payment-reference">Aprobado: {formatDate(payment.approvedAt)}</small>}
-                {payment.providerOrderId && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status) && <button type="button" className="admin-quiet-button" disabled={paymentReconcilingId !== null} onClick={() => void reconcilePayment(activeOrder, payment.id)}>{paymentReconcilingId === payment.id ? 'Consultando Mercado Pago...' : 'Conciliar pago'}</button>}
+                {payment.providerOrderId && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED'].includes(payment.status) && <button type="button" className="admin-quiet-button" disabled={paymentReconcilingId !== null} onClick={() => void reconcilePayment(activeOrder, payment.id)}>{paymentReconcilingId === payment.id ? 'Consultando Mercado Pago...' : 'Conciliar pago'}</button>}
               </div>)}
               {!(activeOrder.paymentAttempts || []).length && <p className="order-payment-empty">Este pedido no tiene intentos de pago online registrados.</p>}
             </section>
