@@ -11,6 +11,7 @@ import { getArcaIvaReceiverConditions, getArcaLastAuthorizedVoucher, getArcaPoin
 import { buildArcaInvoiceCRequestPayload, requestArcaInvoiceC } from '../services/arca-wsfe-issue'
 import { consultArcaVoucher } from '../services/arca-wsfe-consult'
 import { generateArcaInvoicePdf, assertArcaIssuerProfileConfigured } from '../services/arca-invoice-pdf'
+import { matchesArcaInvoiceRequest } from '../services/arca-invoice-request'
 
 export const adminArcaRouter = Router()
 adminArcaRouter.use(requireAdmin)
@@ -172,7 +173,12 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
 
     const sameRequest = await tx.fiscalDocument.findUnique({ where: { requestKey: input.requestKey } })
-    if (sameRequest) return { document: sameRequest, alreadyExists: true as const }
+    if (sameRequest) {
+      if (!matchesArcaInvoiceRequest(sameRequest, orderId)) {
+        throw new Error('ARCA_REQUEST_KEY_CONFLICT')
+      }
+      return { document: sameRequest, alreadyExists: true as const }
+    }
 
     const blockedDocument = await tx.fiscalDocument.findFirst({
       where: {
@@ -269,6 +275,7 @@ adminArcaRouter.post('/orders/:orderId/invoice-c', issueInvoiceLimiter, async (r
       ORDER_NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
       ORDER_NOT_READY_FOR_INVOICE: { status: 409, message: 'El pedido debe estar confirmado y no cancelado antes de facturarlo.' },
       ORDER_ALREADY_HAS_INVOICE: { status: 409, message: 'Este pedido ya tiene una factura autorizada o pendiente de conciliación.' },
+      ARCA_REQUEST_KEY_CONFLICT: { status: 409, message: 'La clave de solicitud ya fue utilizada para otra factura o pedido. Generá una nueva clave para esta operación.' },
       ARCA_ISSUANCE_RECONCILIATION_REQUIRED: { status: 409, message: 'Hay una emisión anterior pendiente de conciliación en este punto de venta. No se emitirán más comprobantes hasta resolverla.' },
       INVALID_ORDER_TOTAL: { status: 409, message: 'El pedido no tiene un total válido para facturar.' },
       INVALID_ARCA_VOUCHER_NUMBER: { status: 409, message: 'ARCA devolvió un número de comprobante fuera del rango permitido.' },
