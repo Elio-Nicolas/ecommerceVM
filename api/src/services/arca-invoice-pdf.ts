@@ -51,17 +51,17 @@ export async function generateArcaInvoicePdf(input: ArcaInvoicePdfInput): Promis
     tipoCodAut: 'E',
     codAut: Number(input.cae),
   }
-  if (!/^\\d{11}$/.test(input.cuit)) {
+  if (!/^\d{11}$/.test(input.cuit)) {
     throw new Error('El CUIT del emisor debe contener exactamente 11 dígitos para el QR de ARCA.')
   }
-  if (!/^\\d{14}$/.test(input.cae)) {
+  if (!/^\d{14}$/.test(input.cae)) {
     throw new Error('El CAE debe contener exactamente 14 dígitos para el QR de ARCA.')
   }
   if (input.currencyCode !== 'PES' || input.currencyRate !== 1) {
     throw new Error('La Factura C solo admite pesos argentinos con cotización 1 en este flujo.')
   }
   if (input.receiverDocumentType !== null && input.receiverDocumentNumber) {
-    if (!/^\\d{1,20}$/.test(input.receiverDocumentNumber)) {
+    if (!/^\d{1,20}$/.test(input.receiverDocumentNumber)) {
       throw new Error('El documento del receptor debe contener entre 1 y 20 dígitos para el QR de ARCA.')
     }
     qrPayload.tipoDocRec = input.receiverDocumentType
