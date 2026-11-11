@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
+import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
 
 export const paymentsRouter = Router()
 
@@ -23,27 +24,6 @@ function paymentConfiguration() {
 
 function toAmount(value: number) {
   return value.toFixed(2)
-}
-
-function parseAmount(value: unknown): number | null {
-  if (typeof value !== 'string' && typeof value !== 'number') return null
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed < 0 || Math.abs(parsed - Math.round(parsed)) > 0.00001) return null
-  return Number.isSafeInteger(Math.round(parsed)) ? Math.round(parsed) : null
-}
-
-function validCheckoutUrl(value: unknown): value is string {
-  if (typeof value !== 'string') return false
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:'
-      && (url.hostname === 'mercadopago.com.ar'
-        || url.hostname.endsWith('.mercadopago.com.ar')
-        || url.hostname === 'mercadopago.com'
-        || url.hostname.endsWith('.mercadopago.com'))
-  } catch {
-    return false
-  }
 }
 
 async function createMercadoPagoOrder(input: {
@@ -131,9 +111,9 @@ async function createMercadoPagoOrder(input: {
   }
   if (
     !payload?.id
-    || !validCheckoutUrl(payload.checkout_url)
+    || !isValidPaymentCheckoutUrl(payload.checkout_url)
     || payload.external_reference !== input.order.code
-    || parseAmount(payload.total_amount) !== input.order.totalArs
+    || parsePaymentAmount(payload.total_amount) !== input.order.totalArs
     || payload.currency !== 'ARS'
   ) {
     throw new Error('Mercado Pago devolvió una orden de pago incompleta o con datos distintos al pedido.')
@@ -187,7 +167,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
   if (!order) return false
 
   const paidAmount = parseAmount(payload.total_paid_amount)
-  const totalAmount = parseAmount(payload.total_amount)
+  const totalAmount = parsePaymentAmount(payload.total_amount)
   const matchesOrder = payload.id === providerOrderId
     && payload.external_reference === order.code
     && payload.currency === 'ARS'
