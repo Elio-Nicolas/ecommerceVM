@@ -471,7 +471,11 @@ paymentsRouter.post('/webhook', webhookLimiter, async (req, res) => {
   try {
     const payload = await refreshMercadoPagoOrder(dataId.data)
     const applied = await applyMercadoPagoStatus(dataId.data, payload)
-    if (!applied) console.warn('Webhook de Mercado Pago recibido para una orden no registrada:', dataId.data)
+    if (!applied) {
+      console.warn('Webhook de Mercado Pago recibido antes de registrar el intento:', dataId.data)
+      res.status(503).send('El intento de pago todavía no está registrado; reintentá la notificación.')
+      return
+    }
     res.status(200).send('OK')
   } catch (error) {
     console.error('No se pudo procesar el webhook de Mercado Pago:', error)
