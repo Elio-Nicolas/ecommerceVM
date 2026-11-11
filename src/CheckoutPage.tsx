@@ -78,6 +78,10 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [error, setError] = useState('')
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
   const [coverageNoticeOpen, setCoverageNoticeOpen] = useState(false)
+  const [paymentsEnabled, setPaymentsEnabled] = useState(false)
+  const [paymentsConfigLoaded, setPaymentsConfigLoaded] = useState(false)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentError, setPaymentError] = useState('')
 
   const cartKey = cart.map((line) => `${line.product.id}:${line.quantity}`).sort().join('|')
   const checkoutStorageKey = `ecommercevm:checkout-request:${cartKey}`
@@ -136,6 +140,14 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       setCoverageNoticeOpen(false)
     }
   }, [deliveryMethod, postalCode, deliveryMethods, localDeliveryAvailable])
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/v1/payments/config`)
+      .then((response) => response.json())
+      .then((payload) => setPaymentsEnabled(Boolean(payload.data?.enabled)))
+      .catch(() => setPaymentsEnabled(false))
+      .finally(() => setPaymentsConfigLoaded(true))
+  }, [])
 
   useEffect(() => {
     fetch(`${API_URL}/api/v1/shipping/methods`).then((response) => response.json()).then((payload) => {
@@ -203,6 +215,42 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     return () => { window.clearTimeout(timeout); controller.abort() }
   }, [provinceCode, postalCode, cartKey, deliveryMethod])
 
+  async function startPayment(orderId: string) {
+    if (paymentLoading) return
+    setPaymentLoading(true)
+    setPaymentError('')
+    try {
+      const storageKey = `ecommercevm:payment-request:${orderId}`
+      let requestKey = ''
+      try {
+        requestKey = sessionStorage.getItem(storageKey) || ''
+        if (!/^[0-9a-f-]{36}$/i.test(requestKey)) {
+          requestKey = crypto.randomUUID()
+          sessionStorage.setItem(storageKey, requestKey)
+        }
+      } catch {
+        requestKey = crypto.randomUUID()
+      }
+      const response = await fetch(`${API_URL}/api/v1/payments/orders/${encodeURIComponent(orderId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestKey }),
+      })
+      const payload = await response.json() as {
+        data?: { checkoutUrl?: string }
+        error?: { message?: string }
+      }
+      if (!response.ok || !payload.data?.checkoutUrl) {
+        throw new Error(payload.error?.message || 'No pudimos iniciar el pago con Mercado Pago.')
+      }
+      window.location.assign(payload.data.checkoutUrl)
+    } catch (cause) {
+      setPaymentError(cause instanceof Error ? cause.message : 'No pudimos iniciar el pago.')
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
+
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting || cart.length === 0 || !canSubmit) return
@@ -238,6 +286,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       try { sessionStorage.removeItem(checkoutStorageKey) } catch { /* El pedido ya quedó registrado; el almacenamiento es opcional. */ }
       setCreatedOrder(payload.data)
       onOrderCreated()
+      if (paymentsEnabled && payload.data.totalArs !== null) await startPayment(payload.data.id)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Ocurrió un error al enviar el pedido.')
     } finally {
@@ -252,7 +301,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-mark">✓</div>
           <span className="checkout-eyebrow">PEDIDO REGISTRADO</span>
           <h1>¡Gracias por tu pedido!</h1>
-          <p>Recibimos tu pedido. El pago todavía no está habilitado.</p>
+          <p>{paymentsEnabled && createdOrder.totalArs !== null ? (paymentLoading ? 'Conectando con Mercado Pago para completar el pago...' : paymentError ? 'El pedido quedó registrado, pero todavía no pudimos iniciar el pago.' : 'Tu pedido quedó registrado. Te estamos redirigiendo a Mercado Pago.') : createdOrder.totalArs === null ? 'Tu pedido quedó registrado. Primero debemos confirmar el costo de entrega.' : 'Tu pedido quedó registrado. El pago se coordinará luego de confirmar el pedido.'}</p>
           <div className="checkout-order-code">
             <span>CÓDIGO DE PEDIDO</span>
             <strong>{createdOrder.code}</strong>
@@ -261,7 +310,9 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-total"><span>Envío</span><strong>{createdOrder.shippingCostArs === null ? 'A coordinar' : formatPrice(createdOrder.shippingCostArs)}</strong></div>
           <div className="checkout-success-total"><span>Total</span><strong>{createdOrder.totalArs === null ? 'A confirmar' : formatPrice(createdOrder.totalArs)}</strong></div>
           {createdOrder.shippingCostArs === null && <p className="checkout-small">Estamos esperando que se registre el costo acordado. El envío y el total se actualizarán automáticamente en este comprobante.</p>}
-          <p className="checkout-small">Este pedido quedó registrado, pero todavía no fue cobrado.</p>
+          {paymentError && <div className="checkout-error" role="alert">{paymentError}</div>}
+          {paymentsEnabled && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : 'Pagar con Mercado Pago'}</button>}
+          <p className="checkout-small">El pedido solo se confirma cuando Mercado Pago informa un pago aprobado y la API verifica su importe.</p>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
         </section>
       </main>
@@ -291,7 +342,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <div className="checkout-fields">
               <label>Nombre y apellido<input required minLength={2} maxLength={120} autoComplete="name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
               <label>Teléfono / WhatsApp<input required type="tel" minLength={8} maxLength={30} autoComplete="tel" placeholder="Ej. 2657 123456" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} /></label>
-              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'ENVIOPACK' ? <span>(obligatorio para el envío)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'ENVIOPACK'} maxLength={deliveryMethod === 'ENVIOPACK' ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
+              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'ENVIOPACK' ? <span>(obligatorio para el envío)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'ENVIOPACK' || paymentsEnabled} maxLength={deliveryMethod === 'ENVIOPACK' || paymentsEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
             </div>
           </section>
           <section className="checkout-card">
@@ -352,10 +403,10 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             </>}
           </section>
           {error && <div className="checkout-error" role="alert">{error}</div>}
-          <button className="checkout-submit" type="submit" disabled={submitting || cart.length === 0 || !canSubmit}>
+          <button className="checkout-submit" type="submit" disabled={!paymentsConfigLoaded || submitting || cart.length === 0 || !canSubmit}>
             {submitting ? 'Registrando pedido...' : 'Confirmar pedido'}
           </button>
-          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. El pago se incorporará en la siguiente etapa.</p>
+          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. {paymentsEnabled ? 'El pago se completa de forma segura en Mercado Pago.' : 'El pago online no está habilitado en este entorno.'}</p>
         </form>
         <aside className="checkout-summary">
           <h2>Tu pedido</h2>
