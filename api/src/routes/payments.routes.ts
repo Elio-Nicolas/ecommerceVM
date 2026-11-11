@@ -211,7 +211,8 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
       },
     })
 
-    if (effectiveStatus === 'APPROVED' && attempt.order.status === 'PENDING') {
+    const currentOrder = await tx.order.findUnique({ where: { id: attempt.orderId }, select: { status: true } })
+    if (effectiveStatus === 'APPROVED' && currentOrder?.status === 'PENDING') {
       const changed = await tx.order.updateMany({
         where: { id: attempt.orderId, status: 'PENDING' },
         data: { status: 'CONFIRMED' },
@@ -226,7 +227,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
           },
         })
       }
-    } else if (effectiveStatus === 'APPROVED' && attempt.order.status === 'CANCELLED' && current.status !== 'APPROVED') {
+    } else if (effectiveStatus === 'APPROVED' && currentOrder?.status === 'CANCELLED' && current.status !== 'APPROVED') {
       await tx.orderStatusHistory.create({
         data: {
           orderId: attempt.orderId,
