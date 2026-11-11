@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { getEnviopackCredentials } from './shipping-settings'
 import { quoteHomeDelivery } from './enviopack'
 import { createEnviopackShipment, downloadEnviopackLabel, refreshEnviopackShipment } from './enviopack-shipments'
@@ -37,7 +39,7 @@ export const enviopackShippingProvider: ShippingProvider = {
 
   async createShipment(orderId: string, serviceSelection: string, parcels: ShippingParcel[]): Promise<ShipmentAdmissionResult> {
     try {
-      return await createEnviopackShipment(orderId, serviceSelection, parcels.map((parcel) => ({
+      const result = await createEnviopackShipment(orderId, serviceSelection, parcels.map((parcel) => ({
         alto: parcel.heightCm,
         ancho: parcel.widthCm,
         largo: parcel.lengthCm,
@@ -45,6 +47,45 @@ export const enviopackShippingProvider: ShippingProvider = {
         descripcion_primera_linea: parcel.description,
         descripcion_segunda_linea: parcel.reference,
       })))
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { shippingService: true },
+      })
+      await prisma.shippingShipment.upsert({
+        where: { orderId_provider: { orderId, provider: 'ENVIOPACK' } },
+        create: {
+          orderId,
+          provider: 'ENVIOPACK',
+          status: result.status,
+          externalAdmissionId: result.shipmentId,
+          serviceCode: order?.shippingService || null,
+          parcels: parcels.map((parcel) => ({
+            heightCm: parcel.heightCm,
+            widthCm: parcel.widthCm,
+            lengthCm: parcel.lengthCm,
+            weightKg: parcel.weightKg,
+            description: parcel.description || null,
+            reference: parcel.reference || null,
+          })) as Prisma.InputJsonArray,
+          admittedAt: new Date(),
+        },
+        update: {
+          status: result.status,
+          externalAdmissionId: result.shipmentId,
+          serviceCode: order?.shippingService || null,
+          parcels: parcels.map((parcel) => ({
+            heightCm: parcel.heightCm,
+            widthCm: parcel.widthCm,
+            lengthCm: parcel.lengthCm,
+            weightKg: parcel.weightKg,
+            description: parcel.description || null,
+            reference: parcel.reference || null,
+          })) as Prisma.InputJsonArray,
+          admittedAt: new Date(),
+          lastError: null,
+        },
+      })
+      return result
     } catch (error) {
       if (error instanceof Error) throw new ShippingProviderError(error.message)
       throw new ShippingProviderError('No se pudo crear el envío con Envíopack.')
@@ -53,7 +94,12 @@ export const enviopackShippingProvider: ShippingProvider = {
 
   async getLabel(shipmentReference: string): Promise<Buffer> {
     try {
-      return await downloadEnviopackLabel(shipmentReference)
+      const pdf = await downloadEnviopackLabel(shipmentReference)
+      await prisma.shippingShipment.updateMany({
+        where: { provider: 'ENVIOPACK', externalAdmissionId: shipmentReference },
+        data: { labelPdf: pdf, labelMimeType: 'application/pdf', lastError: null },
+      })
+      return pdf
     } catch (error) {
       if (error instanceof Error) throw new ShippingProviderError(error.message)
       throw new ShippingProviderError('No se pudo descargar la etiqueta de Envíopack.')
@@ -62,7 +108,35 @@ export const enviopackShippingProvider: ShippingProvider = {
 
   async refreshShipment(shipmentReference: string): Promise<ShipmentRefreshResult> {
     try {
-      return await refreshEnviopackShipment(shipmentReference)
+      const result = await refreshEnviopackShipment(shipmentReference)
+      if (result) {
+        const shipment = await prisma.shippingShipment.findFirst({
+          where: { provider: 'ENVIOPACK', externalAdmissionId: shipmentReference },
+          select: { id: true },
+        })
+        if (shipment) {
+          await prisma.$transaction([
+            prisma.shippingShipment.update({
+              where: { id: shipment.id },
+              data: {
+                status: result.status || 'UNKNOWN',
+                ...(result.processed ? { processedAt: new Date() } : {}),
+                lastError: null,
+              },
+            }),
+            prisma.shippingShipmentEvent.create({
+              data: {
+                shipmentId: shipment.id,
+                eventType: 'STATUS_REFRESH',
+                status: 'PROCESSED',
+                payload: { providerStatus: result.status, processed: result.processed, labelSaved: result.labelSaved },
+                processedAt: new Date(),
+              },
+            }),
+          ])
+        }
+      }
+      return result
     } catch (error) {
       if (error instanceof Error) throw new ShippingProviderError(error.message)
       throw new ShippingProviderError('No se pudo actualizar el seguimiento de Envíopack.')
