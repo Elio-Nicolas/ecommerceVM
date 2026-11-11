@@ -35,3 +35,8 @@ OCA no se activa todavía: faltan credenciales comerciales y pruebas QA. La entr
 ## Migraciones
 
 Render ejecuta \`npm run prisma:deploy\` en \`preDeployCommand\` antes de cada despliegue. No ejecutar \`prisma migrate dev\`, \`db push\` ni el seed general contra producción.
+
+
+## Conectar Vercel
+
+El frontend lee `VITE_API_URL` como URL base y agrega `/api/v1` automáticamente. Cuando Render entregue la URL pública, configurá `VITE_API_URL` en Vercel con esa URL exacta, sin `/api/v1` y sin barra final. Aplicá el cambio en Production y redeployá el frontend.
