@@ -93,14 +93,21 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     }
     const updated = await prisma.$transaction(async (tx) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
-      const blockingPayment = await tx.paymentAttempt.findFirst({
-        where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
-        select: { id: true, status: true },
+      const currentOrder = await tx.order.findUnique({
+        where: { id: existing.id },
+        select: { subtotalArs: true, shippingCostArs: true },
       })
-      if (blockingPayment) return null
+      if (!currentOrder) return null
+      if (input.shippingCostArs !== currentOrder.shippingCostArs) {
+        const blockingPayment = await tx.paymentAttempt.findFirst({
+          where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
+          select: { id: true },
+        })
+        if (blockingPayment) return null
+      }
       await tx.order.update({
         where: { id: existing.id },
-        data: { shippingCostArs: input.shippingCostArs, totalArs },
+        data: { shippingCostArs: input.shippingCostArs, totalArs: currentOrder.subtotalArs + input.shippingCostArs },
       })
       await tx.orderStatusHistory.create({
         data: {
@@ -137,16 +144,23 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
-    const blockingPayment = await tx.paymentAttempt.findFirst({
-      where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
-      select: { id: true, status: true },
+    const currentOrder = await tx.order.findUnique({
+      where: { id: existing.id },
+      select: { subtotalArs: true, shippingCostArs: true },
     })
-    if (blockingPayment) return null
+    if (!currentOrder) return null
+    if (input.shippingCostArs !== currentOrder.shippingCostArs) {
+      const blockingPayment = await tx.paymentAttempt.findFirst({
+        where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
+        select: { id: true },
+      })
+      if (blockingPayment) return null
+    }
     await tx.order.update({
       where: { id: existing.id },
       data: {
         shippingCostArs: input.shippingCostArs,
-        totalArs,
+        totalArs: currentOrder.subtotalArs + input.shippingCostArs,
         shippingCarrier: input.shippingCarrier,
         trackingCode: input.trackingCode,
       },
