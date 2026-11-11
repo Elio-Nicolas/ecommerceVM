@@ -145,7 +145,7 @@ export default function App() {
 
   return (
     <div className="site-shell">
-      <div className="announcement">Envíos a todo el país <span>·</span> Tecnología útil para todos los días</div>
+      <div className="announcement">Consultá las opciones de entrega al finalizar tu pedido</div>
       <header className="header">
         <a className="brand" href="#" aria-label="ecommerceVM inicio">
           <span className="brand-mark">e<span>v</span></span>
@@ -185,7 +185,7 @@ export default function App() {
 
         <section className="benefits" aria-label="Ventajas">
           <div><span className="benefit-icon">01</span><p><strong>Elegidos con criterio</strong><small>Productos útiles, sin vueltas</small></p></div>
-          <div><span className="benefit-icon">02</span><p><strong>Comprá desde donde estés</strong><small>Envíos a toda Argentina</small></p></div>
+          <div><span className="benefit-icon">02</span><p><strong>Elegí cómo recibir tu pedido</strong><small>Retiro o entrega local según disponibilidad</small></p></div>
           <div><span className="benefit-icon">03</span><p><strong>Atención cercana</strong><small>Te ayudamos a elegir</small></p></div>
         </section>
 
@@ -200,7 +200,7 @@ export default function App() {
             </div>
             <label className="sort-control"><span>Ordenar:</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option value="featured">Destacados</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option><option value="name">Nombre</option></select></label>
           </div>
-          <div className="results-line"><span>{visibleProducts.length} productos</span><span>Precios de muestra · Valores editables</span></div>
+          <div className="results-line"><span>{visibleProducts.length} productos</span><span>Precios expresados en pesos argentinos</span></div>
           {catalogLoading ? <div className="empty-results"><strong>Cargando catálogo...</strong></div> : catalogError ? <div className="empty-results"><strong>No se pudo cargar el catálogo.</strong><span>{catalogError}</span></div> : visibleProducts.length ? (
             <div className="product-grid">
               {visibleProducts.map((product) => (
@@ -245,7 +245,7 @@ export default function App() {
               <div className="cart-line-info"><strong>{line.product.name}</strong><span>{formatPrice(line.product.price)}</span><div className="quantity-control"><button onClick={() => changeQuantity(line.product.id, -1)} aria-label="Quitar una unidad">−</button><span>{line.quantity}</span><button onClick={() => changeQuantity(line.product.id, 1)} aria-label="Agregar una unidad">+</button></div></div>
               <button className="remove-line" onClick={() => setCart((current) => current.filter((item) => item.product.id !== line.product.id))}>Quitar</button>
             </div>)}</div>
-            <div className="cart-summary"><div><span>Subtotal</span><strong>{formatPrice(cartTotal)}</strong></div><small>El costo de envío se calcula más adelante.</small><button className="checkout-continue" onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>Continuar con el pedido <ArrowIcon /></button><p>Sin cobro online. El envío y el pago se coordinan después de confirmar el pedido.</p></div>
+            <div className="cart-summary"><div><span>Subtotal</span><strong>{formatPrice(cartTotal)}</strong></div><small>Las opciones de entrega se muestran al finalizar el pedido.</small><button className="checkout-continue" onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>Continuar con el pedido <ArrowIcon /></button><p>Las opciones de pago y entrega disponibles se informan en el checkout.</p></div>
           </> : <div className="empty-cart"><div className="empty-bag"><BagIcon /></div><strong>Tu carrito está esperando.</strong><span>Sumá productos que te interesen y aparecerán acá.</span><button className="primary-button" onClick={() => setCartOpen(false)}>Seguir explorando <ArrowIcon /></button></div>}
         </aside>
       </div>}
@@ -267,7 +267,7 @@ export default function App() {
               </div>
               {selected.specs.length > 0 && <><h2>Características</h2><ul>{selected.specs.map((spec) => <li key={spec}>{spec}</li>)}</ul></>}
               <button className="primary-button product-page-add" disabled={selected.stock <= 0} onClick={() => addToCart(selected)}>{selected.stock > 0 ? 'Agregar al carrito' : 'Sin stock'} <ArrowIcon /></button>
-              <small>El envío se calculará en una próxima etapa. Los pagos todavía no están habilitados.</small>
+              <small>Consultá las opciones de entrega y pago al finalizar el pedido.</small>
             </div>
           </div>
         </section>

@@ -6,7 +6,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   push:
-    branches: [main, feature/enviopack-checkout, 'feat/**']
+    branches: [main, feature/enviopack-checkout, 'feat/**', 'feature/**']
 
 jobs:
   frontend:

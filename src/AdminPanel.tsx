@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { formatPrice } from './products'
+import { catalogCsvTemplate, parseCatalogCsv } from './catalog-csv'
 import ShippingOriginsPanel from './ShippingOriginsPanel'
 import ShippingSettingsPanel from './ShippingSettingsPanel'
 import ArcaSettingsPanel from './ArcaSettingsPanel'
@@ -84,6 +85,7 @@ export default function AdminPanel() {
   const [categoryDescription, setCategoryDescription] = useState('')
   const [categoryEditing, setCategoryEditing] = useState<string | null>(null)
   const [categorySaving, setCategorySaving] = useState(false)
+  const [catalogImporting, setCatalogImporting] = useState(false)
 
   const loadData = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -278,6 +280,102 @@ export default function AdminPanel() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo eliminar la categoría.') }
   }
 
+  function downloadCatalogTemplate() {
+    const blob = new Blob([catalogCsvTemplate], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'plantilla-productos-tu-tiendavm.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function importCatalogFile(file: File | null) {
+    if (!file || !token) return
+    setCatalogImporting(true)
+    setError('')
+    setNotice('')
+    try {
+      if (!file.name.toLocaleLowerCase('es').endsWith('.csv')) throw new Error('Seleccioná un archivo con extensión .csv.')
+      if (file.size > 2 * 1024 * 1024) throw new Error('El CSV no puede superar los 2 MB.')
+      const rows = parseCatalogCsv(await file.text())
+      const required = ['sku', 'nombre', 'descripcion', 'precio_ars', 'stock', 'categoria']
+      const headers = Object.keys(rows[0] || {})
+      const missing = required.filter((field) => !headers.includes(field))
+      if (missing.length) throw new Error('Faltan columnas obligatorias: ' + missing.join(', '))
+
+      const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('es')
+      const categoryByName = new Map(categories.map((item) => [normalize(item.name), item.id]))
+      const knownSkus = new Set(products.map((item) => item.sku.trim().toLocaleLowerCase('es')))
+      const failures: string[] = []
+      let created = 0
+      let skipped = 0
+
+      const optionalInteger = (value: string, label: string, rowNumber: number, minimum = 1) => {
+        if (!value.trim()) return null
+        const parsed = Number(value)
+        if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new Error(`Fila ${rowNumber}: ${label} debe ser un número entero válido.`)
+        return parsed
+      }
+
+      for (const [index, row] of rows.entries()) {
+        const rowNumber = index + 2
+        try {
+          const sku = row.sku.trim()
+          const name = row.nombre.trim()
+          const description = row.descripcion.trim()
+          const categoryId = categoryByName.get(normalize(row.categoria))
+          const priceArs = Number(row.precio_ars)
+          const stock = Number(row.stock)
+          if (sku.length < 2 || sku.length > 60) throw new Error('SKU inválido.')
+          if (knownSkus.has(sku.toLocaleLowerCase('es'))) { skipped += 1; continue }
+          if (name.length < 2 || name.length > 160) throw new Error('Nombre inválido.')
+          if (description.length < 5 || description.length > 5000) throw new Error('Descripción inválida.')
+          if (!Number.isSafeInteger(priceArs) || priceArs < 1 || priceArs > 2_000_000_000) throw new Error('Precio inválido: usá pesos argentinos enteros.')
+          if (!Number.isSafeInteger(stock) || stock < 0 || stock > 1_000_000) throw new Error('Stock inválido.')
+          if (!categoryId) throw new Error(`La categoría "${row.categoria}" no existe. Creala antes de importar.`)
+
+          const imageUrl = row.imagen_url?.trim() || null
+          if (imageUrl) {
+            const parsedUrl = new URL(imageUrl)
+            if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('La imagen debe tener una URL HTTP o HTTPS.')
+          }
+          const statusValue = (row.estado || 'DRAFT').trim().toLocaleUpperCase('es')
+          const status = statusValue === 'ACTIVE' || statusValue === 'PUBLICADO' ? 'ACTIVE' : statusValue === 'DRAFT' || statusValue === 'BORRADOR' || !statusValue ? 'DRAFT' : null
+          if (!status) throw new Error('Estado inválido: usá ACTIVE o DRAFT.')
+          const featuredValue = (row.destacado || '').trim().toLocaleLowerCase('es')
+          const featured = ['true', '1', 'si', 'sí', 'yes'].includes(featuredValue)
+          const specs = (row.especificaciones || '').split('|').map((value) => value.trim()).filter(Boolean).slice(0, 20)
+
+          await request('/admin/products', token, {
+            method: 'POST',
+            body: JSON.stringify({
+              sku, slug: slugify(name), name, description, priceArs, stock, categoryId, status,
+              featured, imageUrl, specs,
+              compareAtArs: optionalInteger(row.precio_anterior_ars || '', 'Precio anterior', rowNumber),
+              weightGrams: optionalInteger(row.peso_gramos || '', 'Peso', rowNumber),
+              packageLengthCm: optionalInteger(row.largo_cm || '', 'Largo', rowNumber),
+              packageWidthCm: optionalInteger(row.ancho_cm || '', 'Ancho', rowNumber),
+              packageHeightCm: optionalInteger(row.alto_cm || '', 'Alto', rowNumber),
+              badge: row.etiqueta?.trim() || null,
+            }),
+          })
+          knownSkus.add(sku.toLocaleLowerCase('es'))
+          created += 1
+        } catch (cause) {
+          failures.push(`Fila ${rowNumber}: ${cause instanceof Error ? cause.message : 'no se pudo importar.'}`)
+        }
+      }
+
+      await loadData(token)
+      setNotice(`Importación terminada: ${created} creados, ${skipped} omitidos por SKU existente, ${failures.length} con errores.${failures.length ? ' ' + failures.slice(0, 4).join(' · ') : ''}`)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo importar el archivo.')
+    } finally {
+      setCatalogImporting(false)
+    }
+  }
+
   async function archiveProduct(product: Product) {
     if (!token || !window.confirm(`¿Archivar "${product.name}"? Dejará de mostrarse en la tienda, pero conservará sus datos.`)) return
     setError('')
@@ -330,6 +428,17 @@ export default function AdminPanel() {
             <div><span>BORRADORES</span><strong>{products.filter((item) => item.status === 'DRAFT').length}</strong></div>
             <div><span>STOCK TOTAL</span><strong>{products.reduce((total, item) => total + item.stock, 0).toLocaleString('es-AR')}</strong></div>
           </div>
+          <section className="admin-category-card">
+            <div className="admin-category-heading"><h2>Carga masiva de productos</h2><p>Importá varios productos desde una planilla CSV. Los productos nuevos quedan como borradores por seguridad, salvo que indiques ACTIVE en la columna estado.</p></div>
+            <div className="admin-category-actions">
+              <button type="button" className="admin-quiet-button" onClick={downloadCatalogTemplate}>Descargar plantilla CSV</button>
+              <label className="admin-primary" style={{ display: 'inline-flex', alignItems: 'center', cursor: catalogImporting ? 'wait' : 'pointer', opacity: catalogImporting ? 0.65 : 1 }}>
+                {catalogImporting ? 'Importando productos...' : 'Seleccionar CSV'}
+                <input type="file" accept=".csv,text/csv" disabled={catalogImporting} onChange={(event) => { const file = event.currentTarget.files?.[0] || null; event.currentTarget.value = ''; void importCatalogFile(file) }} style={{ display: 'none' }} />
+              </label>
+            </div>
+            <p className="admin-muted-copy">Columnas obligatorias: sku, nombre, descripcion, precio_ars, stock y categoria (nombre exacto de una categoría existente). Opcionales: estado (DRAFT o ACTIVE), imagen_url, precio_anterior_ars, peso_gramos, largo_cm, ancho_cm, alto_cm, destacado (true/false), etiqueta y especificaciones separadas por |. Los SKU existentes se omiten; no se modifican.</p>
+          </section>
           <section className="admin-category-card">
             <div className="admin-category-heading"><h2>Categorías</h2><p>Organizá el catálogo y asigná productos.</p></div>
             <form className="admin-category-form" onSubmit={saveCategory}>

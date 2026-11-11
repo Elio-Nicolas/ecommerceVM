@@ -16,6 +16,7 @@ La aplicación cuenta con storefront, API persistente, administración, gestión
 ### Administración
 - Acceso protegido para administradores; no existe registro público.
 - Alta, edición y archivo de productos; gestión de categorías e imágenes.
+- Importación masiva de productos desde CSV UTF-8 (separador coma o punto y coma). Las categorías deben existir antes; los SKU repetidos se omiten y los productos nuevos quedan como borradores salvo que el archivo indique `ACTIVE`.
 - Gestión de pedidos, estados, historial y stock reservado.
 - Configuración de modalidades de entrega, orígenes de despacho y credenciales logísticas. La cuenta OCA se puede configurar de forma segura, pero la integración operativa aún no está habilitada.
 - Registro y seguimiento de pagos Mercado Pago, con confirmación basada en Webhook firmado.
@@ -73,9 +74,9 @@ npm run db:seed
 npm run dev
 ```
 
-La API queda en `http://localhost:7381`. El health check es `http://localhost:7381/api/v1/health`.
+La API queda en `http://localhost:7381`. El health check es `http://localhost:7381/api/v1/health`. En hosting como Render, si no definís `API_PORT`, la API toma automáticamente el puerto provisto por la plataforma (`PORT`).
 
-El repositorio incluye el historial de migraciones. En una base nueva se usa `prisma:deploy`; no ejecutes `prisma migrate dev --name init` ni `db push` para reconstruir el esquema. El seed crea datos iniciales faltantes y configura el administrador si se definieron `ADMIN_EMAIL` y `ADMIN_PASSWORD`; no debe utilizarse como mecanismo para actualizar el catálogo comercial.
+El repositorio incluye el historial de migraciones. En una base nueva se usa `prisma:deploy`; no ejecutes `prisma migrate dev --name init` ni `db push` para reconstruir el esquema. El seed crea datos iniciales faltantes y configura el administrador si se definieron `ADMIN_EMAIL` y `ADMIN_PASSWORD`; no debe utilizarse como mecanismo para actualizar el catálogo comercial. Para producción, no ejecutes `db:seed`: agrega diez productos demostrativos. Usá `npm run db:seed:admin` para crear o actualizar únicamente el administrador, sin tocar el catálogo.
 
 ### 3. Frontend
 
@@ -99,6 +100,7 @@ Desde `api`:
 | `npm run prisma:deploy` | Aplicar migraciones pendientes |
 | `npm run prisma:generate` | Regenerar Prisma Client |
 | `npm run db:seed` | Crear datos iniciales faltantes y sincronizar el administrador |
+| `npm run db:seed:admin` | Crear o actualizar solo el administrador, sin insertar productos |
 
 Desde la raíz:
 

@@ -257,3 +257,5 @@
 .arca-diagnostics-list span{flex:1;color:#53606c}
 .arca-diagnostics-list small{font-size:9px;color:#7c8791}
 @media(max-width:760px){.arca-diagnostics-summary{grid-template-columns:1fr}.arca-diagnostics-grid{grid-template-columns:1fr}.arca-diagnostics-heading{align-items:flex-start;flex-direction:column}}
+
+.admin-muted-copy{margin:12px 0 0;color:#78838d;font-size:11px;line-height:1.65}
