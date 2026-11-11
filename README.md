@@ -18,12 +18,13 @@ La aplicación cuenta con storefront, API persistente, administración, gestión
 - Alta, edición y archivo de productos; gestión de categorías e imágenes.
 - Gestión de pedidos, estados, historial y stock reservado.
 - Configuración de modalidades de entrega, orígenes de despacho y credenciales de Envíopack.
+- Registro y seguimiento de pagos Mercado Pago, con confirmación basada en Webhook firmado.
 - Integración ARCA para consultas, emisión manual de Factura C de homologación, conciliación y PDF de prueba.
 
 ### Integraciones y límites actuales
 - **Envíopack:** cotización y gestión logística desde el backend. Requiere credenciales y origen de despacho configurados. La generación de etiquetas y el seguimiento dependen de la cuenta y de las pruebas con el proveedor.
 - **ARCA:** exclusivamente homologación. Requiere certificado X.509 de pruebas asociado a WSFE, CUIT y punto de venta habilitados. Los comprobantes de homologación no son facturas fiscales válidas para entregar a compradores.
-- **Pagos:** no hay pasarela integrada ni confirmación automática de cobros.
+- **Pagos:** integración de código con Mercado Pago Checkout Pro mediante Orders API, persistencia de intentos, idempotencia, Webhook firmado y confirmación automática solo cuando la API verifica estado e importe. Requiere credenciales de prueba/producción y configurar el evento Order (Mercado Pago) en el panel del proveedor; no está activa sin esas variables.
 - **Catálogo:** el seed incluye diez productos demostrativos. Deben reemplazarse o revisarse antes de vender; sus precios, imágenes y disponibilidad no representan una oferta comercial real.
 
 ## Puertos locales
