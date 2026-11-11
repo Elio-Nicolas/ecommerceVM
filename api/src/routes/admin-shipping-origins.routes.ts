@@ -6,14 +6,38 @@ import { requireAdmin } from '../middleware/require-admin'
 export const adminShippingOriginsRouter = Router()
 adminShippingOriginsRouter.use(requireAdmin)
 
+const DEFAULT_LOCK = 'ecommercevm-shipping-origin-default'
+
 const originSchema = z.object({
   name: z.string().trim().min(2).max(100),
   provinceCode: z.string().trim().length(1).regex(/^[A-Z]$/, 'Usá el código provincial ISO de Envíopack, sin el prefijo AR-.'),
-  postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal argentino de cuatro dígitos.'),
+  postalCode: z.string().trim().regex(/^\\d{4}$/, 'Ingresá un código postal argentino de cuatro dígitos.'),
   enviopackAddressId: z.string().trim().max(100).nullable().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
 })
+
+async function lockDefaultOrigin(tx: typeof prisma) {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${DEFAULT_LOCK}, 0))`
+}
+
+async function ensureActiveDefault(tx: typeof prisma, preferredId?: string) {
+  const current = await tx.shippingOrigin.findFirst({
+    where: { isActive: true, isDefault: true },
+    select: { id: true },
+  })
+  if (current) return
+
+  const candidate = preferredId
+    ? await tx.shippingOrigin.findFirst({ where: { id: preferredId, isActive: true }, select: { id: true } })
+    : null
+  const fallback = candidate || await tx.shippingOrigin.findFirst({
+    where: { isActive: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: { id: true },
+  })
+  if (fallback) await tx.shippingOrigin.update({ where: { id: fallback.id }, data: { isDefault: true } })
+}
 
 adminShippingOriginsRouter.get('/', async (_req, res) => {
   const data = await prisma.shippingOrigin.findMany({ orderBy: [{ isDefault: 'desc' }, { name: 'asc' }] })
@@ -23,9 +47,13 @@ adminShippingOriginsRouter.get('/', async (_req, res) => {
 adminShippingOriginsRouter.post('/', async (req, res) => {
   const input = originSchema.parse(req.body)
   const origin = await prisma.$transaction(async (tx) => {
-    const hasActiveDefault = await tx.shippingOrigin.findFirst({ where: { isActive: true, isDefault: true }, select: { id: true } })
-    const makeDefault = input.isDefault === true || (!hasActiveDefault && input.isActive !== false)
-    if (makeDefault) await tx.shippingOrigin.updateMany({ data: { isDefault: false } })
+    await lockDefaultOrigin(tx)
+    const hasActiveDefault = await tx.shippingOrigin.findFirst({
+      where: { isActive: true, isDefault: true },
+      select: { id: true },
+    })
+    const makeDefault = input.isActive !== false && (input.isDefault === true || !hasActiveDefault)
+    if (makeDefault) await tx.shippingOrigin.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
     return tx.shippingOrigin.create({
       data: {
         name: input.name,
@@ -42,40 +70,51 @@ adminShippingOriginsRouter.post('/', async (req, res) => {
 
 adminShippingOriginsRouter.put('/:id', async (req, res) => {
   const input = originSchema.partial().parse(req.body)
-  const existing = await prisma.shippingOrigin.findUnique({ where: { id: req.params.id } })
-  if (!existing) {
-    res.status(404).json({ error: { code: 'SHIPPING_ORIGIN_NOT_FOUND', message: 'El depósito de despacho no existe.' } })
-    return
-  }
   const origin = await prisma.$transaction(async (tx) => {
-    if (input.isDefault === true) await tx.shippingOrigin.updateMany({ data: { isDefault: false } })
+    await lockDefaultOrigin(tx)
+    const existing = await tx.shippingOrigin.findUnique({ where: { id: req.params.id } })
+    if (!existing) return null
+
+    const active = input.isActive ?? existing.isActive
+    const wantsDefault = active && (input.isDefault === true || (input.isDefault === undefined && existing.isDefault))
     const updated = await tx.shippingOrigin.update({
-      where: { id: req.params.id },
+      where: { id: existing.id },
       data: {
         ...input,
         ...(input.enviopackAddressId !== undefined ? { enviopackAddressId: input.enviopackAddressId || null } : {}),
-        ...(input.isActive === false ? { isDefault: false } : {}),
+        isActive: active,
+        isDefault: false,
       },
     })
-    if (!updated.isDefault && updated.isActive) {
-      const otherDefault = await tx.shippingOrigin.findFirst({ where: { isActive: true, isDefault: true } })
-      if (!otherDefault) return tx.shippingOrigin.update({ where: { id: updated.id }, data: { isDefault: true } })
+
+    if (wantsDefault) {
+      await tx.shippingOrigin.updateMany({ where: { isDefault: true }, data: { isDefault: false } })
+      return tx.shippingOrigin.update({ where: { id: updated.id }, data: { isDefault: true } })
     }
-    return updated
+
+    await ensureActiveDefault(tx)
+    return tx.shippingOrigin.findUnique({ where: { id: updated.id } })
   })
+  if (!origin) {
+    res.status(404).json({ error: { code: 'SHIPPING_ORIGIN_NOT_FOUND', message: 'El depósito de despacho no existe.' } })
+    return
+  }
   res.json({ data: origin })
 })
 
 adminShippingOriginsRouter.delete('/:id', async (req, res) => {
-  const existing = await prisma.shippingOrigin.findUnique({ where: { id: req.params.id } })
-  if (!existing) {
+  const deleted = await prisma.$transaction(async (tx) => {
+    await lockDefaultOrigin(tx)
+    const existing = await tx.shippingOrigin.findUnique({ where: { id: req.params.id } })
+    if (!existing) return false
+
+    await tx.shippingOrigin.delete({ where: { id: existing.id } })
+    await ensureActiveDefault(tx)
+    return true
+  })
+  if (!deleted) {
     res.status(404).json({ error: { code: 'SHIPPING_ORIGIN_NOT_FOUND', message: 'El depósito de despacho no existe.' } })
     return
-  }
-  await prisma.shippingOrigin.delete({ where: { id: req.params.id } })
-  if (existing.isDefault) {
-    const next = await prisma.shippingOrigin.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } })
-    if (next) await prisma.shippingOrigin.update({ where: { id: next.id }, data: { isDefault: true } })
   }
   res.status(204).send()
 })
