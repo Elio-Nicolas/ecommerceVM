@@ -43,7 +43,6 @@ export async function getShippingSettings() {
 
 export async function getShippingSettingsPublic() {
   const settings = await getShippingSettings()
-  const hasCredentials = Boolean(settings.enviopackApiKeyEncrypted && settings.enviopackSecretKeyEncrypted)
   return {
     pickup: {
       enabled: settings.pickupEnabled,
@@ -57,7 +56,7 @@ export async function getShippingSettingsPublic() {
       priceArs: settings.localDeliveryCoordinate ? null : settings.localDeliveryFeeArs,
       coordinate: settings.localDeliveryCoordinate,
     },
-    enviopack: { enabled: settings.enviopackEnabled && hasCredentials },
+    // Envíopack queda disponible solo para operaciones históricas de administración.\n    // No ofrecer nuevos envíos hasta completar la migración a OCA.\n    enviopack: { enabled: false },
   }
 }
 
