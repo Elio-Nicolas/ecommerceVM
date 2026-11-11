@@ -198,7 +198,6 @@ model FiscalDocument {
   attempts Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  @@unique([pointOfSale, voucherType, voucherNumber])
   @@index([orderId, createdAt])
   @@index([status, createdAt])
   @@index([cae])
