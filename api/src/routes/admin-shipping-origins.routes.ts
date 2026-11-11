@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
@@ -17,11 +18,11 @@ const originSchema = z.object({
   isActive: z.boolean().optional(),
 })
 
-async function lockDefaultOrigin(tx: typeof prisma) {
+async function lockDefaultOrigin(tx: Prisma.TransactionClient) {
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${DEFAULT_LOCK}, 0))`
 }
 
-async function ensureActiveDefault(tx: typeof prisma, preferredId?: string) {
+async function ensureActiveDefault(tx: Prisma.TransactionClient, preferredId?: string) {
   const current = await tx.shippingOrigin.findFirst({
     where: { isActive: true, isDefault: true },
     select: { id: true },
