@@ -41,6 +41,8 @@ enum PaymentAttemptStatus {
   REJECTED
   CANCELLED
   UNKNOWN
+  REFUNDED
+  PARTIALLY_REFUNDED
 }
 model AdminUser {
   id String @id @default(uuid())
