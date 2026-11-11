@@ -119,7 +119,7 @@ export const enviopackShippingProvider: ShippingProvider = {
             prisma.shippingShipment.update({
               where: { id: shipment.id },
               data: {
-                status: result.status || 'UNKNOWN',
+                ...(result.status ? { status: result.status } : {}),
                 ...(result.processed ? { processedAt: new Date() } : {}),
                 lastError: null,
               },
