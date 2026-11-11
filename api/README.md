@@ -151,5 +151,8 @@ El servidor valida `x-signature` mediante HMAC-SHA256 y consulta `GET /v1/orders
 - `POST /api/v1/payments/orders/:orderId`: crea o recupera un intento idempotente y devuelve `checkoutUrl`.
 - `GET /api/v1/payments/orders/:orderId/status`: consulta el estado público del pago.
 - `POST /api/v1/payments/webhook`: recibe y valida eventos Order de Mercado Pago.
+- `POST /api/v1/payments/admin/orders/:orderId/attempts/:attemptId/reconcile`: permite al administrador consultar el estado actual directamente en Mercado Pago cuando un Webhook no llegó.
+
+Los reembolsos se inician desde el panel de Mercado Pago. El Webhook sincroniza reembolsos totales y parciales; un pedido reembolsado no puede seguir preparándose y un reembolso parcial queda bloqueado para revisión manual.
 
 La integración de código no sustituye la prueba de extremo a extremo. Antes de cobrar a compradores reales, completar pruebas con credenciales de prueba, verificar notificaciones en el panel, configurar credenciales productivas y ejecutar una prueba controlada en producción.
