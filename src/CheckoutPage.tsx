@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { formatPrice, type Product } from './products'
 import './checkout.css'
 
@@ -80,6 +80,17 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [coverageNoticeOpen, setCoverageNoticeOpen] = useState(false)
 
   const cartKey = cart.map((line) => `${line.product.id}:${line.quantity}`).sort().join('|')
+  const checkoutStorageKey = `ecommercevm:checkout-request:${cartKey}`
+  const checkoutRequestKey = useRef<string | null>(null)
+  if (!checkoutRequestKey.current) {
+    try {
+      const savedKey = sessionStorage.getItem(checkoutStorageKey)
+      checkoutRequestKey.current = savedKey && /^[0-9a-f-]{36}$/i.test(savedKey) ? savedKey : crypto.randomUUID()
+      sessionStorage.setItem(checkoutStorageKey, checkoutRequestKey.current)
+    } catch {
+      checkoutRequestKey.current = crypto.randomUUID()
+    }
+  }
   const selectedOption = quote?.options.find((option) => option.key === selectedOptionKey) || null
   const provinceName = PROVINCES.find(([code]) => code === provinceCode)?.[1] || ''
   const displayedSubtotal = quote?.subtotalArs ?? subtotal
@@ -202,6 +213,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          checkoutRequestKey: checkoutRequestKey.current,
           customerName,
           customerEmail,
           customerPhone,
@@ -223,6 +235,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       if (!response.ok || !payload.data) {
         throw new Error(payload.error?.message || 'No pudimos registrar el pedido. Revisá los datos e intentá nuevamente.')
       }
+      try { sessionStorage.removeItem(checkoutStorageKey) } catch { /* El pedido ya quedó registrado; el almacenamiento es opcional. */ }
       setCreatedOrder(payload.data)
       onOrderCreated()
     } catch (requestError) {
