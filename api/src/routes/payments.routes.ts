@@ -6,6 +6,7 @@ import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
+import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
 import { verifyMercadoPagoWebhookSignature } from '../services/payment-webhook-signature'
 
 export const paymentsRouter = Router()
@@ -161,8 +162,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
     const matchesOrder = payload.id === providerOrderId
       && payload.external_reference === currentOrder.code
       && payload.currency === 'ARS'
-      && totalAmount === current.amountArs
-      && totalAmount === currentOrder.totalArs
+      && paymentAmountsMatchCurrentOrder(totalAmount, current.amountArs, currentOrder.totalArs)
 
     let nextStatus: PaymentAttemptStatus = 'UNKNOWN'
     if (matchesOrder && payload.status === 'processed' && payload.status_detail === 'partially_refunded') {
