@@ -53,7 +53,7 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
     void run()
     let pollCount = 0
     const interval = window.setInterval(() => {
-      if (payment?.payment?.status === 'APPROVED' || payment?.payment?.status === 'REJECTED' || payment?.payment?.status === 'CANCELLED' || pollCount >= 20) return
+      if (payment?.payment?.status === 'APPROVED' || payment?.payment?.status === 'REJECTED' || payment?.payment?.status === 'CANCELLED' || payment?.payment?.status === 'REFUNDED' || payment?.payment?.status === 'PARTIALLY_REFUNDED' || pollCount >= 20) return
       pollCount += 1
       void refresh(controller.signal).catch(() => undefined)
     }, 15000)
@@ -88,7 +88,7 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
   }
 
   useEffect(() => {
-    if (payment?.payment?.status !== 'REJECTED' && payment?.payment?.status !== 'CANCELLED') return
+    if (payment?.payment?.status !== 'REJECTED' && payment?.payment?.status !== 'CANCELLED' && payment?.payment?.status !== 'REFUNDED' && payment?.payment?.status !== 'PARTIALLY_REFUNDED') return
     try { sessionStorage.removeItem('ecommercevm:payment-request:' + orderId) } catch { /* El almacenamiento es opcional. */ }
   }, [orderId, payment?.payment?.status])
 
