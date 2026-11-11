@@ -211,6 +211,7 @@ model ShippingShipmentEvent {
   lastError String?
   @@unique([shipmentId, externalEventId])
   @@index([status, receivedAt])
+  @@index([status, lockedAt])
   @@index([shipmentId, receivedAt])
 }
 
