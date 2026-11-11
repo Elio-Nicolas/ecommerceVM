@@ -3,6 +3,7 @@ import { OrderStatus, Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
+import { wouldChangeOrderTotal } from '../services/shipping-total-consistency'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -99,7 +100,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       })
       if (!currentOrder) return null
       const nextTotalArs = currentOrder.subtotalArs + input.shippingCostArs
-      if (nextTotalArs !== currentOrder.totalArs) {
+      if (wouldChangeOrderTotal(currentOrder.subtotalArs, input.shippingCostArs, currentOrder.totalArs)) {
         const blockingPayment = await tx.paymentAttempt.findFirst({
           where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
           select: { id: true },
@@ -151,7 +152,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     })
     if (!currentOrder) return null
     const nextTotalArs = currentOrder.subtotalArs + input.shippingCostArs
-    if (nextTotalArs !== currentOrder.totalArs) {
+    if (wouldChangeOrderTotal(currentOrder.subtotalArs, input.shippingCostArs, currentOrder.totalArs)) {
       const blockingPayment = await tx.paymentAttempt.findFirst({
         where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
         select: { id: true },
