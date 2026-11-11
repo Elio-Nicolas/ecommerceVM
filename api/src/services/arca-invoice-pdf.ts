@@ -51,13 +51,29 @@ export async function generateArcaInvoicePdf(input: ArcaInvoicePdfInput): Promis
     tipoCodAut: 'E',
     codAut: Number(input.cae),
   }
-  if (input.receiverDocumentType !== null && input.receiverDocumentNumber) {
-    const receiverNumber = Number(input.receiverDocumentNumber)
-    if (!Number.isSafeInteger(receiverNumber)) throw new Error('El documento del receptor supera el rango numérico seguro para el QR de ARCA.')
-    qrPayload.tipoDocRec = input.receiverDocumentType
-    qrPayload.nroDocRec = receiverNumber
+  if (!/^\\d{11}$/.test(input.cuit)) {
+    throw new Error('El CUIT del emisor debe contener exactamente 11 dígitos para el QR de ARCA.')
   }
-  const encoded = Buffer.from(JSON.stringify(qrPayload), 'utf8').toString('base64')
+  if (!/^\\d{14}$/.test(input.cae)) {
+    throw new Error('El CAE debe contener exactamente 14 dígitos para el QR de ARCA.')
+  }
+  if (input.currencyCode !== 'PES' || input.currencyRate !== 1) {
+    throw new Error('La Factura C solo admite pesos argentinos con cotización 1 en este flujo.')
+  }
+  if (input.receiverDocumentType !== null && input.receiverDocumentNumber) {
+    if (!/^\\d{1,20}$/.test(input.receiverDocumentNumber)) {
+      throw new Error('El documento del receptor debe contener entre 1 y 20 dígitos para el QR de ARCA.')
+    }
+    qrPayload.tipoDocRec = input.receiverDocumentType
+    // La especificación ARCA define nroDocRec como número de hasta 20 dígitos.
+    // Se serializa como literal JSON para no perder precisión en identificadores largos.
+    qrPayload.nroDocRec = '__ARCA_RECEIVER_DOCUMENT_NUMBER__'
+  }
+  const qrJson = JSON.stringify(qrPayload).replace(
+    '"__ARCA_RECEIVER_DOCUMENT_NUMBER__"',
+    input.receiverDocumentType !== null && input.receiverDocumentNumber ? input.receiverDocumentNumber : 'null',
+  )
+  const encoded = Buffer.from(qrJson, 'utf8').toString('base64')
   const qrUrl = `https://www.arca.gob.ar/fe/qr/?p=${encoded}`
   const qrPng = await QRCode.toBuffer(qrUrl, { type: 'png', errorCorrectionLevel: 'M', margin: 1, width: 220 })
   const chunks: Buffer[] = []
