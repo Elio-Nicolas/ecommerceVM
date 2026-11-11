@@ -92,6 +92,12 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       return
     }
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
+      const blockingPayment = await tx.paymentAttempt.findFirst({
+        where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
+        select: { id: true, status: true },
+      })
+      if (blockingPayment) return null
       await tx.order.update({
         where: { id: existing.id },
         data: { shippingCostArs: input.shippingCostArs, totalArs },
@@ -107,6 +113,10 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       })
       return tx.order.findUnique({ where: { id: existing.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
     })
+    if (!updated) {
+      res.status(409).json({ error: { code: 'PAYMENT_ALREADY_STARTED', message: 'No se puede modificar el costo de entrega porque el pedido tiene un pago iniciado o registrado. Primero resolvé el pago en Mercado Pago.' } })
+      return
+    }
     res.json({ data: updated, message: 'Costo de entrega local registrado.' })
     return
   }
@@ -126,6 +136,12 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
+    const blockingPayment = await tx.paymentAttempt.findFirst({
+      where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
+      select: { id: true, status: true },
+    })
+    if (blockingPayment) return null
     await tx.order.update({
       where: { id: existing.id },
       data: {
@@ -151,6 +167,10 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     return tx.order.findUnique({ where: { id: existing.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
   })
 
+  if (!updated) {
+    res.status(409).json({ error: { code: 'PAYMENT_ALREADY_STARTED', message: 'No se puede modificar el costo de envío porque el pedido tiene un pago iniciado o registrado. Primero resolvé el pago en Mercado Pago.' } })
+    return
+  }
   res.json({ data: updated, message: 'Datos de envío actualizados.' })
 })
 
