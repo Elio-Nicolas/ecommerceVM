@@ -69,10 +69,12 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
     setRetrying(true)
     setError('')
     try {
+      const requestKey = crypto.randomUUID()
+      try { sessionStorage.setItem('ecommercevm:payment-request:' + orderId, requestKey) } catch { /* El almacenamiento es opcional. */ }
       const response = await fetch(API_URL + '/api/v1/payments/orders/' + encodeURIComponent(orderId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestKey: crypto.randomUUID() }),
+        body: JSON.stringify({ requestKey }),
       })
       const payload = await response.json() as { data?: { checkoutUrl?: string }; error?: { message?: string } }
       if (!response.ok || !payload.data?.checkoutUrl) {
@@ -84,6 +86,11 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
       setRetrying(false)
     }
   }
+
+  useEffect(() => {
+    if (payment?.payment?.status !== 'REJECTED' && payment?.payment?.status !== 'CANCELLED') return
+    try { sessionStorage.removeItem('ecommercevm:payment-request:' + orderId) } catch { /* El almacenamiento es opcional. */ }
+  }, [orderId, payment?.payment?.status])
 
   const status = payment?.payment?.status
   const approved = status === 'APPROVED'
