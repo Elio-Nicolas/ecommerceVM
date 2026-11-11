@@ -19,7 +19,7 @@ type Order = {
   enviopackOrderId: string | null; enviopackShipmentId: string | null; enviopackShipmentStatus: string | null
   enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null; enviopackPackages: EnviopackPackage[] | null; enviopackLabelSavedAt: string | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
-  paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
+  paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'REFUNDED' | 'PARTIALLY_REFUNDED'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
   fiscalDocuments?: { id: string; type: 'INVOICE_C' | 'CREDIT_NOTE_C' | 'DEBIT_NOTE_C'; status: 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'; pointOfSale: number | null; voucherType: number; voucherNumber: number | null; cae: string | null; caeExpiresAt: string | null; lastErrorMessage: string | null; createdAt: string }[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
@@ -39,6 +39,8 @@ const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
 
 function availableNextStatuses(order: Order): OrderStatus[] {
   if (order.status === 'PENDING' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) return []
+  if (order.status === 'CONFIRMED' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'REFUNDED')) return ['CANCELLED']
+  if (order.status === 'CONFIRMED' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'PARTIALLY_REFUNDED')) return []
   if (order.status === 'CONFIRMED' && (order.paymentAttempts || []).some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'APPROVED')) return ['PREPARING']
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
@@ -435,7 +437,7 @@ export default function AdminOrders() {
             <section className="order-payment-card">
               <div className="order-payment-heading"><div><span className="admin-kicker">COBROS ONLINE</span><h3>Mercado Pago</h3></div><small>Estado verificado por Webhook</small></div>
               {(activeOrder.paymentAttempts || []).map((payment) => <div className="order-payment-attempt" key={payment.id}>
-                <div><strong>{payment.status === 'APPROVED' ? 'Pago aprobado' : payment.status === 'REJECTED' ? 'Pago rechazado' : payment.status === 'CANCELLED' ? 'Pago cancelado' : payment.status === 'UNKNOWN' ? 'Resultado incierto' : payment.status === 'CREATING' ? 'Creando pago' : 'Pago pendiente'}</strong><small>{payment.statusDetail || 'Sin detalle informado'} · {formatDate(payment.createdAt)}</small></div>
+                <div><strong>{payment.status === 'APPROVED' ? 'Pago aprobado' : payment.status === 'REJECTED' ? 'Pago rechazado' : payment.status === 'CANCELLED' ? 'Pago cancelado' : payment.status === 'REFUNDED' ? 'Pago reembolsado' : payment.status === 'PARTIALLY_REFUNDED' ? 'Reembolso parcial' : payment.status === 'UNKNOWN' ? 'Resultado incierto' : payment.status === 'CREATING' ? 'Creando pago' : 'Pago pendiente'}</strong><small>{payment.statusDetail || 'Sin detalle informado'} · {formatDate(payment.createdAt)}</small></div>
                 <strong>{formatPrice(payment.amountArs)}</strong>
                 {payment.providerOrderId && <small className="order-payment-reference">Orden Mercado Pago: {payment.providerOrderId}</small>}
                 {payment.approvedAt && <small className="order-payment-reference">Aprobado: {formatDate(payment.approvedAt)}</small>}
