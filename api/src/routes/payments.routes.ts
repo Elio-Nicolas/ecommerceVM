@@ -5,6 +5,7 @@ import { rateLimit } from 'express-rate-limit'
 import { z } from 'zod'
 import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
+import { requireAdmin } from '../middleware/require-admin'
 
 export const paymentsRouter = Router()
 
@@ -395,6 +396,39 @@ paymentsRouter.get('/orders/:orderId/status', statusLimiter, async (req, res) =>
       payment: order.paymentAttempts[0] || null,
     },
   })
+})
+
+paymentsRouter.post('/admin/orders/:orderId/attempts/:attemptId/reconcile', requireAdmin, async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.orderId)
+  const attemptId = z.string().uuid().safeParse(req.params.attemptId)
+  if (!orderId.success || !attemptId.success) {
+    res.status(400).json({ error: { code: 'PAYMENT_ATTEMPT_INVALID', message: 'El intento de pago no es válido.' } })
+    return
+  }
+  const attempt = await prisma.paymentAttempt.findFirst({
+    where: { id: attemptId.data, orderId: orderId.data, provider: 'MERCADO_PAGO' },
+  })
+  if (!attempt) {
+    res.status(404).json({ error: { code: 'PAYMENT_ATTEMPT_NOT_FOUND', message: 'No se encontró el intento de pago.' } })
+    return
+  }
+  if (!attempt.providerOrderId) {
+    res.status(409).json({ error: { code: 'PAYMENT_ORDER_ID_MISSING', message: 'Mercado Pago todavía no devolvió un identificador de orden. Reintentá la creación con la misma clave desde el checkout.' } })
+    return
+  }
+  try {
+    const payload = await refreshMercadoPagoOrder(attempt.providerOrderId)
+    await applyMercadoPagoStatus(attempt.providerOrderId, payload)
+    const updated = await prisma.paymentAttempt.findUnique({
+      where: { id: attempt.id },
+      select: { id: true, status: true, statusDetail: true, amountArs: true, approvedAt: true, providerOrderId: true },
+    })
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({ data: updated, message: 'Estado consultado directamente en Mercado Pago.' })
+  } catch (error) {
+    console.error('No se pudo conciliar el pago desde administración:', error)
+    res.status(503).json({ error: { code: 'PAYMENT_RECONCILIATION_FAILED', message: 'No se pudo consultar Mercado Pago. Intentá nuevamente más tarde.' } })
+  }
 })
 
 paymentsRouter.post('/webhook', webhookLimiter, async (req, res) => {
