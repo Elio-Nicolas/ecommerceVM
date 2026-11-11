@@ -19,6 +19,7 @@ type Order = {
   enviopackOrderId: string | null; enviopackShipmentId: string | null; enviopackShipmentStatus: string | null
   enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null; enviopackPackages: EnviopackPackage[] | null; enviopackLabelSavedAt: string | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
+  paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
   fiscalDocuments?: { id: string; type: 'INVOICE_C' | 'CREDIT_NOTE_C' | 'DEBIT_NOTE_C'; status: 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'; pointOfSale: number | null; voucherType: number; voucherNumber: number | null; cae: string | null; caeExpiresAt: string | null; lastErrorMessage: string | null; createdAt: string }[]
 }
 type ApiResponse<T> = { data: T; pagination?: { page: number; limit: number; total: number; totalPages: number } }
@@ -412,6 +413,16 @@ export default function AdminOrders() {
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
             <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de coordinación' : `Envío: ${formatPrice(activeOrder.shippingCostArs)}`}</small><span>Total del pedido</span><strong>{activeOrder.totalArs === null ? 'Pendiente de coordinación' : formatPrice(activeOrder.totalArs)}</strong></div>
+            <section className="order-payment-card">
+              <div className="order-payment-heading"><div><span className="admin-kicker">COBROS ONLINE</span><h3>Mercado Pago</h3></div><small>Estado verificado por Webhook</small></div>
+              {(activeOrder.paymentAttempts || []).map((payment) => <div className="order-payment-attempt" key={payment.id}>
+                <div><strong>{payment.status === 'APPROVED' ? 'Pago aprobado' : payment.status === 'REJECTED' ? 'Pago rechazado' : payment.status === 'CANCELLED' ? 'Pago cancelado' : payment.status === 'UNKNOWN' ? 'Resultado incierto' : payment.status === 'CREATING' ? 'Creando pago' : 'Pago pendiente'}</strong><small>{payment.statusDetail || 'Sin detalle informado'} · {formatDate(payment.createdAt)}</small></div>
+                <strong>{formatPrice(payment.amountArs)}</strong>
+                {payment.providerOrderId && <small className="order-payment-reference">Orden Mercado Pago: {payment.providerOrderId}</small>}
+                {payment.approvedAt && <small className="order-payment-reference">Aprobado: {formatDate(payment.approvedAt)}</small>}
+              </div>)}
+              {!(activeOrder.paymentAttempts || []).length && <p className="order-payment-empty">Este pedido no tiene intentos de pago online registrados.</p>}
+            </section>
             <section className="order-fiscal-card">
               <div className="order-fiscal-heading"><div><span className="admin-kicker">ARCA · HOMOLOGACIÓN</span><h3>Factura C</h3></div><small>Emisión manual de prueba</small></div>
               {(activeOrder.fiscalDocuments || []).filter((document) => document.type === 'INVOICE_C').map((document) => <div className={`order-fiscal-document ${document.status.toLowerCase()}`} key={document.id}>
