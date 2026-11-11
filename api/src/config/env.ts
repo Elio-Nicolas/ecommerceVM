@@ -1,4 +1,10 @@
 import { z } from 'zod'
+
+const optionalTrimmedString = (minimumLength: number) => z.preprocess(
+  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().trim().min(minimumLength).optional(),
+)
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(7381),
@@ -6,9 +12,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
   ARCA_CUIT: z.string().regex(/^\d{11}$/).optional(),
-  ARCA_ISSUER_NAME: z.string().trim().min(2).optional(),
-  ARCA_ISSUER_ADDRESS: z.string().trim().min(5).optional(),
-  ARCA_ISSUER_VAT_CONDITION: z.string().trim().min(2).optional(),
+  ARCA_ISSUER_NAME: optionalTrimmedString(2),
+  ARCA_ISSUER_ADDRESS: optionalTrimmedString(5),
+  ARCA_ISSUER_VAT_CONDITION: optionalTrimmedString(2),
   ARCA_CERTIFICATE_PATH: z.string().min(1).optional(),
   ARCA_PRIVATE_KEY_PATH: z.string().min(1).optional(),
   ARCA_OPENSSL_PATH: z.string().min(1).default('openssl'),
