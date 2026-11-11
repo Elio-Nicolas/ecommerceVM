@@ -135,7 +135,7 @@ export default function ArcaSettingsPanel({ token }: { token: string }) {
     <section className="admin-category-card arca-settings-card">
       <div className="admin-category-heading">
         <h2>Facturación electrónica · ARCA</h2>
-        <p>Configuración inicial de homologación. La emisión de comprobantes todavía no está habilitada.</p>
+        <p>Configurá y verificá la conexión de homologación. Desde Pedidos podés emitir manualmente Facturas C de prueba, conciliarlas y descargar el PDF cuando ARCA las autorice.</p>
       </div>
       {error && <div className="admin-alert error">{error}</div>}
       {notice && <div className="admin-alert success">{notice}</div>}
