@@ -3,12 +3,8 @@ import { z } from 'zod'
 import { rateLimit } from 'express-rate-limit'
 import { requireAdmin } from '../middleware/require-admin'
 import { prisma } from '../lib/prisma'
-import {
-  createEnviopackShipment,
-  downloadEnviopackLabel,
-  EnviopackShipmentError,
-  refreshEnviopackShipment,
-} from '../services/enviopack-shipments'
+import { enviopackShippingProvider } from '../services/enviopack-provider'
+import { ShippingProviderError } from '../services/shipping-provider'
 
 export const adminEnviopackRouter = Router()
 adminEnviopackRouter.use(requireAdmin)
@@ -26,10 +22,17 @@ adminEnviopackRouter.post('/orders/:id/create', async (req, res) => {
     })).min(1).max(20),
   }).parse(req.body)
   try {
-    const result = await createEnviopackShipment(req.params.id, input.carrierId, input.packages)
-    res.status(201).json({ data: result, message: 'Envío creado en Envíopack. La etiqueta estará disponible cuando el correo lo procese.' })
+    const result = await enviopackShippingProvider.createShipment(req.params.id, input.carrierId, input.packages.map((parcel) => ({
+      heightCm: parcel.alto,
+      widthCm: parcel.ancho,
+      lengthCm: parcel.largo,
+      weightKg: parcel.peso,
+      description: parcel.descripcion_primera_linea,
+      reference: parcel.descripcion_segunda_linea,
+    })))
+    res.status(201).json({ data: result, message: 'Envío creado. La etiqueta estará disponible cuando el transportista lo procese.' })
   } catch (error) {
-    if (error instanceof EnviopackShipmentError) {
+    if (error instanceof ShippingProviderError) {
       res.status(409).json({ error: { code: 'ENVIOPACK_SHIPMENT_ERROR', message: error.message } })
       return
     }
@@ -52,7 +55,7 @@ adminEnviopackRouter.get('/orders/:id/label', async (req, res) => {
     if (order.enviopackLabelPdf) {
       pdf = Buffer.from(order.enviopackLabelPdf)
     } else {
-      pdf = await downloadEnviopackLabel(order.enviopackShipmentId)
+      pdf = await enviopackShippingProvider.getLabel(order.enviopackShipmentId)
       await prisma.order.update({
         where: { id: order.id },
         data: { enviopackLabelPdf: pdf, enviopackLabelSavedAt: new Date() },
@@ -63,7 +66,7 @@ adminEnviopackRouter.get('/orders/:id/label', async (req, res) => {
     res.setHeader('Content-Length', pdf.length)
     res.send(pdf)
   } catch (error) {
-    const message = error instanceof EnviopackShipmentError ? error.message : 'No se pudo descargar la etiqueta.'
+    const message = error instanceof ShippingProviderError ? error.message : 'No se pudo descargar la etiqueta.'
     res.status(502).json({ error: { code: 'ENVIOPACK_LABEL_ERROR', message } })
   }
 })
@@ -75,11 +78,11 @@ adminEnviopackRouter.post('/orders/:id/refresh', async (req, res) => {
     return
   }
   try {
-    const result = await refreshEnviopackShipment(order.enviopackShipmentId)
+    const result = await enviopackShippingProvider.refreshShipment(order.enviopackShipmentId)
     res.json({ data: result })
   } catch (error) {
-    const message = error instanceof EnviopackShipmentError ? error.message : 'No se pudo consultar el estado del envío.'
-    res.status(502).json({ error: { code: 'ENVIOPACK_REFRESH_ERROR', message } })
+    const message = error instanceof ShippingProviderError ? error.message : 'No se pudo consultar el estado del envío.'
+    res.status(502).json({ error: { code: 'SHIPPING_PROVIDER_REFRESH_ERROR', message } })
   }
 })
 
