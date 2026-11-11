@@ -9,7 +9,7 @@ import { prisma } from '../lib/prisma'
 export const paymentsRouter = Router()
 
 const createPaymentLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false })
-const statusLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false })
+const statusLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false })
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false })
 const paymentInputSchema = z.object({ requestKey: z.string().uuid() })
 
