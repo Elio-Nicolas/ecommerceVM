@@ -72,3 +72,48 @@ Para generar el PDF se deben completar en el entorno de la API los datos legales
 - `ARCA_ISSUER_VAT_CONDITION`: condición frente al IVA.
 
 Si falta alguno, la API no genera una representación fiscal incompleta. El QR utiliza los datos persistidos del comprobante autorizado y el verificador oficial de ARCA.
+
+
+## Facturación electrónica ARCA (solo homologación)
+
+La integración implementa autenticación WSAA, consultas WSFEv1, emisión manual de Factura C (tipo 11), conciliación de resultados inciertos y descarga del PDF con CAE y QR. La configuración de producción no está habilitada.
+
+### Preparar el entorno
+
+1. Gestioná en ARCA un certificado de **homologación** para el servicio WSFEv1 y su clave privada correspondiente. El certificado debe estar asociado al CUIT emisor y habilitado para el entorno de pruebas.
+2. Instalá ambos archivos en el servidor de la API, fuera del repositorio y con permisos de lectura exclusivos para el usuario del proceso.
+3. Configurá estas variables en el entorno de ejecución de la API:
+   - `ARCA_CUIT`: CUIT emisor, solo dígitos.
+   - `ARCA_CERTIFICATE_PATH`: ruta absoluta al certificado PEM.
+   - `ARCA_PRIVATE_KEY_PATH`: ruta absoluta a la clave privada PEM.
+   - `ARCA_OPENSSL_PATH`: opcional; ejecutable OpenSSL si no está disponible como `openssl` en PATH.
+   - `ARCA_ISSUER_NAME`, `ARCA_ISSUER_ADDRESS`, `ARCA_ISSUER_VAT_CONDITION`: datos legales del emisor requeridos para construir el PDF fiscal.
+4. Reiniciá la API para que lea las variables. No guardes certificados, claves privadas ni archivos `.env` en Git, ni los pegues en tickets o chats.
+5. Aplicá las migraciones pendientes desde `api`:
+   ```powershell
+   npx prisma migrate deploy
+   npx prisma generate
+   ```
+   La migración fiscal inicial es `20261110170000_fiscal_documents`. En instalaciones donde ya fue aplicada, no se vuelve a ejecutar. `migrate deploy` es el comando para entornos desplegados; no uses `migrate dev` en producción.
+6. En Administración > Configuración > ARCA, guardá el punto de venta habilitado en homologación y activá la integración. Probá la conexión y consultá los datos de homologación.
+7. En Administración > Pedidos, confirmá primero el pedido y verificá el cobro por fuera de esta integración. Completá tipo/número de documento y condición IVA del receptor según los datos y catálogos devueltos por ARCA. La emisión es una acción manual y explícita.
+
+### Operación y controles
+
+- La integración está limitada a homologación. No se debe cambiar el entorno ni apuntar a producción.
+- El endpoint de emisión exige confirmación explícita del pago, reserva el número bajo bloqueo transaccional y usa una clave de solicitud idempotente.
+- Si la respuesta de ARCA no permite conocer el resultado con certeza, el documento queda en `UNKNOWN` y bloquea nuevas emisiones para ese punto de venta. Primero se debe usar **Conciliar con ARCA**; no se debe reintentar manualmente a ciegas.
+- El PDF solo se habilita cuando el comprobante figura `AUTHORIZED` y tiene CAE y vencimiento confirmados. El PDF no se genera para solicitudes rechazadas o inciertas.
+- Los comprobantes emitidos en homologación son comprobantes de prueba: no son facturas fiscales válidas para entregar al comprador ni registran una venta real.
+- La habilitación de producción requiere un proceso separado: certificado productivo, punto de venta productivo, revisión fiscal/legal y pruebas de aceptación. Esta versión no ofrece esa activación.
+
+### Endpoints administrativos
+
+Todos requieren sesión administrativa (Bearer token):
+
+- `GET/PUT /api/v1/admin/arca/settings`: consultar y guardar configuración de homologación.
+- `POST /api/v1/admin/arca/settings/test`: validar autenticación WSAA.
+- `GET /api/v1/admin/arca/diagnostics`: consultar puntos de venta, tipos de comprobante, condiciones IVA y último número autorizado; solo lectura.
+- `POST /api/v1/admin/arca/orders/:orderId/invoice-c`: solicitar una Factura C de prueba.
+- `POST /api/v1/admin/arca/documents/:documentId/reconcile`: consultar en ARCA el resultado de una emisión pendiente.
+- `GET /api/v1/admin/arca/documents/:documentId/pdf`: descargar el PDF de una factura autorizada.
