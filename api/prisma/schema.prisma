@@ -107,6 +107,11 @@ model ShippingSettings {
   enviopackEnabled Boolean @default(false)
   enviopackApiKeyEncrypted String?
   enviopackSecretKeyEncrypted String?
+  ocaEnvironment String @default("QA")
+  ocaUsernameEncrypted String?
+  ocaPasswordEncrypted String?
+  ocaCuitEncrypted String?
+  ocaOperativeEncrypted String?
   pickupEnabled Boolean @default(true)
   pickupAddress String @default("Domicilio del vendedor")
   pickupInstructions String @default("La dirección exacta y el horario se coordinarán luego de confirmar el pedido.")
