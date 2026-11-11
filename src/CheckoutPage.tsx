@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { formatPrice, type Product } from './products'
 import './checkout.css'
 
@@ -78,6 +78,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [error, setError] = useState('')
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
   const [coverageNoticeOpen, setCoverageNoticeOpen] = useState(false)
+  const checkoutRequestKey = useRef(crypto.randomUUID())
 
   const cartKey = cart.map((line) => `${line.product.id}:${line.quantity}`).sort().join('|')
   const selectedOption = quote?.options.find((option) => option.key === selectedOptionKey) || null
@@ -202,6 +203,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          checkoutRequestKey: checkoutRequestKey.current,
           customerName,
           customerEmail,
           customerPhone,
