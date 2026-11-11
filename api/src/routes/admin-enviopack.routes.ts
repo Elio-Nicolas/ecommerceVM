@@ -100,15 +100,30 @@ enviopackWebhookRouter.get('/', enviopackWebhookLimiter, async (req, res) => {
   // Primero persistimos el evento; solo después confirmamos HTTP 200.
   // Así no se pierde una notificación si el proceso se reinicia tras el ACK.
   try {
-    const order = await prisma.order.findFirst({ where: { enviopackShipmentId: input.data.id }, select: { id: true } })
-    if (!order) {
-      console.warn('Notificación de Envíopack recibida para un envío no registrado:', input.data.id)
-      res.status(200).send('OK')
-      return
-    }
-    await prisma.enviopackWebhookEvent.create({
-      data: { shipmentId: input.data.id, type: input.data.tipo },
+    const shipment = await prisma.shippingShipment.findFirst({
+      where: { provider: 'ENVIOPACK', externalAdmissionId: input.data.id },
+      select: { id: true },
     })
+    if (shipment) {
+      await prisma.shippingShipmentEvent.create({
+        data: {
+          shipmentId: shipment.id,
+          eventType: input.data.tipo,
+          payload: { shipmentId: input.data.id, webhookType: input.data.tipo },
+        },
+      })
+    } else {
+      // Compatibilidad: los envíos históricos todavía no tienen registro neutral.
+      const order = await prisma.order.findFirst({ where: { enviopackShipmentId: input.data.id }, select: { id: true } })
+      if (!order) {
+        console.warn('Notificación de Envíopack recibida para un envío no registrado:', input.data.id)
+        res.status(200).send('OK')
+        return
+      }
+      await prisma.enviopackWebhookEvent.create({
+        data: { shipmentId: input.data.id, type: input.data.tipo },
+      })
+    }
     res.status(200).send('OK')
   } catch (error) {
     console.error('No se pudo guardar la notificación de Envíopack:', error)

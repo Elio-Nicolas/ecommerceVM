@@ -205,11 +205,13 @@ model ShippingShipmentEvent {
   status String @default("RECEIVED")
   payload Json?
   receivedAt DateTime @default(now())
+  lockedAt DateTime?
   processedAt DateTime?
   attempts Int @default(0)
   lastError String?
   @@unique([shipmentId, externalEventId])
   @@index([status, receivedAt])
+  @@index([status, lockedAt])
   @@index([shipmentId, receivedAt])
 }
 
