@@ -34,6 +34,14 @@ enum ArcaEnvironment {
   HOMOLOGATION
   PRODUCTION
 }
+enum PaymentAttemptStatus {
+  CREATING
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  UNKNOWN
+}
 model AdminUser {
   id String @id @default(uuid())
   email String @unique
@@ -153,12 +161,33 @@ model Order {
   items OrderItem[]
   history OrderStatusHistory[]
   fiscalDocuments FiscalDocument[]
+  paymentAttempts PaymentAttempt[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])
   @@index([customerPhone])
   @@index([customerName])
   @@index([enviopackOrderId])
+}
+model PaymentAttempt {
+  id String @id @default(uuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  provider String @default("MERCADO_PAGO")
+  requestKey String @unique
+  providerOrderId String? @unique
+  checkoutUrl String?
+  amountArs Int
+  currencyCode String @default("ARS")
+  status PaymentAttemptStatus @default(CREATING)
+  statusDetail String?
+  approvedAt DateTime?
+  responsePayload Json?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
 }
 model FiscalDocument {
   id String @id @default(uuid())
