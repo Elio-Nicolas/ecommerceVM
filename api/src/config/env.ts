@@ -4,6 +4,10 @@ const optionalTrimmedString = (minimumLength: number) => z.preprocess(
   (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
   z.string().trim().min(minimumLength).optional(),
 )
+const optionalHttpsUrl = z.preprocess(
+  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+  z.string().trim().url().refine((value) => new URL(value).protocol === 'https:', 'La URL pública debe usar HTTPS.').optional(),
+)
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -22,8 +26,8 @@ const envSchema = z.object({
   ARCA_OPENSSL_PATH: z.string().min(1).default('openssl'),
   MP_ACCESS_TOKEN: optionalTrimmedString(20),
   MP_WEBHOOK_SECRET: optionalTrimmedString(20),
-  PUBLIC_APP_URL: optionalTrimmedString(8),
-  PUBLIC_API_URL: optionalTrimmedString(8),
+  PUBLIC_APP_URL: optionalHttpsUrl,
+  PUBLIC_API_URL: optionalHttpsUrl,
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(12).optional(),
   SUPABASE_URL: z.string().url().optional(),
