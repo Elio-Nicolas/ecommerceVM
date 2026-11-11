@@ -188,3 +188,15 @@ El contrato neutral ahora contempla también operaciones de ciclo de vida del en
 La ruta de webhook sigue siendo específica de Envíopack porque el protocolo de notificación y la tabla de eventos actuales también lo son. No se simula que OCA tenga el mismo webhook; su seguimiento se integrará según las operaciones habilitadas por OCA.
 
 Este bloque tampoco requiere migración ni cambia el flujo de checkout. La administración todavía utiliza las rutas históricas de Envíopack; el próximo paso es normalizar persistencia/configuración y luego migrar la UI sin perder compatibilidad.
+
+### Persistencia neutral incorporada (11/11/2026)
+
+Se agregó una migración aditiva para introducir:
+
+- `ShippingShipment`: registro por pedido/proveedor, estado, identificadores de admisión y tracking, servicio, bultos declarados, etiqueta PDF y errores recuperables.
+- `ShippingShipmentEvent`: eventos asociados al envío, identificador externo opcional, payload JSON, estado de procesamiento, intentos y último error.
+- Restricción única por pedido/proveedor para impedir dos admisiones del mismo proveedor para un pedido; índices para tracking y cola de eventos.
+
+La relación con `Order` es opcional desde el lado del pedido y no se crean registros retroactivos. No se modifican ni eliminan las columnas `enviopack*`, la tabla `EnviopackWebhookEvent` ni etiquetas históricas. La migración no habilita OCA ni cambia el checkout: prepara el almacenamiento para adaptar el flujo actual sin pérdida de datos.
+
+La tabla de eventos neutral no reemplaza todavía la cola del webhook de Envíopack. Esa migración operativa se hará cuando el procesamiento existente pueda trasladarse y probarse sin perder reintentos ni eventos pendientes.
