@@ -1,38 +1,41 @@
-# ARCA WSFEv1: consultas de solo lectura
+# ARCA WSFEv1
 
-## Alcance
+## Estado y alcance
 
-El cliente está implementado en `src/services/arca-wsfe-readonly.ts` y reutiliza el ticket de acceso de `src/services/arca-wsaa.ts`.
+La integración WSFEv1 está conectada al módulo administrativo y, en esta versión, opera exclusivamente contra homologación.
 
-Operaciones habilitadas en esta etapa:
+### Consultas de solo lectura
 
 - `FEParamGetPtosVenta`: consulta puntos de venta y su estado.
 - `FEParamGetTiposCbte`: consulta tipos de comprobante.
-- `FEParamGetCondicionIvaReceptor`: consulta condiciones de IVA del receptor; permite filtrar por clase A, ALEY, B, C o 49.
-- `FECompUltimoAutorizado`: consulta el último número autorizado para un punto de venta y tipo de comprobante.
+- `FEParamGetCondicionIvaReceptor`: consulta condiciones de IVA del receptor.
+- `FECompUltimoAutorizado`: consulta el último número autorizado.
 
-No se implementan ni exponen `FECAESolicitar`, notas de crédito/débito ni ninguna operación que autorice comprobantes. Este módulo no crea facturas ni modifica pedidos o documentos fiscales.
+### Operaciones de comprobantes
+
+- `FECAESolicitar`: emisión manual de Factura C (tipo 11), luego de la confirmación explícita del pago por parte del administrador.
+- `FECompConsultar`: conciliación del comprobante exacto reservado cuando la emisión devuelve un resultado incierto.
+
+No se emiten comprobantes automáticamente al crear o confirmar un pedido. Notas de crédito y débito no están implementadas.
 
 ## Entornos
 
 - Homologación: `https://wswhomo.afip.gov.ar/wsfev1/service.asmx`
 - Producción: `https://servicios1.afip.gov.ar/wsfev1/service.asmx`
 
-El entorno se recibe explícitamente en cada función y debe coincidir con el entorno usado para obtener el ticket WSAA. No se infiere desde `NODE_ENV`.
+Las rutas administrativas fijan el entorno en homologación y validan que la configuración persistida también sea HOMOLOGATION. No se infiere el entorno desde `NODE_ENV`.
 
-## Funciones
+## Seguridad e idempotencia
 
-- `getArcaPointsOfSale(environment)`
-- `getArcaVoucherTypes(environment)`
-- `getArcaIvaReceiverConditions(environment, voucherClass?)`
-- `getArcaLastAuthorizedVoucher(environment, pointOfSale, voucherType)`
-
-El filtro opcional `voucherClass` acepta únicamente los valores documentados por WSFEv1 v4.1: `A`, `ALEY`, `B`, `C` y `49`.
-
-Las funciones validan parámetros locales, aplican timeout a la llamada SOAP y convierten errores SOAP/WSFE en excepciones sin registrar token, firma ni contenido de autenticación.
+- La emisión requiere sesión administrativa, pedido confirmado/en preparación/enviado/entregado, confirmación explícita del pago y credenciales de homologación.
+- Un bloqueo transaccional por punto de venta y tipo de comprobante serializa la reserva del número.
+- Una clave de solicitud UUID evita repetir una misma petición.
+- Si el resultado de la emisión es incierto, el documento queda en `UNKNOWN` y bloquea nuevas emisiones hasta conciliar.
+- Si ARCA confirma autorización, se conserva CAE y vencimiento. Si confirma que el comprobante no existe (error 602) o rechaza la solicitud, el intento queda en `REJECTED`; el número puede volver a utilizarse en un nuevo intento porque ARCA no lo consumió.
+- La base mantiene unicidad para números de comprobante activos/autorizados, pero permite conservar múltiples intentos rechazados del mismo número.
 
 ## Validación pendiente
 
-El CI valida generación de Prisma y compilación TypeScript. La consulta real de punta a punta requiere un certificado X.509 de homologación habilitado para WSFE y configurado de forma segura en el entorno de la API. No se deben copiar certificados ni claves privadas al repositorio ni compartirlos por chat.
+El CI valida generación de Prisma y compilación TypeScript. La operación real requiere un certificado X.509 de homologación asociado a WSFE, CUIT y punto de venta configurados en ARCA. La descarga del PDF requiere además los datos legales del emisor.
 
-La habilitación de producción y cualquier operación emisora quedan fuera de esta etapa y requieren una decisión explícita posterior.
+Los comprobantes de homologación son pruebas, no facturas fiscales válidas para entregar al comprador. La producción y cualquier emisión automática quedan fuera del alcance actual y requieren una decisión explícita posterior.
