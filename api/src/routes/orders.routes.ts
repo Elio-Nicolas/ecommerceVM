@@ -112,6 +112,16 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
     }
   }
 
+  if (input.deliveryMethod === 'ENVIOPACK') {
+    res.status(503).json({
+      error: {
+        code: 'SHIPPING_PROVIDER_MIGRATION_PENDING',
+        message: 'Los envíos nacionales están en proceso de migración a OCA. Elegí retiro o entrega local si están disponibles.',
+      },
+    })
+    return
+  }
+
   try {
     if (input.deliveryMethod === 'ENVIOPACK' && (!input.customerEmail || input.customerEmail.length > 100)) {
       throw new OrderConflictError('Para realizar un envío por Envíopack necesitamos un correo electrónico válido de hasta 100 caracteres.')
