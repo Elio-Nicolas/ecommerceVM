@@ -342,7 +342,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <div className="checkout-fields">
               <label>Nombre y apellido<input required minLength={2} maxLength={120} autoComplete="name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
               <label>Teléfono / WhatsApp<input required type="tel" minLength={8} maxLength={30} autoComplete="tel" placeholder="Ej. 2657 123456" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} /></label>
-              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'ENVIOPACK' ? <span>(obligatorio para el envío)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'ENVIOPACK' || paymentsEnabled} maxLength={deliveryMethod === 'ENVIOPACK' || paymentsEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
+              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'ENVIOPACK' || paymentsEnabled ? <span>(obligatorio para el envío y el pago)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'ENVIOPACK' || paymentsEnabled} maxLength={deliveryMethod === 'ENVIOPACK' || paymentsEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
             </div>
           </section>
           <section className="checkout-card">
