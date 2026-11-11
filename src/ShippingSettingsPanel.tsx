@@ -5,6 +5,8 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replac
 type ShippingSettings = {
   enviopackEnabled: boolean
   enviopackConfigured: boolean
+  ocaEnvironment: 'QA' | 'PRODUCTION'
+  ocaConfigured: boolean
   pickupEnabled: boolean
   pickupAddress: string
   pickupInstructions: string
@@ -18,6 +20,8 @@ type ShippingSettings = {
 const defaults: ShippingSettings = {
   enviopackEnabled: false,
   enviopackConfigured: false,
+  ocaEnvironment: 'QA',
+  ocaConfigured: false,
   pickupEnabled: true,
   pickupAddress: 'Domicilio del vendedor',
   pickupInstructions: 'La dirección exacta y el horario se coordinarán luego de confirmar el pedido.',
@@ -32,6 +36,11 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
   const [settings, setSettings] = useState<ShippingSettings>(defaults)
   const [apiKey, setApiKey] = useState('')
   const [secretKey, setSecretKey] = useState('')
+  const [ocaUsername, setOcaUsername] = useState('')
+  const [ocaPassword, setOcaPassword] = useState('')
+  const [ocaCuit, setOcaCuit] = useState('')
+  const [ocaOperative, setOcaOperative] = useState('')
+  const [clearOcaCredentials, setClearOcaCredentials] = useState(false)
   const [postalCodesText, setPostalCodesText] = useState('5730')
   const [clearCredentials, setClearCredentials] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -107,6 +116,10 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
       localDeliveryInternalCostArs: settings.localDeliveryInternalCostArs === null ? null : Number(settings.localDeliveryInternalCostArs),
       ...(apiKey.trim() && secretKey.trim() ? { enviopackApiKey: apiKey.trim(), enviopackSecretKey: secretKey.trim() } : {}),
       ...(clearCredentials ? { clearEnviopackCredentials: true } : {}),
+      ...(ocaUsername.trim() && ocaPassword.trim() && ocaCuit.trim() && ocaOperative.trim()
+        ? { ocaUsername: ocaUsername.trim(), ocaPassword: ocaPassword.trim(), ocaCuit: ocaCuit.trim(), ocaOperative: ocaOperative.trim() }
+        : {}),
+      ...(clearOcaCredentials ? { clearOcaCredentials: true } : {}),
     }
     try {
       const result = await request<{ data: ShippingSettings }>('/admin/shipping-settings', {
@@ -118,6 +131,11 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
       setApiKey('')
       setSecretKey('')
       setClearCredentials(false)
+      setOcaUsername('')
+      setOcaPassword('')
+      setOcaCuit('')
+      setOcaOperative('')
+      setClearOcaCredentials(false)
       setNotice('Configuración de envíos guardada. Los cambios ya están disponibles en el checkout.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.')
@@ -146,6 +164,36 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
           <div className="shipping-credential-status"><span className={settings.enviopackConfigured && !clearCredentials ? 'shipping-status-dot is-ready' : 'shipping-status-dot'} />{settings.enviopackConfigured && !clearCredentials ? 'Credenciales almacenadas' : 'Credenciales pendientes'}{settings.enviopackConfigured && <button type="button" className="archive-action" onClick={() => { const next = !clearCredentials; setClearCredentials(next); setApiKey(''); setSecretKey(''); if (next) update('enviopackEnabled', false) }}>{clearCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales'}</button>}</div>
           <div className="admin-category-actions"><button type="button" className="admin-quiet-button" onClick={() => void testConnection()} disabled={testing}>{testing ? 'Probando conexión...' : 'Probar conexión con Envíopack'}</button></div>
           <p className="shipping-settings-help">Para cotizar también necesitás configurar un depósito predeterminado en la sección “Depósitos de despacho” y completar peso y dimensiones en cada producto.</p>
+        </section>
+
+        <section className="shipping-setting-section">
+          <div className="shipping-setting-title">
+            <div>
+              <span className="admin-kicker">TRANSPORTE NACIONAL</span>
+              <h3>OCA e-Pak</h3>
+              <p>Prepará la cuenta de OCA. Las cuatro credenciales se cifran en el backend y nunca se muestran nuevamente.</p>
+            </div>
+            <span className={settings.ocaConfigured && !clearOcaCredentials ? 'shipping-credential-status' : 'shipping-credential-status'}>
+              {settings.ocaConfigured && !clearOcaCredentials ? 'Cuenta configurada' : 'Cuenta pendiente'}
+            </span>
+          </div>
+          <div className="admin-form-grid">
+            <label>Entorno
+              <select value={settings.ocaEnvironment} onChange={(event) => update('ocaEnvironment', event.target.value as 'QA' | 'PRODUCTION')}>
+                <option value="QA">Pruebas (QA)</option>
+                <option value="PRODUCTION">Producción</option>
+              </select>
+              <small>Producción queda seleccionada solo cuando OCA habilite la cuenta. Esto no activa envíos.</small>
+            </label>
+            <label>Usuario e-Pak<input type="text" autoComplete="off" value={ocaUsername} onChange={(event) => setOcaUsername(event.target.value)} placeholder={settings.ocaConfigured && !clearOcaCredentials ? 'Credencial guardada · dejar vacío para conservar' : 'Usuario asignado por OCA'} /></label>
+            <label>Contraseña e-Pak<input type="password" autoComplete="new-password" value={ocaPassword} onChange={(event) => setOcaPassword(event.target.value)} placeholder={settings.ocaConfigured && !clearOcaCredentials ? 'Credencial guardada · dejar vacío para conservar' : 'Contraseña asignada por OCA'} /></label>
+            <label>CUIT registrado en OCA<input inputMode="numeric" maxLength={11} value={ocaCuit} onChange={(event) => setOcaCuit(event.target.value.replace(/\D/g, '').slice(0, 11))} placeholder="11 dígitos" /></label>
+            <label>Número de operativa<input value={ocaOperative} onChange={(event) => setOcaOperative(event.target.value)} placeholder="Operativa confirmada por OCA" /></label>
+          </div>
+          <div className="shipping-settings-help">
+            La integración no se habilita al guardar estos datos. Primero deben confirmarse con OCA la operativa, modalidad de despacho desde Villa Mercedes y acceso QA. No ingreses aquí credenciales de Envíopack.
+          </div>
+          {settings.ocaConfigured && <div className="admin-category-actions"><button type="button" className="archive-action" onClick={() => { setClearOcaCredentials((value) => !value); setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative('') }}>{clearOcaCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales OCA'}</button></div>}
         </section>
 
         <section className="shipping-setting-section">
