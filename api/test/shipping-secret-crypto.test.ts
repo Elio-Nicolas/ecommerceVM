@@ -32,7 +32,7 @@ test('rechaza una clave incorrecta, datos alterados y formatos inválidos', () =
     () => decryptShippingSecret(encrypted, { jwtSecret, shippingEncryptionKey: 'another-dedicated-key-with-enough-length' }),
   )
   const [version, iv, tag, ciphertext] = encrypted.split('.')
-  const altered = `${version}.${iv}.${tag}.${ciphertext.slice(0, -1)}${ciphertext.endsWith('A') ? 'B' : 'A'}`
+  const altered = `${version}.${iv}.${tag}.${ciphertext.startsWith('A') ? 'B' : 'A'}${ciphertext.slice(1)}`
   assert.throws(() => decryptShippingSecret(altered, { jwtSecret, shippingEncryptionKey: dedicatedKey }))
   assert.throws(() => decryptShippingSecret('v2.invalid', { jwtSecret, shippingEncryptionKey: dedicatedKey }), /formato válido/)
 })
