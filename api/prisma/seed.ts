@@ -40,14 +40,14 @@ async function main() {
   for (const group of catalog) {
     const category = await prisma.category.upsert({
       where: { slug: group.slug },
-      update: { name: group.category },
+      update: {},
       create: { name: group.category, slug: group.slug },
     })
 
     for (const item of group.products) {
       await prisma.product.upsert({
         where: { sku: item.sku },
-        update: { ...item, categoryId: category.id, status: 'ACTIVE' },
+        update: {},
         create: { ...item, categoryId: category.id, status: 'ACTIVE' },
       })
     }

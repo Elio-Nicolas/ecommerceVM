@@ -21,7 +21,7 @@ import { adminArcaRouter } from './routes/admin-arca.routes'
 export const app = express()
 app.disable('x-powered-by')
 app.use(helmet())
-app.use(cors({ origin: env.CORS_ORIGIN.split(',').map((origin) => origin.trim()) }))
+app.use(cors({ origin: env.CORS_ORIGIN }))
 app.use(express.json({ limit: '1mb' }))
 app.get('/api/v1', (_req, res) => { res.json({ service: 'ecommercevm-api', version: '1.0.0' }) })
 app.use('/api/v1/health', healthRouter)
