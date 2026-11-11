@@ -42,6 +42,10 @@ const createOrderSchema = z.object({
   }),
 })
 
+function isLegacyShippingMethod(method: string): boolean {
+  return method === 'ENVIOPACK'
+}
+
 class OrderConflictError extends Error {
   constructor(message: string) {
     super(message)
