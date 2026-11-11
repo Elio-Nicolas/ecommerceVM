@@ -3,7 +3,7 @@ import test from 'node:test'
 import { parseArcaVoucherConsultResponse } from '../src/services/arca-wsfe-consult-response'
 
 const expected = { pointOfSale: 4, voucherType: 11, voucherNumber: 125 }
-const response = (overrides: Partial<Record<string, string>> = '') => {
+const response = (overrides: Record<string, string> = {}) => {
   const values = {
     Resultado: 'A',
     CodAutorizacion: '74123456789012',
@@ -12,10 +12,11 @@ const response = (overrides: Partial<Record<string, string>> = '') => {
     PtoVta: '4',
     CbteDesde: '125',
     CbteFch: '20261201',
-    ...(typeof overrides === 'string' ? {} : overrides),
+    ...overrides,
   }
-  const tags = Object.entries(values).map(([tag, value]) => \`<\${tag}>\${value}</\${tag}>\`).join('')
-  return \`<soap:Envelope><soap:Body><FECompConsultarResponse><FECompConsultarResult><ResultGet>\${tags}</ResultGet></FECompConsultarResult></FECompConsultarResponse></soap:Body></soap:Envelope>\`
+  const tags = Object.entries(values).map(([tag, value]) => '<' + tag + '>' + value + '</' + tag + '>').join('')
+  return '<soap:Envelope><soap:Body><FECompConsultarResponse><FECompConsultarResult><ResultGet>' +
+    tags + '</ResultGet></FECompConsultarResult></FECompConsultarResponse></soap:Body></soap:Envelope>'
 }
 
 test('recupera una factura autorizada cuando identidad, CAE y vencimiento coinciden', () => {
