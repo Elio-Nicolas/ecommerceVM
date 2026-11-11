@@ -49,9 +49,9 @@ function readMessages(xml: string, group: 'Err' | 'Obs' | 'Evt'): string[] {
   })
 }
 
-function readIdentity(detail: string): ArcaInvoiceCIdentity | null {
-  const pointOfSale = Number(readTag(detail, 'PtoVta'))
-  const voucherType = Number(readTag(detail, 'CbteTipo'))
+function readIdentity(header: string, detail: string): ArcaInvoiceCIdentity | null {
+  const pointOfSale = Number(readTag(header, 'PtoVta'))
+  const voucherType = Number(readTag(header, 'CbteTipo'))
   const voucherNumber = Number(readTag(detail, 'CbteDesde'))
   const voucherNumberTo = Number(readTag(detail, 'CbteHasta'))
   if (![pointOfSale, voucherType, voucherNumber, voucherNumberTo].every(Number.isSafeInteger)) return null
@@ -89,7 +89,7 @@ export function parseArcaInvoiceCResponse(
   const detail = readBlocks(readTag(result, 'FeDetResp') ?? '', 'FECAEDetResponse')[0] ?? ''
   const headerOutcome = readTag(header, 'Resultado')
   const detailOutcome = readTag(detail, 'Resultado')
-  const identity = readIdentity(detail)
+  const identity = readIdentity(header, detail)
   const cae = readTag(detail, 'CAE')
   const caeExpiresAt = parseArcaDate(readTag(detail, 'CAEFchVto'))
   const errors = readMessages(result, 'Err')
