@@ -27,7 +27,7 @@ test('rechaza firmas alteradas o vinculadas a otra orden o request', () => {
   const signature = signed(String(now))
   assert.equal(verifyMercadoPagoWebhookSignature(signature, requestId, 'other-order', secret, now), false)
   assert.equal(verifyMercadoPagoWebhookSignature(signature, 'other-request', dataId, secret, now), false)
-  assert.equal(verifyMercadoPagoWebhookSignature(signature.replace(/v1=./, 'v1=f'), requestId, dataId, secret, now), false)
+  assert.equal(verifyMercadoPagoWebhookSignature(signature.replace(/v1=[a-f0-9]{64}/, 'v1=' + '0'.repeat(64)), requestId, dataId, secret, now), false)
 })
 
 test('rechaza firmas vencidas, timestamps inválidos y secretos ausentes', () => {
