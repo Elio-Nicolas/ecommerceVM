@@ -5,11 +5,10 @@ import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../src/services/p
 test('acepta importes enteros en ARS como número o texto', () => {
   assert.equal(parsePaymentAmount(12500), 12500)
   assert.equal(parsePaymentAmount('12500'), 12500)
-  assert.equal(parsePaymentAmount('12500.000001'), 12500)
 })
 
 test('rechaza importes negativos, fraccionarios, infinitos y no numéricos', () => {
-  for (const value of [-1, '-1', 10.5, '10.5', Infinity, 'NaN', null, undefined, {}, '']) {
+  for (const value of [-1, '-1', 10.5, '10.5', '12500.000001', Infinity, 'NaN', null, undefined, {}, '']) {
     assert.equal(parsePaymentAmount(value), null, String(value))
   }
 })
