@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: tu-tiendavm-api
+    runtime: node
+    plan: starter
+    region: ohio
+    rootDir: api
+    buildCommand: npm install && npm run prisma:generate && npm run build
+    preDeployCommand: npm run prisma:deploy
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SHIPPING_ENCRYPTION_KEY
+        generateValue: true
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: product-images
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: PICKUP_ENABLED
+        value: "true"
+      - key: PICKUP_ADDRESS
+        sync: false
+      - key: PICKUP_INSTRUCTIONS
+        sync: false
+      - key: LOCAL_DELIVERY_ENABLED
+        value: "false"
+      - key: LOCAL_DELIVERY_POSTAL_CODES
+        value: "5730"
