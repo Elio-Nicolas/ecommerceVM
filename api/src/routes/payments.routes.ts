@@ -174,7 +174,6 @@ function verifyWebhookSignature(signature: string, requestId: string, dataId: st
 async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<ReturnType<typeof refreshMercadoPagoOrder>>) {
   const attempt = await prisma.paymentAttempt.findUnique({
     where: { providerOrderId },
-    include: { order: true },
   })
   if (!attempt) return false
 
@@ -186,20 +185,33 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
     && totalAmount === attempt.amountArs
 
   let nextStatus: PaymentAttemptStatus = 'UNKNOWN'
-  if (matchesOrder && payload.status === 'processed' && paidAmount === attempt.amountArs) {
+  if (matchesOrder && payload.status === 'processed' && payload.status_detail === 'partially_refunded') {
+    nextStatus = 'PARTIALLY_REFUNDED'
+  } else if (matchesOrder && payload.status === 'processed' && paidAmount === attempt.amountArs) {
     nextStatus = 'APPROVED'
+  } else if (matchesOrder && payload.status === 'refunded') {
+    nextStatus = 'REFUNDED'
   } else if (matchesOrder && payload.status === 'canceled') {
     nextStatus = 'CANCELLED'
-  } else if (matchesOrder && ['created', 'action_required', 'processing'].includes(String(payload.status))) {
-    nextStatus = 'PENDING'
-  } else if (matchesOrder && ['rejected', 'failed'].includes(String(payload.status))) {
+  } else if (matchesOrder && payload.status === 'failed') {
     nextStatus = 'REJECTED'
+  } else if (matchesOrder && ['created', 'processing'].includes(String(payload.status))) {
+    nextStatus = 'PENDING'
   }
 
   await prisma.$transaction(async (tx) => {
     const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
     if (!current) return
-    const effectiveStatus = current.status === 'APPROVED' && nextStatus !== 'APPROVED' ? 'APPROVED' : nextStatus
+    const terminalPaymentStatuses: PaymentAttemptStatus[] = ['REFUNDED', 'CANCELLED', 'REJECTED']
+    const effectiveStatus = current.status === 'REFUNDED'
+      ? 'REFUNDED'
+      : current.status === 'PARTIALLY_REFUNDED' && nextStatus !== 'REFUNDED'
+        ? 'PARTIALLY_REFUNDED'
+        : current.status === 'APPROVED' && !['REFUNDED', 'PARTIALLY_REFUNDED', 'CANCELLED'].includes(nextStatus)
+          ? 'APPROVED'
+          : terminalPaymentStatuses.includes(current.status) && ['PENDING', 'UNKNOWN'].includes(nextStatus)
+            ? current.status
+            : nextStatus
     await tx.paymentAttempt.update({
       where: { id: current.id },
       data: {
