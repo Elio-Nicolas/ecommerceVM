@@ -164,8 +164,6 @@ function verifyWebhookSignature(signature: string, requestId: string, dataId: st
   const timestamp = parts.get('ts')
   const receivedHash = parts.get('v1')
   if (!timestamp || !receivedHash || !/^[a-f0-9]{64}$/i.test(receivedHash)) return false
-  const timestampMs = Number(timestamp)
-  if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) return false
   const manifest = 'id:' + dataId.toLowerCase() + ';request-id:' + requestId + ';ts:' + timestamp + ';'
   const expectedHash = createHmac('sha256', env.MP_WEBHOOK_SECRET).update(manifest).digest()
   const suppliedHash = Buffer.from(receivedHash, 'hex')
