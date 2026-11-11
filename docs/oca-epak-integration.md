@@ -8,7 +8,9 @@ La tienda vende desde Villa Mercedes, San Luis. El método actual de Envíopack 
 
 ## Lo que confirma la documentación oficial
 
-Documentación: https://developers.oca.com.ar/epak.html
+Documentación oficial: https://developers.oca.com.ar/epak.html  
+Servicio de QA: https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx  
+Servicio de producción: https://webservice.oca.com.ar/ePak_tracking/Oep_TrackEPak.asmx
 
 - Los Web Services e-Pak responden en XML y publican el contrato WSDL agregando `?wsdl` a la URL del servicio.
 - Cotización: `Tarifar_Envio_Corporativo`. Requiere CUIT registrado en OCA, número de operativa, peso total en kg, volumen total, CP de origen, CP de destino, cantidad de paquetes y valor declarado.
