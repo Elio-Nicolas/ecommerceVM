@@ -11,13 +11,13 @@ Copiar .env.example a .env y completar JWT_SECRET con un secreto aleatorio de al
 Desde esta carpeta:
 ```powershell
 npm install
+npm run prisma:deploy
 npm run prisma:generate
-npm run prisma:migrate -- --name admin_auth
 npm run db:seed
 npm run dev
 ```
 
-La migración agrega la tabla AdminUser. El seed crea o actualiza el administrador inicial si las dos variables ADMIN están definidas.
+El repositorio incluye el historial completo de migraciones, desde el esquema inicial de catálogo hasta pedidos, logística y facturación. Para una base nueva, `prisma:deploy` crea el esquema en el orden correcto; no generes otra migración `admin_auth`. El seed crea o actualiza el administrador inicial si las dos variables ADMIN están definidas.
 
 ## Endpoints públicos
 - GET /api/v1
