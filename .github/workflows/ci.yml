@@ -51,4 +51,5 @@ jobs:
       - run: npm install
       - run: npm run prisma:deploy
       - run: npm run prisma:generate
+      - run: npm test
       - run: npm run build

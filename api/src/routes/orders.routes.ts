@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import { Prisma } from '@prisma/client'
@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { getShippingSettings } from '../services/shipping-settings'
 import { shippingCartFingerprint } from '../services/shipping-fingerprint'
+import { createCheckoutFingerprint } from '../services/order-checkout-fingerprint'
 
 export const ordersRouter = Router()
 
@@ -80,12 +81,7 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
 
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
-  const checkoutFingerprint = input.checkoutRequestKey
-    ? createHash('sha256').update(JSON.stringify({
-        ...input,
-        items: [...input.items].sort((a, b) => a.productId.localeCompare(b.productId)),
-      })).digest('hex')
-    : null
+  const checkoutFingerprint = input.checkoutRequestKey ? createCheckoutFingerprint(input) : null
 
   if (input.checkoutRequestKey) {
     const previousOrder = await prisma.order.findUnique({
