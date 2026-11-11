@@ -17,6 +17,7 @@ const envSchema = z.object({
     .pipe(z.array(z.string().url()).min(1)),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
+  SHIPPING_ENCRYPTION_KEY: optionalTrimmedString(32),
   ARCA_CUIT: z.string().regex(/^\d{11}$/).optional(),
   ARCA_ISSUER_NAME: optionalTrimmedString(2),
   ARCA_ISSUER_ADDRESS: optionalTrimmedString(5),
