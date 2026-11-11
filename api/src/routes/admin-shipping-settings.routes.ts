@@ -61,7 +61,7 @@ const schema = z.object({
   ocaEnvironment: z.enum(['QA', 'PRODUCTION']).optional(),
   ocaUsername: z.string().trim().min(1).max(200).optional(),
   ocaPassword: z.string().trim().min(1).max(300).optional(),
-  ocaCuit: z.string().trim().regex(/^\\d{11}$/, 'El CUIT OCA debe tener 11 dígitos.').optional(),
+  ocaCuit: z.string().trim().regex(/^\d{11}$/, 'El CUIT OCA debe tener 11 dígitos.').optional(),
   ocaOperative: z.string().trim().min(1).max(100).optional(),
   clearOcaCredentials: z.boolean().optional(),
   pickupEnabled: z.boolean(),
