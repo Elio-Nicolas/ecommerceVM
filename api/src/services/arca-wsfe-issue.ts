@@ -1,6 +1,7 @@
 import type { ArcaEnvironment } from './arca-wsaa'
 import { env } from '../config/env'
 import { getArcaAccessTicket } from './arca-wsaa'
+import { parseArcaInvoiceCResponse, type ArcaInvoiceCResult } from './arca-wsfe-response'
 
 const WSFE_URLS: Record<ArcaEnvironment, string> = {
   HOMOLOGATION: 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
@@ -18,30 +19,8 @@ export interface ArcaInvoiceCRequest {
   totalAmountArs: number
 }
 
-export interface ArcaInvoiceCResult {
-  outcome: 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'
-  cae: string | null
-  caeExpiresAt: Date | null
-  responsePayload: Record<string, unknown>
-  message: string
-}
-
 function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
-}
-
-function decodeXml(value: string): string {
-  return value.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
-}
-
-function readTag(xml: string, tag: string): string | null {
-  const match = xml.match(new RegExp(`<(?:[\\w.-]+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${tag}\\s*>`, 'i'))
-  return match ? decodeXml(match[1].trim()) : null
-}
-
-function readBlocks(xml: string, tag: string): string[] {
-  const matches = xml.matchAll(new RegExp(`<(?:[\\w.-]+:)?${tag}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${tag}\\s*>`, 'gi'))
-  return Array.from(matches, (match) => match[1])
 }
 
 function arcaDate(date: Date): string {
@@ -51,19 +30,6 @@ function arcaDate(date: Date): string {
   }).formatToParts(date)
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${values.year}${values.month}${values.day}`
-}
-
-function parseArcaDate(value: string | null): Date | null {
-  if (!value || !/^\d{8}$/.test(value)) return null
-  return new Date(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}T00:00:00-03:00`)
-}
-
-function readMessages(xml: string, group: 'Err' | 'Obs' | 'Evt'): string[] {
-  return readBlocks(xml, group).map((block) => {
-    const code = readTag(block, 'Code')
-    const message = readTag(block, 'Msg')
-    return [code ? `[${code}]` : '', message ?? ''].filter(Boolean).join(' ')
-  })
 }
 
 export async function requestArcaInvoiceC(
@@ -127,75 +93,7 @@ export async function requestArcaInvoiceC(
     signal: AbortSignal.timeout(25_000),
   })
   const responseXml = await response.text()
-  const fault = readTag(responseXml, 'faultstring')
-  if (fault) {
-    return {
-      outcome: 'UNKNOWN',
-      cae: null,
-      caeExpiresAt: null,
-      responsePayload: { soapFault: fault, httpStatus: response.status },
-      message: `ARCA devolvió un error SOAP y no se puede asegurar el resultado: ${fault}`,
-    }
-  }
-  if (!response.ok) {
-    return {
-      outcome: 'UNKNOWN',
-      cae: null,
-      caeExpiresAt: null,
-      responsePayload: { httpStatus: response.status, responseReceived: Boolean(responseXml) },
-      message: `ARCA respondió HTTP ${response.status}; el resultado queda pendiente de conciliación.`,
-    }
-  }
-
-  const result = readTag(responseXml, 'FECAESolicitarResult') ?? ''
-  const header = readTag(result, 'FeCabResp') ?? ''
-  const detail = readBlocks(readTag(result, 'FeDetResp') ?? '', 'FECAEDetResponse')[0] ?? ''
-  const headerOutcome = readTag(header, 'Resultado')
-  const detailOutcome = readTag(detail, 'Resultado')
-  const cae = readTag(detail, 'CAE')
-  const caeExpiresAt = parseArcaDate(readTag(detail, 'CAEFchVto'))
-  const errors = readMessages(result, 'Err')
-  const observations = readMessages(result, 'Obs')
-  const events = readMessages(result, 'Evt')
-  const responsePayload = {
-    headerOutcome,
-    detailOutcome,
-    errors,
-    observations,
-    events,
-    cae,
-    caeExpiresAt: caeExpiresAt?.toISOString() ?? null,
-  }
-
-  if ((headerOutcome === 'A' || headerOutcome === 'P') && detailOutcome === 'A' && cae && caeExpiresAt) {
-    return {
-      outcome: 'AUTHORIZED',
-      cae,
-      caeExpiresAt,
-      responsePayload,
-      message: observations.length
-        ? `Factura C autorizada con observaciones: ${observations.join('; ')}`
-        : 'Factura C autorizada por ARCA.',
-    }
-  }
-
-  if (headerOutcome === 'R' || detailOutcome === 'R') {
-    return {
-      outcome: 'REJECTED',
-      cae: null,
-      caeExpiresAt: null,
-      responsePayload,
-      message: errors.length ? `ARCA rechazó la factura: ${errors.join('; ')}` : 'ARCA rechazó la factura.',
-    }
-  }
-
-  return {
-    outcome: 'UNKNOWN',
-    cae: null,
-    caeExpiresAt: null,
-    responsePayload,
-    message: 'ARCA respondió sin una autorización o rechazo concluyente. No vuelvas a emitir hasta conciliar el comprobante.',
-  }
+  return parseArcaInvoiceCResponse(responseXml, response.status)
 }
 
 export function buildArcaInvoiceCRequestPayload(input: ArcaInvoiceCRequest): Record<string, unknown> {
