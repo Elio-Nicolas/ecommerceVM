@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { Router } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import { Prisma } from '@prisma/client'
@@ -18,6 +18,7 @@ const createOrderLimiter = rateLimit({
 })
 
 const createOrderSchema = z.object({
+  checkoutRequestKey: z.string().uuid().optional(),
   customerName: z.string().trim().min(2).max(120),
   customerEmail: z.union([z.string().trim().email().max(160), z.literal('')]).optional().transform((value) => value || null),
   customerPhone: z.string().trim().min(8).max(30).regex(/^[+0-9\s().-]+$/, 'Ingresá un teléfono válido.').refine((value) => value.replace(/\D/g, '').length >= 8, 'Ingresá al menos 8 dígitos.'),
@@ -75,6 +76,42 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
 
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
+  const checkoutFingerprint = input.checkoutRequestKey
+    ? createHash('sha256').update(JSON.stringify({
+        ...input,
+        items: [...input.items].sort((a, b) => a.productId.localeCompare(b.productId)),
+      })).digest('hex')
+    : null
+
+  if (input.checkoutRequestKey) {
+    const previousOrder = await prisma.order.findUnique({
+      where: { checkoutRequestKey: input.checkoutRequestKey },
+      include: { items: true },
+    })
+    if (previousOrder) {
+      if (previousOrder.checkoutFingerprint !== checkoutFingerprint) {
+        res.status(409).json({ error: { code: 'ORDER_IDEMPOTENCY_CONFLICT', message: 'Esta solicitud ya registró un pedido con datos diferentes. Actualizá el checkout antes de volver a intentar.' } })
+        return
+      }
+      res.setHeader('Cache-Control', 'no-store')
+      res.status(200).json({
+        data: {
+          id: previousOrder.id,
+          code: previousOrder.code,
+          status: previousOrder.status,
+          subtotalArs: previousOrder.subtotalArs,
+          shippingCostArs: previousOrder.shippingCostArs,
+          totalArs: previousOrder.totalArs,
+          createdAt: previousOrder.createdAt,
+          items: previousOrder.items,
+        },
+        deliveryMethod: previousOrder.deliveryMethod,
+        message: 'El pedido ya estaba registrado. No se creó un duplicado.',
+      })
+      return
+    }
+  }
+
   try {
     if (input.deliveryMethod === 'ENVIOPACK' && (!input.customerEmail || input.customerEmail.length > 100)) {
       throw new OrderConflictError('Para realizar un envío por Envíopack necesitamos un correo electrónico válido de hasta 100 caracteres.')
@@ -192,6 +229,8 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       return tx.order.create({
         data: {
           code,
+          checkoutRequestKey: input.checkoutRequestKey || null,
+          checkoutFingerprint,
           customerName: input.customerName,
           customerEmail: input.customerEmail,
           customerPhone: input.customerPhone,
@@ -234,6 +273,38 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       message: 'Pedido registrado. El pago todavía no está habilitado.',
     })
   } catch (error) {
+    if (
+      input.checkoutRequestKey &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === 'P2002' || error.code === 'P2034')
+    ) {
+      const previousOrder = await prisma.order.findUnique({
+        where: { checkoutRequestKey: input.checkoutRequestKey },
+        include: { items: true },
+      })
+      if (previousOrder) {
+        if (previousOrder.checkoutFingerprint !== checkoutFingerprint) {
+          res.status(409).json({ error: { code: 'ORDER_IDEMPOTENCY_CONFLICT', message: 'Esta solicitud ya registró un pedido con datos diferentes. Actualizá el checkout antes de volver a intentar.' } })
+          return
+        }
+        res.setHeader('Cache-Control', 'no-store')
+        res.status(200).json({
+          data: {
+            id: previousOrder.id,
+            code: previousOrder.code,
+            status: previousOrder.status,
+            subtotalArs: previousOrder.subtotalArs,
+            shippingCostArs: previousOrder.shippingCostArs,
+            totalArs: previousOrder.totalArs,
+            createdAt: previousOrder.createdAt,
+            items: previousOrder.items,
+          },
+          deliveryMethod: previousOrder.deliveryMethod,
+          message: 'El pedido ya estaba registrado. No se creó un duplicado.',
+        })
+        return
+      }
+    }
     if (error instanceof OrderConflictError) {
       res.status(409).json({ error: { code: 'ORDER_CONFLICT', message: error.message } })
       return
