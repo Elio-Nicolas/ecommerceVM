@@ -267,6 +267,12 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
     if (!order.customerEmail) return { error: 'EMAIL_REQUIRED' as const }
     if (!order.totalArs || order.totalArs <= 0) return { error: 'TOTAL_NOT_FINAL' as const }
 
+    const approvedAttempt = await tx.paymentAttempt.findFirst({
+      where: { orderId: order.id, status: 'APPROVED' },
+      select: { id: true },
+    })
+    if (approvedAttempt) return { error: 'ALREADY_PAID' as const }
+
     let attempt = await tx.paymentAttempt.findUnique({ where: { requestKey: input.data.requestKey } })
     if (attempt && attempt.orderId !== order.id) return { error: 'REQUEST_KEY_CONFLICT' as const }
     if (attempt && ['APPROVED', 'REJECTED', 'CANCELLED'].includes(attempt.status)) {
