@@ -12,7 +12,7 @@ const DEFAULT_LOCK = 'ecommercevm-shipping-origin-default'
 const originSchema = z.object({
   name: z.string().trim().min(2).max(100),
   provinceCode: z.string().trim().length(1).regex(/^[A-Z]$/, 'Usá el código provincial ISO de Envíopack, sin el prefijo AR-.'),
-  postalCode: z.string().trim().regex(/^\\d{4}$/, 'Ingresá un código postal argentino de cuatro dígitos.'),
+  postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal argentino de cuatro dígitos.'),
   enviopackAddressId: z.string().trim().max(100).nullable().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
