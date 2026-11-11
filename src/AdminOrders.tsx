@@ -442,7 +442,7 @@ export default function AdminOrders() {
                 <strong>{formatPrice(payment.amountArs)}</strong>
                 {payment.providerOrderId && <small className="order-payment-reference">Orden Mercado Pago: {payment.providerOrderId}</small>}
                 {payment.approvedAt && <small className="order-payment-reference">Aprobado: {formatDate(payment.approvedAt)}</small>}
-                {payment.providerOrderId && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED'].includes(payment.status) && <button type="button" className="admin-quiet-button" disabled={paymentReconcilingId !== null} onClick={() => void reconcilePayment(activeOrder, payment.id)}>{paymentReconcilingId === payment.id ? 'Consultando Mercado Pago...' : 'Conciliar pago'}</button>}
+                {payment.providerOrderId && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status) && <button type="button" className="admin-quiet-button" disabled={paymentReconcilingId !== null} onClick={() => void reconcilePayment(activeOrder, payment.id)}>{paymentReconcilingId === payment.id ? 'Consultando Mercado Pago...' : 'Conciliar pago'}</button>}
               </div>)}
               {!(activeOrder.paymentAttempts || []).length && <p className="order-payment-empty">Este pedido no tiene intentos de pago online registrados.</p>}
             </section>
