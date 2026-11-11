@@ -164,6 +164,7 @@ model Order {
   history OrderStatusHistory[]
   fiscalDocuments FiscalDocument[]
   paymentAttempts PaymentAttempt[]
+  shipments ShippingShipment[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])
@@ -171,6 +172,47 @@ model Order {
   @@index([customerName])
   @@index([enviopackOrderId])
 }
+model ShippingShipment {
+  id String @id @default(uuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  provider String
+  status String @default("CREATED")
+  externalAdmissionId String?
+  trackingNumber String?
+  serviceCode String?
+  serviceLabel String?
+  parcels Json
+  labelPdf Bytes?
+  labelMimeType String?
+  admittedAt DateTime?
+  processedAt DateTime?
+  lastError String?
+  events ShippingShipmentEvent[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([orderId, provider])
+  @@index([provider, status, updatedAt])
+  @@index([trackingNumber])
+}
+
+model ShippingShipmentEvent {
+  id String @id @default(uuid())
+  shipmentId String
+  shipment ShippingShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  externalEventId String?
+  eventType String
+  status String @default("RECEIVED")
+  payload Json?
+  receivedAt DateTime @default(now())
+  processedAt DateTime?
+  attempts Int @default(0)
+  lastError String?
+  @@unique([shipmentId, externalEventId])
+  @@index([status, receivedAt])
+  @@index([shipmentId, receivedAt])
+}
+
 model PaymentAttempt {
   id String @id @default(uuid())
   orderId String
