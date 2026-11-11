@@ -80,7 +80,7 @@ test('mantiene como inconclusas las respuestas SOAP, HTTP e incompletas', () => 
     /respuesta incompleta/,
   )
   assert.throws(
-    () => parseArcaVoucherConsultResponse('<FECompConsultarResult/>', 200, expected),
+    () => parseArcaVoucherConsultResponse('<FECompConsultarResult><FeCabResp><Resultado>A</Resultado></FeCabResp></FECompConsultarResult>', 200, expected),
     /resultado sigue siendo ambiguo/,
   )
 })
