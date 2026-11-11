@@ -1,6 +1,7 @@
 import type { ArcaEnvironment } from './arca-wsaa'
 import { env } from '../config/env'
 import { getArcaAccessTicket } from './arca-wsaa'
+import { parseArcaInvoiceCResponse, type ArcaInvoiceCResult } from './arca-wsfe-response'
 
 const WSFE_URLS: Record<ArcaEnvironment, string> = {
   HOMOLOGATION: 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
@@ -18,9 +19,6 @@ export interface ArcaInvoiceCRequest {
   totalAmountArs: number
 }
 
-import { parseArcaInvoiceCResponse } from './arca-wsfe-response'
-
-
 function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 }
@@ -32,11 +30,6 @@ function arcaDate(date: Date): string {
   }).formatToParts(date)
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${values.year}${values.month}${values.day}`
-}
-
-function parseArcaDate(value: string | null): Date | null {
-  if (!value || !/^\d{8}$/.test(value)) return null
-  return new Date(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}T00:00:00-03:00`)
 }
 
 export async function requestArcaInvoiceC(
