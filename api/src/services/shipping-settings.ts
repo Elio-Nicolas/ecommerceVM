@@ -70,6 +70,24 @@ export async function getStoredEnviopackCredentials() {
   }
 }
 
+export async function getStoredOcaCredentials() {
+  const settings = await getShippingSettings()
+  const values = [
+    settings.ocaUsernameEncrypted,
+    settings.ocaPasswordEncrypted,
+    settings.ocaCuitEncrypted,
+    settings.ocaOperativeEncrypted,
+  ]
+  if (values.some((value) => !value)) return null
+  return {
+    username: decryptSecret(settings.ocaUsernameEncrypted!),
+    password: decryptSecret(settings.ocaPasswordEncrypted!),
+    cuit: decryptSecret(settings.ocaCuitEncrypted!),
+    operative: decryptSecret(settings.ocaOperativeEncrypted!),
+    environment: settings.ocaEnvironment,
+  }
+}
+
 export async function getEnviopackCredentials() {
   const settings = await getShippingSettings()
   if (!settings.enviopackEnabled) return null
@@ -89,12 +107,27 @@ export async function saveShippingSettings(input: {
   localDeliveryFeeArs: number
   localDeliveryInternalCostArs: number | null
   localDeliveryCoordinate: boolean
+  ocaEnvironment?: 'QA' | 'PRODUCTION'
+  ocaUsername?: string
+  ocaPassword?: string
+  ocaCuit?: string
+  ocaOperative?: string
+  clearOcaCredentials?: boolean
 }) {
   const current = await getShippingSettings()
   const clear = input.clearEnviopackCredentials === true
   const apiKey = input.enviopackApiKey?.trim()
   const secretKey = input.enviopackSecretKey?.trim()
   const hasNewPair = Boolean(apiKey && secretKey)
+  const ocaValues = [input.ocaUsername?.trim(), input.ocaPassword?.trim(), input.ocaCuit?.trim(), input.ocaOperative?.trim()]
+  const hasAnyOcaValue = ocaValues.some(Boolean)
+  const hasCompleteOcaSet = ocaValues.every(Boolean)
+  const hasStoredOcaSet = Boolean(current.ocaUsernameEncrypted && current.ocaPasswordEncrypted && current.ocaCuitEncrypted && current.ocaOperativeEncrypted)
+  if (hasAnyOcaValue && !hasCompleteOcaSet) throw new Error('Para guardar OCA completá usuario, contraseña, CUIT y operativa.')
+  if (input.clearOcaCredentials && hasAnyOcaValue) throw new Error('No podés reemplazar y eliminar las credenciales OCA en la misma operación.')
+  if (!input.clearOcaCredentials && !hasAnyOcaValue && !hasStoredOcaSet && input.ocaEnvironment === 'PRODUCTION') {
+    throw new Error('Configurá primero la cuenta OCA antes de seleccionar producción.')
+  }
   if ((apiKey && !secretKey) || (!apiKey && secretKey)) {
     throw new Error('Ingresá la API Key y la Secret Key juntas para actualizar las credenciales.')
   }
@@ -112,6 +145,11 @@ export async function saveShippingSettings(input: {
       enviopackEnabled: input.enviopackEnabled,
       enviopackApiKeyEncrypted: hasNewPair ? encryptSecret(apiKey!) : null,
       enviopackSecretKeyEncrypted: hasNewPair ? encryptSecret(secretKey!) : null,
+      ocaEnvironment: input.ocaEnvironment ?? 'QA',
+      ocaUsernameEncrypted: hasCompleteOcaSet ? encryptSecret(input.ocaUsername!.trim()) : null,
+      ocaPasswordEncrypted: hasCompleteOcaSet ? encryptSecret(input.ocaPassword!.trim()) : null,
+      ocaCuitEncrypted: hasCompleteOcaSet ? encryptSecret(input.ocaCuit!.trim()) : null,
+      ocaOperativeEncrypted: hasCompleteOcaSet ? encryptSecret(input.ocaOperative!.trim()) : null,
       pickupEnabled: input.pickupEnabled,
       pickupAddress: input.pickupAddress,
       pickupInstructions: input.pickupInstructions,
@@ -125,6 +163,14 @@ export async function saveShippingSettings(input: {
       enviopackEnabled: input.enviopackEnabled,
       ...(clear ? { enviopackApiKeyEncrypted: null, enviopackSecretKeyEncrypted: null } : {}),
       ...(hasNewPair ? { enviopackApiKeyEncrypted: encryptSecret(apiKey!), enviopackSecretKeyEncrypted: encryptSecret(secretKey!) } : {}),
+      ocaEnvironment: input.ocaEnvironment ?? current.ocaEnvironment,
+      ...(input.clearOcaCredentials ? { ocaUsernameEncrypted: null, ocaPasswordEncrypted: null, ocaCuitEncrypted: null, ocaOperativeEncrypted: null } : {}),
+      ...(hasCompleteOcaSet ? {
+        ocaUsernameEncrypted: encryptSecret(input.ocaUsername!.trim()),
+        ocaPasswordEncrypted: encryptSecret(input.ocaPassword!.trim()),
+        ocaCuitEncrypted: encryptSecret(input.ocaCuit!.trim()),
+        ocaOperativeEncrypted: encryptSecret(input.ocaOperative!.trim()),
+      } : {}),
       pickupEnabled: input.pickupEnabled,
       pickupAddress: input.pickupAddress,
       pickupInstructions: input.pickupInstructions,
