@@ -110,7 +110,7 @@ export async function requestArcaInvoiceC(
     `<CbteDesde>${request.voucherNumber}</CbteDesde><CbteHasta>${request.voucherNumber}</CbteHasta>`,
     `<CbteFch>${request.issueDate}</CbteFch>`,
     `<ImpTotal>${request.totalAmount.toFixed(2)}</ImpTotal><ImpTotConc>0.00</ImpTotConc>`,
-    `<ImpNeto>${request.netAmount.toFixed(2)}</ImpNeto><ImpOpEx>0.00</ImpOpEx><ImpTrib>0.00</ImpTrib><ImpIVA>0.00</ImpIVA>`, 
+    `<ImpNeto>${request.netAmount.toFixed(2)}</ImpNeto><ImpOpEx>0.00</ImpOpEx><ImpTrib>0.00</ImpTrib><ImpIVA>0.00</ImpIVA>`,
     '<MonId>PES</MonId><MonCotiz>1</MonCotiz>',
     `<CondicionIVAReceptorId>${request.receiverVatConditionId}</CondicionIVAReceptorId>`,
     '</FECAEDetRequest></FeDetReq></FeCAEReq>',
