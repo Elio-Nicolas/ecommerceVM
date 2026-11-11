@@ -36,6 +36,6 @@ Las rutas administrativas fijan el entorno en homologación y validan que la con
 
 ## Validación pendiente
 
-El CI valida generación de Prisma y compilación TypeScript. La operación real requiere un certificado X.509 de homologación asociado a WSFE, CUIT y punto de venta configurados en ARCA. La descarga del PDF requiere además los datos legales del emisor.
+El CI aplica el historial completo de migraciones sobre PostgreSQL 16 limpio y valida generación de Prisma y compilación TypeScript. Eso comprueba el esquema y el build, pero no sustituye la prueba real contra ARCA: se requiere un certificado X.509 de homologación asociado a WSFE, CUIT y punto de venta configurados. La descarga del PDF requiere además los datos legales del emisor.
 
 Los comprobantes de homologación son pruebas, no facturas fiscales válidas para entregar al comprador. La producción y cualquier emisión automática quedan fuera del alcance actual y requieren una decisión explícita posterior.
