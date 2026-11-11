@@ -132,7 +132,7 @@ async function createMercadoPagoOrder(input: {
     || !validCheckoutUrl(payload.checkout_url)
     || payload.external_reference !== input.order.code
     || parseAmount(payload.total_amount) !== input.order.totalArs
-    || (payload.currency && payload.currency !== 'ARS')
+    || payload.currency !== 'ARS'
   ) {
     throw new Error('Mercado Pago devolvió una orden de pago incompleta o con datos distintos al pedido.')
   }
@@ -177,11 +177,13 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
     where: { providerOrderId },
   })
   if (!attempt) return false
+  const order = await prisma.order.findUnique({ where: { id: attempt.orderId }, select: { code: true } })
+  if (!order) return false
 
   const paidAmount = parseAmount(payload.total_paid_amount)
   const totalAmount = parseAmount(payload.total_amount)
   const matchesOrder = payload.id === providerOrderId
-    && payload.external_reference === attempt.order.code
+    && payload.external_reference === order.code
     && payload.currency === 'ARS'
     && totalAmount === attempt.amountArs
 
@@ -290,7 +292,7 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
 
     let attempt = await tx.paymentAttempt.findUnique({ where: { requestKey: input.data.requestKey } })
     if (attempt && attempt.orderId !== order.id) return { error: 'REQUEST_KEY_CONFLICT' as const }
-    if (attempt && ['APPROVED', 'REJECTED', 'CANCELLED'].includes(attempt.status)) {
+    if (attempt && ['APPROVED', 'REJECTED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(attempt.status)) {
       return { error: attempt.status === 'APPROVED' ? 'ALREADY_PAID' as const : 'ATTEMPT_CLOSED' as const }
     }
 
