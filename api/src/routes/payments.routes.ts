@@ -91,7 +91,6 @@ async function createMercadoPagoOrder(input: {
         failure_url: appUrl + '/?payment=failure&order=' + encodeURIComponent(input.order.id),
         pending_url: appUrl + '/?payment=pending&order=' + encodeURIComponent(input.order.id),
         auto_return: 'approved',
-        notification_url: apiUrl + '/api/v1/payments/webhook',
       },
     },
   }
@@ -189,7 +188,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
   let nextStatus: PaymentAttemptStatus = 'UNKNOWN'
   if (matchesOrder && payload.status === 'processed' && paidAmount === attempt.amountArs) {
     nextStatus = 'APPROVED'
-  } else if (matchesOrder && payload.status === 'cancelled') {
+  } else if (matchesOrder && payload.status === 'canceled') {
     nextStatus = 'CANCELLED'
   } else if (matchesOrder && ['created', 'action_required', 'processing'].includes(String(payload.status))) {
     nextStatus = 'PENDING'
