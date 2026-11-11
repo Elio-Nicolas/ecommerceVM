@@ -1,36 +1,14 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
 import { prisma } from '../lib/prisma'
 import { env } from '../config/env'
+import { decryptShippingSecret, encryptShippingSecret } from './shipping-secret-crypto'
 
 const SETTINGS_ID = 'default'
-const legacyEncryptionKey = () => scryptSync(env.JWT_SECRET, 'ecommercevm-shipping-settings-v1', 32)
-const encryptionKey = () => env.SHIPPING_ENCRYPTION_KEY
-  ? scryptSync(env.SHIPPING_ENCRYPTION_KEY, 'ecommercevm-shipping-settings-v2', 32)
-  : legacyEncryptionKey()
-
-function encryptSecret(value: string): string {
-  const iv = randomBytes(12)
-  const cipher = createCipheriv('aes-256-gcm', encryptionKey(), iv)
-  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()])
-  const payload = [iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join('.')
-  return env.SHIPPING_ENCRYPTION_KEY ? `v2.${payload}` : payload
+const encryptionConfig = {
+  jwtSecret: env.JWT_SECRET,
+  shippingEncryptionKey: env.SHIPPING_ENCRYPTION_KEY,
 }
-
-function decryptSecret(value: string): string {
-  const parts = value.split('.')
-  const isV2 = parts.length === 4 && parts[0] === 'v2'
-  const [ivValue, tagValue, encryptedValue] = isV2 ? parts.slice(1) : parts
-  if (!ivValue || !tagValue || !encryptedValue || parts.length !== (isV2 ? 4 : 3)) {
-    throw new Error('La credencial almacenada no tiene un formato válido.')
-  }
-  if (isV2 && !env.SHIPPING_ENCRYPTION_KEY) {
-    throw new Error('Falta SHIPPING_ENCRYPTION_KEY para descifrar las credenciales de integraciones.')
-  }
-  const key = isV2 ? encryptionKey() : legacyEncryptionKey()
-  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivValue, 'base64url'))
-  decipher.setAuthTag(Buffer.from(tagValue, 'base64url'))
-  return Buffer.concat([decipher.update(Buffer.from(encryptedValue, 'base64url')), decipher.final()]).toString('utf8')
-}
+const encryptSecret = (value: string) => encryptShippingSecret(value, encryptionConfig)
+const decryptSecret = (value: string) => decryptShippingSecret(value, encryptionConfig)
 
 export async function getShippingSettings() {
   return prisma.shippingSettings.upsert({
