@@ -46,7 +46,7 @@ adminOrdersRouter.get('/', async (req, res) => {
   const [data, total] = await prisma.$transaction([
     prisma.order.findMany({
       where,
-      omit: { enviopackLabelPdf: true },
+      ,
       include: orderInclude,
       orderBy: { createdAt: 'desc' },
       skip: (query.page - 1) * query.limit,
@@ -58,7 +58,7 @@ adminOrdersRouter.get('/', async (req, res) => {
 })
 
 adminOrdersRouter.get('/:id', async (req, res) => {
-  const order = await prisma.order.findUnique({ where: { id: req.params.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
+  const order = await prisma.order.findUnique({ where: { id: req.params.id }, include: orderInclude })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
@@ -120,7 +120,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
           changedByAdminId: req.admin?.id || null,
         },
       })
-      return tx.order.findUnique({ where: { id: existing.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
+      return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
     })
     if (!updated) {
       res.status(409).json({ error: { code: 'PAYMENT_ALREADY_STARTED', message: 'No se puede modificar el costo de entrega porque el pedido tiene un pago iniciado o registrado. Primero resolvé el pago en Mercado Pago.' } })
@@ -181,7 +181,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
         changedByAdminId: req.admin?.id || null,
       },
     })
-    return tx.order.findUnique({ where: { id: existing.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
+    return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
   })
 
   if (!updated) {
@@ -266,7 +266,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
           changedByAdminId: req.admin?.id || null,
         },
       })
-      return tx.order.findUnique({ where: { id: existing.id }, omit: { enviopackLabelPdf: true }, include: orderInclude })
+      return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
     })
     res.json({ data: updated })
   } catch (error) {
