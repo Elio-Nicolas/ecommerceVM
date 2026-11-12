@@ -22,7 +22,16 @@ import { paymentsRouter } from './routes/payments.routes'
 export const app = express()
 app.disable('x-powered-by')
 app.use(helmet())
-app.use(cors({ origin: env.CORS_ORIGIN }))
+
+// Keep the production storefront available even when Render still has the
+// local-development CORS_ORIGIN value configured. Additional origins remain
+// configurable through CORS_ORIGIN (comma-separated).
+const allowedOrigins = [...new Set([
+  ...env.CORS_ORIGIN,
+  'https://ecommerce-vm.vercel.app',
+])]
+app.use(cors({ origin: allowedOrigins }))
+
 app.use(express.json({ limit: '1mb' }))
 app.get('/api/v1', (_req, res) => { res.json({ service: 'ecommercevm-api', version: '1.0.0' }) })
 app.use('/api/v1/health', healthRouter)
