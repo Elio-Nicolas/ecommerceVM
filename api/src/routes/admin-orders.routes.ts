@@ -29,6 +29,7 @@ const orderInclude = {
   paymentAttempts: { orderBy: { createdAt: 'desc' as const }, select: { id: true, provider: true, providerOrderId: true, status: true, statusDetail: true, amountArs: true, approvedAt: true, createdAt: true } },
   fiscalDocuments: { orderBy: { createdAt: 'desc' as const }, select: { id: true, type: true, status: true, pointOfSale: true, voucherType: true, voucherNumber: true, cae: true, caeExpiresAt: true, lastErrorMessage: true, createdAt: true } },
   history: { orderBy: { createdAt: 'desc' as const }, include: { changedByAdmin: { select: { email: true } } } },
+  shipments: { where: { provider: 'OCA' }, select: { provider: true, status: true, trackingNumber: true } },
 }
 
 adminOrdersRouter.get('/', async (req, res) => {
@@ -46,7 +47,6 @@ adminOrdersRouter.get('/', async (req, res) => {
   const [data, total] = await prisma.$transaction([
     prisma.order.findMany({
       where,
-      ,
       include: orderInclude,
       orderBy: { createdAt: 'desc' },
       skip: (query.page - 1) * query.limit,
@@ -198,7 +198,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }).parse(req.body)
   const existing = await prisma.order.findUnique({
     where: { id: req.params.id },
-    include: { items: true, paymentAttempts: { select: { status: true, provider: true } } },
+    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: 'OCA' }, select: { provider: true, status: true, trackingNumber: true } } },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -224,9 +224,12 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Primero registrá el costo acordado de entrega local. Después podrás confirmar el costo y continuar con el pedido.' } })
     return
   }
-  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'OCA' && (existing.shippingCostArs === null || !existing.shippingCarrier)) {
-    res.status(409).json({ error: { code: 'SHIPPING_NOT_CONFIGURED', message: 'Antes de marcar el pedido como enviado, registrá el costo y el transporte OCA.' } })
-    return
+  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'OCA') {
+    const admittedShipment = existing.shipments.some((shipment) => shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))
+    if (!admittedShipment) {
+      res.status(409).json({ error: { code: 'OCA_SHIPMENT_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando OCA confirme la admisión y exista un número de seguimiento.' } })
+      return
+    }
   }
   if (input.status === 'SHIPPED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
     res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Antes de despachar el pedido, registrá el costo de entrega local acordado con el comprador.' } })
