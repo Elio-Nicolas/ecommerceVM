@@ -100,7 +100,7 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
   return (
     <main className="payment-return-page">
       <section className="payment-return-card">
-        <span className="payment-return-kicker">ECOMMERCEVM · MERCADO PAGO</span>
+        <span className="payment-return-kicker">TU TIENDAVM · MERCADO PAGO</span>
         <div className={approved ? 'payment-return-mark approved' : rejected ? 'payment-return-mark rejected' : 'payment-return-mark'}>
           {approved ? '✓' : rejected ? '!' : '…'}
         </div>

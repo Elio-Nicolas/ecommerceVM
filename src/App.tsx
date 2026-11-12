@@ -145,11 +145,11 @@ export default function App() {
 
   return (
     <div className="site-shell">
-      <div className="announcement">Envíos a todo el país <span>·</span> Tecnología útil para todos los días</div>
+      <div className="announcement">Comprá online <span>·</span> Entrega según disponibilidad</div>
       <header className="header">
-        <a className="brand" href="#" aria-label="ecommerceVM inicio">
-          <span className="brand-mark">e<span>v</span></span>
-          <span className="brand-name">ecommerce<span>VM</span></span>
+        <a className="brand" href="#" aria-label="Tu TiendaVM inicio">
+          <span className="brand-mark">T<span>V</span></span>
+          <span className="brand-name">Tu Tienda<span>VM</span></span>
         </a>
         <label className="search-box">
           <SearchIcon />
@@ -185,7 +185,7 @@ export default function App() {
 
         <section className="benefits" aria-label="Ventajas">
           <div><span className="benefit-icon">01</span><p><strong>Elegidos con criterio</strong><small>Productos útiles, sin vueltas</small></p></div>
-          <div><span className="benefit-icon">02</span><p><strong>Comprá desde donde estés</strong><small>Envíos a toda Argentina</small></p></div>
+          <div><span className="benefit-icon">02</span><p><strong>Comprá desde donde estés</strong><small>Opciones de entrega según tu zona</small></p></div>
           <div><span className="benefit-icon">03</span><p><strong>Atención cercana</strong><small>Te ayudamos a elegir</small></p></div>
         </section>
 
@@ -226,14 +226,14 @@ export default function App() {
         <section className="closing-banner">
           <div><span className="eyebrow">TECNOLOGÍA SIN COMPLICACIONES</span><h2>Lo útil también<br /><em>puede sorprender.</em></h2></div>
           <a href="#catalogo" className="banner-link">Descubrí la selección <ArrowIcon /></a>
-          <span className="banner-decoration">eV</span>
+          <span className="banner-decoration">TV</span>
         </section>
       </main>
 
       <footer className="footer">
-        <a className="brand footer-brand" href="#"><span className="brand-mark">e<span>v</span></span><span className="brand-name">ecommerce<span>VM</span></span></a>
+        <a className="brand footer-brand" href="#"><span className="brand-mark">T<span>V</span></span><span className="brand-name">Tu Tienda<span>VM</span></span></a>
         <p>Una nueva forma de encontrar tecnología útil.</p>
-        <div className="footer-bottom"><span>© 2026 ecommerceVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span></div>
+        <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span></div>
       </footer>
 
       {cartOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
@@ -245,7 +245,7 @@ export default function App() {
               <div className="cart-line-info"><strong>{line.product.name}</strong><span>{formatPrice(line.product.price)}</span><div className="quantity-control"><button onClick={() => changeQuantity(line.product.id, -1)} aria-label="Quitar una unidad">−</button><span>{line.quantity}</span><button onClick={() => changeQuantity(line.product.id, 1)} aria-label="Agregar una unidad">+</button></div></div>
               <button className="remove-line" onClick={() => setCart((current) => current.filter((item) => item.product.id !== line.product.id))}>Quitar</button>
             </div>)}</div>
-            <div className="cart-summary"><div><span>Subtotal</span><strong>{formatPrice(cartTotal)}</strong></div><small>El costo de envío se calcula más adelante.</small><button className="checkout-continue" onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>Continuar con el pedido <ArrowIcon /></button><p>Sin cobro online. El envío y el pago se coordinan después de confirmar el pedido.</p></div>
+            <div className="cart-summary"><div><span>Subtotal</span><strong>{formatPrice(cartTotal)}</strong></div><small>El costo de envío se calcula más adelante.</small><button className="checkout-continue" onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>Continuar con el pedido <ArrowIcon /></button><p>Las opciones de entrega y pago se muestran al finalizar el pedido.</p></div>
           </> : <div className="empty-cart"><div className="empty-bag"><BagIcon /></div><strong>Tu carrito está esperando.</strong><span>Sumá productos que te interesen y aparecerán acá.</span><button className="primary-button" onClick={() => setCartOpen(false)}>Seguir explorando <ArrowIcon /></button></div>}
         </aside>
       </div>}
@@ -267,7 +267,7 @@ export default function App() {
               </div>
               {selected.specs.length > 0 && <><h2>Características</h2><ul>{selected.specs.map((spec) => <li key={spec}>{spec}</li>)}</ul></>}
               <button className="primary-button product-page-add" disabled={selected.stock <= 0} onClick={() => addToCart(selected)}>{selected.stock > 0 ? 'Agregar al carrito' : 'Sin stock'} <ArrowIcon /></button>
-              <small>El envío se calculará en una próxima etapa. Los pagos todavía no están habilitados.</small>
+              <small>Consultá las opciones de entrega y pago al finalizar tu compra.</small>
             </div>
           </div>
         </section>

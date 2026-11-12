@@ -1,6 +1,6 @@
-# ecommerceVM
+# Tu TiendaVM
 
-Tienda online independiente orientada al público general de Argentina. La marca comercial es provisoria; IORed participa como desarrollador/proveedor tecnológico, no como marca de la tienda.
+Tienda online independiente orientada al público general de Argentina. La marca comercial es Tu TiendaVM; IORed participa como desarrollador/proveedor tecnológico, no como marca de la tienda.
 
 ## Estado del proyecto
 
