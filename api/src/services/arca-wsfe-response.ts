@@ -120,7 +120,7 @@ export function parseArcaInvoiceCResponse(
     }
   }
 
-  if ((headerOutcome === 'A' || headerOutcome === 'P') && detailOutcome === 'A' && cae && /^\\d{14}$/.test(cae) && caeExpiresAt) {
+  if ((headerOutcome === 'A' || headerOutcome === 'P') && detailOutcome === 'A' && cae && /^\d{14}$/.test(cae) && caeExpiresAt) {
     return {
       outcome: 'AUTHORIZED',
       cae,
