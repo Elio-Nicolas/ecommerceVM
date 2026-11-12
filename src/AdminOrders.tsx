@@ -379,7 +379,6 @@ export default function AdminOrders() {
     if (!selectedOrders.length) return
     setPrintOrders(selectedOrders)
     setPrintKind('prep')
-    window.setTimeout(() => window.print(), 100)
   }
 
   if (checking) return <div className="admin-loading">Verificando sesión...</div>
