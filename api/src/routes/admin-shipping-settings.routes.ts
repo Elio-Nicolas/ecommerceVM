@@ -24,7 +24,7 @@ const schema = z.object({
   ocaOperative: z.string().trim().min(1).max(100).optional(),
   clearOcaCredentials: z.boolean().optional(),
   pickupEnabled: z.boolean(), pickupAddress: z.string().trim().min(3).max(250), pickupInstructions: z.string().trim().max(1000),
-  localDeliveryEnabled: z.boolean(), localDeliveryPostalCodes: z.array(z.string().trim().regex(/^\\d{4}$/)).max(100),
+  localDeliveryEnabled: z.boolean(), localDeliveryPostalCodes: z.array(z.string().trim().regex(/^\d{4}$/)).max(100),
   localDeliveryFeeArs: z.number().int().min(0).max(2_000_000_000),
   localDeliveryInternalCostArs: z.number().int().min(0).max(2_000_000_000).nullable(),
   localDeliveryCoordinate: z.boolean(),
