@@ -13,7 +13,7 @@ async function main() {
   if (!email || !password) {
     throw new Error('Definí ADMIN_EMAIL y ADMIN_PASSWORD para crear el administrador inicial.')
   }
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('ADMIN_EMAIL no tiene un formato válido.')
   }
   if (password.length < 12) {
