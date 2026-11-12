@@ -277,7 +277,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         items: order.items,
       },
       deliveryMethod: order.deliveryMethod,
-      message: 'Pedido registrado. El pago todavía no está habilitado.',
+      message: 'Pedido registrado correctamente.'
     })
   } catch (error) {
     if (
