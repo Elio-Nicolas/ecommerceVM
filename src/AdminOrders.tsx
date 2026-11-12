@@ -44,6 +44,7 @@ function historyEventLabel(entry: OrderHistory): string {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
+  if (order.status === 'PREPARING' && order.deliveryMethod === 'OCA' && !order.shipments?.some((shipment) => shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
   const mpStatuses = (order.paymentAttempts || []).filter((payment) => payment.provider === 'MERCADO_PAGO').map((payment) => payment.status)
   if (order.status === 'PENDING' && mpStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
   if (mpStatuses.includes('PARTIALLY_REFUNDED')) return []
@@ -51,7 +52,6 @@ function availableNextStatuses(order: Order): OrderStatus[] {
   if (mpStatuses.includes('APPROVED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
-  if (order.status === 'PREPARING' && order.deliveryMethod === 'OCA' && !order.shipments?.some((shipment) => shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   return nextStatuses[order.status]
 }
