@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\\/$/, '')
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 type ShippingSettings = {
   ocaEnvironment: 'QA' | 'PRODUCTION'; ocaConfigured: boolean
   pickupEnabled: boolean; pickupAddress: string; pickupInstructions: string
@@ -43,7 +43,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     if (clearOcaCredentials && credentials.some(Boolean)) { setError('No podés reemplazar y eliminar las credenciales OCA en la misma operación.'); setSaving(false); return }
     const payload = {
       ...settings, localDeliveryPostalCodes: [...new Set(postalCodesText.split(',').map((v) => v.trim()).filter(Boolean))],
-      ...(credentials.every(Boolean) ? { ocaUsername: credentials[0], ocaPassword: credentials[1], ocaCuit: credentials[2].replace(/\\D/g, ''), ocaOperative: credentials[3] } : {}),
+      ...(credentials.every(Boolean) ? { ocaUsername: credentials[0], ocaPassword: credentials[1], ocaCuit: credentials[2].replace(/\D/g, ''), ocaOperative: credentials[3] } : {}),
       ...(clearOcaCredentials ? { clearOcaCredentials: true } : {}),
     }
     try {
