@@ -180,7 +180,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setSelectedOptionKey('')
     setQuoteError('')
     setQuoteLoading(false)
-    if (deliveryMethod !== 'ENVIOPACK' || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
+    if (!deliveryMethods?.enviopack.enabled || deliveryMethod !== 'ENVIOPACK' || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
       return () => controller.abort()
     }
 
