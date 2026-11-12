@@ -14,6 +14,7 @@ type Order = {
   customerNotes: string | null; subtotalArs: number; shippingCostArs: number | null; totalArs: number | null
   shippingCarrier: string | null; trackingCode: string | null; shippingService: string | null; shippingEstimatedHours: number | null
   deliveryMethod: 'OCA' | 'LOCAL_DELIVERY' | 'PICKUP' | 'LEGACY_CARRIER'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
+  shipments?: { provider: string; status: string; trackingNumber: string | null }[]
   shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
   paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'REFUNDED' | 'PARTIALLY_REFUNDED'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
@@ -50,6 +51,7 @@ function availableNextStatuses(order: Order): OrderStatus[] {
   if (mpStatuses.includes('APPROVED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
+  if (order.status === 'PREPARING' && order.deliveryMethod === 'OCA' && !order.shipments?.some((shipment) => shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   return nextStatuses[order.status]
 }
