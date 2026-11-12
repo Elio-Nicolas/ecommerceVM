@@ -147,9 +147,9 @@ export default function App() {
     <div className="site-shell">
       <div className="announcement">Envíos a todo el país <span>·</span> Tecnología útil para todos los días</div>
       <header className="header">
-        <a className="brand" href="#" aria-label="ecommerceVM inicio">
-          <span className="brand-mark">e<span>v</span></span>
-          <span className="brand-name">ecommerce<span>VM</span></span>
+        <a className="brand" href="#" aria-label="Tu TiendaVM inicio">
+          <span className="brand-mark">T<span>V</span></span>
+          <span className="brand-name">Tu Tienda<span>VM</span></span>
         </a>
         <label className="search-box">
           <SearchIcon />
@@ -231,9 +231,9 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <a className="brand footer-brand" href="#"><span className="brand-mark">e<span>v</span></span><span className="brand-name">ecommerce<span>VM</span></span></a>
+        <a className="brand footer-brand" href="#"><span className="brand-mark">T<span>V</span></span><span className="brand-name">Tu Tienda<span>VM</span></span></a>
         <p>Una nueva forma de encontrar tecnología útil.</p>
-        <div className="footer-bottom"><span>© 2026 ecommerceVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span></div>
+        <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span></div>
       </footer>
 
       {cartOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
@@ -245,7 +245,7 @@ export default function App() {
               <div className="cart-line-info"><strong>{line.product.name}</strong><span>{formatPrice(line.product.price)}</span><div className="quantity-control"><button onClick={() => changeQuantity(line.product.id, -1)} aria-label="Quitar una unidad">−</button><span>{line.quantity}</span><button onClick={() => changeQuantity(line.product.id, 1)} aria-label="Agregar una unidad">+</button></div></div>
               <button className="remove-line" onClick={() => setCart((current) => current.filter((item) => item.product.id !== line.product.id))}>Quitar</button>
             </div>)}</div>
-            <div className="cart-summary"><div><span>Subtotal</span><strong>{formatPrice(cartTotal)}</strong></div><small>El costo de envío se calcula más adelante.</small><button className="checkout-continue" onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>Continuar con el pedido <ArrowIcon /></button><p>Sin cobro online. El envío y el pago se coordinan después de confirmar el pedido.</p></div>
+            <div className="cart-summary"><div><span>Subtotal</span><strong>{formatPrice(cartTotal)}</strong></div><small>El costo de envío se calcula más adelante.</small><button className="checkout-continue" onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>Continuar con el pedido <ArrowIcon /></button><p>Las opciones de entrega y pago se muestran al finalizar el pedido.</p></div>
           </> : <div className="empty-cart"><div className="empty-bag"><BagIcon /></div><strong>Tu carrito está esperando.</strong><span>Sumá productos que te interesen y aparecerán acá.</span><button className="primary-button" onClick={() => setCartOpen(false)}>Seguir explorando <ArrowIcon /></button></div>}
         </aside>
       </div>}
