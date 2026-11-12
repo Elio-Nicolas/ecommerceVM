@@ -43,9 +43,9 @@ Los tokens vencen a las 8 horas. Las contraseñas se almacenan con bcrypt. No ex
 
 ## Estado de logística y entregas
 
-La logística nacional está en transición de Envíopack a OCA e-Pak. Envíopack se encuentra pausado para nuevos checkouts: no se ofrecen nuevas cotizaciones ni se aceptan nuevos pedidos con ese método. Se conservan los registros, etiquetas y operaciones históricas para consulta y administración.
+OCA e-Pak es el único proveedor nacional. El código anterior del transportista fue retirado; los envíos históricos se conservan en el modelo neutral ShippingShipment como LEGACY_CARRIER.
 
-El backend ya dispone de un contrato neutral de proveedores, persistencia de envíos y eventos, procesamiento de eventos con bloqueo, y configuración segura de credenciales OCA. Esto constituye la base técnica, no una integración OCA operativa.
+El backend dispone de cotizador OCA y configuración cifrada. La cotización requiere credenciales y una respuesta real para validar el mapeo. La admisión, etiquetas y tracking se completarán cuando OCA confirme los datos comerciales de la cuenta.
 
 ### Qué está disponible
 
@@ -60,15 +60,15 @@ El backend ya dispone de un contrato neutral de proveedores, persistencia de env
 1. Recibir de OCA la cuenta comercial, CUIT habilitado, usuario/contraseña de e-Pak y número de operativa.
 2. Confirmar si la admisión se hará en sucursal de Villa Mercedes o mediante retiro, y obtener los datos de origen/cuenta/centro de costo requeridos.
 3. Validar conectividad y respuestas reales en QA con datos de la cuenta asignada.
-4. Implementar y probar cotización, admisión idempotente, etiquetas PDF y seguimiento usando respuestas documentadas del proveedor.
+4. Validar el mapeo de la cotización y luego implementar admisión idempotente, etiquetas PDF y seguimiento con respuestas reales del proveedor.
 5. Habilitar el método en checkout solo después de pruebas de aceptación y confirmación del proceso operativo.
 
-No cargues credenciales reales en Git, tickets ni chats. No se debe habilitar OCA en producción ni reactivar Envíopack para nuevos pedidos hasta completar estas verificaciones.
+No cargues credenciales reales en Git, tickets ni chats. No se debe habilitar producción hasta completar estas verificaciones.
 
 ### Endpoints públicos
 
 - GET `/api/v1/shipping/methods`: informa modalidades disponibles.
-- POST `/api/v1/shipping/quotes`: responde temporalmente `503 SHIPPING_PROVIDER_MIGRATION_PENDING` para evitar ofrecer una logística nacional todavía no operativa.
+- POST `/api/v1/shipping/quotes`: cotiza con OCA cuando la cuenta y el origen están configurados; devuelve 503 si faltan credenciales.
 - POST `/api/v1/orders`: acepta únicamente modalidades habilitadas; los métodos de envío nacional están pausados.
 
 ### Configuración administrativa
