@@ -133,6 +133,12 @@ export default function AdminOrders() {
   }, [checking, token, loadOrders])
 
   useEffect(() => {
+    if (!printKind || printOrders.length === 0) return
+    const frame = window.requestAnimationFrame(() => window.print())
+    return () => window.cancelAnimationFrame(frame)
+  }, [printKind, printOrders])
+
+  useEffect(() => {
     if (!printKind) return
     const clearPrint = () => setPrintKind(null)
     window.addEventListener('afterprint', clearPrint)
@@ -366,7 +372,6 @@ export default function AdminOrders() {
   function printCurrentOrder(order: Order, kind: 'receipt' | 'prep') {
     setPrintOrders([order])
     setPrintKind(kind)
-    window.setTimeout(() => window.print(), 100)
   }
 
   function printSelectedOrders() {
