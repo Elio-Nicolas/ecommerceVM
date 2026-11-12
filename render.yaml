@@ -6,7 +6,7 @@ services:
     region: ohio
     rootDir: api
     buildCommand: npm install --include=dev && npm run prisma:generate && npm run prisma:deploy && npm run build
-    startCommand: npm start
+    startCommand: node dist/src/server.js
     initialDeployHook: npm run db:seed:admin
     healthCheckPath: /api/v1/health
     autoDeployTrigger: checksPass
