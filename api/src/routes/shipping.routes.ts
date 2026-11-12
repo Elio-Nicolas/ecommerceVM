@@ -15,7 +15,7 @@ const quoteLimiter = rateLimit({
 })
 const quoteSchema = z.object({
   provinceCode: z.string().length(1).regex(/^[A-Z]$/),
-  postalCode: z.string().regex(/^\\d{4}$/),
+  postalCode: z.string().regex(/^\d{4}$/),
   items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().int().min(1).max(99) })).min(1).max(30),
 }).superRefine((input, ctx) => {
   const ids = input.items.map((item) => item.productId)
