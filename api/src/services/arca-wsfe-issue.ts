@@ -93,7 +93,7 @@ export async function requestArcaInvoiceC(
     signal: AbortSignal.timeout(25_000),
   })
   const responseXml = await response.text()
-  return parseArcaInvoiceCResponse(responseXml, response.status)
+  return parseArcaInvoiceCResponse(responseXml, response.status, { pointOfSale: request.pointOfSale, voucherType: request.voucherType, voucherNumber: request.voucherNumber })
 }
 
 export function buildArcaInvoiceCRequestPayload(input: ArcaInvoiceCRequest): Record<string, unknown> {
