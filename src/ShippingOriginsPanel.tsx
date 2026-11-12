@@ -7,7 +7,6 @@ type ShippingOrigin = {
   name: string
   provinceCode: string
   postalCode: string
-  enviopackAddressId: string | null
   isDefault: boolean
   isActive: boolean
 }
@@ -16,7 +15,6 @@ type OriginForm = {
   name: string
   provinceCode: string
   postalCode: string
-  enviopackAddressId: string
   isDefault: boolean
   isActive: boolean
 }
@@ -25,7 +23,6 @@ const emptyForm: OriginForm = {
   name: '',
   provinceCode: 'D',
   postalCode: '',
-  enviopackAddressId: '',
   isDefault: false,
   isActive: true,
 }
@@ -65,7 +62,6 @@ export default function ShippingOriginsPanel({ token }: { token: string }) {
       name: origin.name,
       provinceCode: origin.provinceCode,
       postalCode: origin.postalCode,
-      enviopackAddressId: origin.enviopackAddressId || '',
       isDefault: origin.isDefault,
       isActive: origin.isActive,
     })
@@ -90,7 +86,6 @@ export default function ShippingOriginsPanel({ token }: { token: string }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           ...form,
-          enviopackAddressId: form.enviopackAddressId.trim() || null,
         }),
       })
       const payload = await response.json().catch(() => ({}))
@@ -130,7 +125,7 @@ export default function ShippingOriginsPanel({ token }: { token: string }) {
     <section className="admin-category-card">
       <div className="admin-category-heading">
         <h2>Depósitos de despacho</h2>
-        <p>Configurá los orígenes de despacho. Para cotizar a domicilio, Envíopack utiliza el depósito predeterminado de tu cuenta; el ID local queda disponible para la futura generación de etiquetas.</p>
+        <p>Configurá los orígenes de despacho. OCA utiliza el código postal del depósito predeterminado para calcular las tarifas.</p>
       </div>
       <div className="admin-category-actions">
         <button type="button" className="admin-primary" onClick={() => { setExpanded((value) => !value); if (expanded) resetForm() }}>
@@ -144,7 +139,6 @@ export default function ShippingOriginsPanel({ token }: { token: string }) {
           <label>Nombre identificador<input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required minLength={2} maxLength={100} placeholder="Casa · Villa Mercedes" /></label>
           <label>Código de provincia<input value={form.provinceCode} onChange={(event) => setForm((current) => ({ ...current, provinceCode: event.target.value.toUpperCase() }))} required minLength={1} maxLength={1} placeholder="S" /></label>
           <label>Código postal (4 dígitos)<input value={form.postalCode} onChange={(event) => setForm((current) => ({ ...current, postalCode: event.target.value.replace(/\D/g, '').slice(0, 4) }))} required inputMode="numeric" pattern="\d{4}" placeholder="5730" /></label>
-          <label>ID del depósito en Envíopack <span>(opcional hasta configurar la cuenta)</span><input value={form.enviopackAddressId} onChange={(event) => setForm((current) => ({ ...current, enviopackAddressId: event.target.value }))} maxLength={100} placeholder="ID asignado por Envíopack" /></label>
           <label className="admin-checkbox"><input type="checkbox" checked={form.isDefault} onChange={(event) => setForm((current) => ({ ...current, isDefault: event.target.checked }))} /> Usar como origen predeterminado</label>
           <label className="admin-checkbox"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))} /> Activo</label>
           <div className="admin-category-actions">
@@ -159,7 +153,7 @@ export default function ShippingOriginsPanel({ token }: { token: string }) {
             <div className="admin-category-row" key={origin.id}>
               <div>
                 <strong>{origin.name} {origin.isDefault ? '· Predeterminado' : ''}</strong>
-                <small>Provincia {origin.provinceCode} · CP {origin.postalCode} · {origin.isActive ? 'Activo' : 'Inactivo'} · Envíopack: {origin.enviopackAddressId || 'pendiente de configurar'}</small>
+                <small>Provincia {origin.provinceCode} · CP {origin.postalCode} · {origin.isActive ? 'Activo' : 'Inactivo'}</small>
               </div>
               <div>
                 <button type="button" onClick={() => editOrigin(origin)}>Editar</button>

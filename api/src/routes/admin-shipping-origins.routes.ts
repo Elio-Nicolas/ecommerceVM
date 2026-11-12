@@ -11,9 +11,8 @@ const DEFAULT_LOCK = 'ecommercevm-shipping-origin-default'
 
 const originSchema = z.object({
   name: z.string().trim().min(2).max(100),
-  provinceCode: z.string().trim().length(1).regex(/^[A-Z]$/, 'Usá el código provincial ISO de Envíopack, sin el prefijo AR-.'),
+  provinceCode: z.string().trim().length(1).regex(/^[A-Z]$/, 'Usá el código provincial ISO de OCA.'),
   postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal argentino de cuatro dígitos.'),
-  enviopackAddressId: z.string().trim().max(100).nullable().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
 })
@@ -60,7 +59,6 @@ adminShippingOriginsRouter.post('/', async (req, res) => {
         name: input.name,
         provinceCode: input.provinceCode,
         postalCode: input.postalCode,
-        enviopackAddressId: input.enviopackAddressId || null,
         isDefault: makeDefault,
         isActive: input.isActive ?? true,
       },
@@ -82,7 +80,6 @@ adminShippingOriginsRouter.put('/:id', async (req, res) => {
       where: { id: existing.id },
       data: {
         ...input,
-        ...(input.enviopackAddressId !== undefined ? { enviopackAddressId: input.enviopackAddressId || null } : {}),
         isActive: active,
         isDefault: false,
       },

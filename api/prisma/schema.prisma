@@ -95,7 +95,6 @@ model ShippingOrigin {
   name String
   provinceCode String
   postalCode String
-  enviopackAddressId String?
   isDefault Boolean @default(false)
   isActive Boolean @default(true)
   createdAt DateTime @default(now())
@@ -104,9 +103,6 @@ model ShippingOrigin {
 }
 model ShippingSettings {
   id String @id @default("default")
-  enviopackEnabled Boolean @default(false)
-  enviopackApiKeyEncrypted String?
-  enviopackSecretKeyEncrypted String?
   ocaEnvironment String @default("QA")
   ocaUsernameEncrypted String?
   ocaPasswordEncrypted String?
@@ -153,18 +149,10 @@ model Order {
   shippingQuoteId String?
   shippingOptionKey String?
   shippingCostOptions Json?
-  deliveryMethod String @default("ENVIOPACK")
+  deliveryMethod String @default("OCA")
   shippingInternalCostArs Int?
   deliveryInstructions String?
   provinceCode String?
-  enviopackOrderId String?
-  enviopackShipmentId String? @unique
-  enviopackShipmentStatus String?
-  enviopackTrackingNumber String?
-  enviopackProcessedAt DateTime?
-  enviopackPackages Json?
-  enviopackLabelPdf Bytes?
-  enviopackLabelSavedAt DateTime?
   items OrderItem[]
   history OrderStatusHistory[]
   fiscalDocuments FiscalDocument[]
@@ -175,7 +163,6 @@ model Order {
   @@index([status, createdAt])
   @@index([customerPhone])
   @@index([customerName])
-  @@index([enviopackOrderId])
 }
 model ShippingShipment {
   id String @id @default(uuid())
@@ -326,17 +313,4 @@ model OrderStatusHistory {
   changedByAdmin AdminUser? @relation(fields: [changedByAdminId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   @@index([orderId, createdAt])
-}
-model EnviopackWebhookEvent {
-  id String @id @default(uuid())
-  shipmentId String
-  type String
-  status String @default("PENDING")
-  attempts Int @default(0)
-  lastError String?
-  receivedAt DateTime @default(now())
-  lockedAt DateTime?
-  processedAt DateTime?
-  @@index([status, receivedAt])
-  @@index([shipmentId])
 }

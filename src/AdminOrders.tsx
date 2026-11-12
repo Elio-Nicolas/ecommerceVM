@@ -7,17 +7,14 @@ const TOKEN_KEY = 'ecommercevm_admin_token'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
 type OrderItem = { id: string; productName: string; productSku: string; unitPriceArs: number; quantity: number; lineTotalArs: number }
-type EnviopackPackage = { alto: number; ancho: number; largo: number; peso: number; descripcion_primera_linea?: string; descripcion_segunda_linea?: string }
 type OrderHistory = { id: string; fromStatus: OrderStatus | null; toStatus: OrderStatus; note: string | null; createdAt: string; changedByAdmin?: { email: string } | null }
 type Order = {
   id: string; code: string; status: OrderStatus; customerName: string; customerEmail: string | null
   customerPhone: string; addressLine: string; city: string; province: string; postalCode: string | null
   customerNotes: string | null; subtotalArs: number; shippingCostArs: number | null; totalArs: number | null
   shippingCarrier: string | null; trackingCode: string | null; shippingService: string | null; shippingEstimatedHours: number | null
-  deliveryMethod: 'ENVIOPACK' | 'LOCAL_DELIVERY' | 'PICKUP'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
+  deliveryMethod: 'OCA' | 'LOCAL_DELIVERY' | 'PICKUP' | 'LEGACY_CARRIER'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
   shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
-  enviopackOrderId: string | null; enviopackShipmentId: string | null; enviopackShipmentStatus: string | null
-  enviopackTrackingNumber: string | null; enviopackProcessedAt: string | null; enviopackPackages: EnviopackPackage[] | null; enviopackLabelSavedAt: string | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
   paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'REFUNDED' | 'PARTIALLY_REFUNDED'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
   fiscalDocuments?: { id: string; type: 'INVOICE_C' | 'CREDIT_NOTE_C' | 'DEBIT_NOTE_C'; status: 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'; pointOfSale: number | null; voucherType: number; voucherNumber: number | null; cae: string | null; caeExpiresAt: string | null; lastErrorMessage: string | null; createdAt: string }[]
@@ -53,7 +50,6 @@ function availableNextStatuses(order: Order): OrderStatus[] {
   if (mpStatuses.includes('APPROVED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
-  if (order.status === 'PREPARING' && order.deliveryMethod === 'ENVIOPACK' && order.enviopackShipmentStatus !== 'P') return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   return nextStatuses[order.status]
 }
@@ -85,7 +81,6 @@ export default function AdminOrders() {
   const [note, setNote] = useState('')
   const [updating, setUpdating] = useState(false)
   const [shippingSaving, setShippingSaving] = useState(false)
-  const [packageCount, setPackageCount] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -197,54 +192,6 @@ export default function AdminOrders() {
     } finally {
       setShippingSaving(false)
     }
-  }
-
-  async function createEnviopack(order: Order, carrierId: string, packages: { alto: number; ancho: number; largo: number; peso: number }[]) {
-    if (!token || shippingSaving || !carrierId || packages.length < 1) return
-    setShippingSaving(true); setError(''); setNotice('')
-    try {
-      const result = await request<{ data: { shipmentId: string; status: string }; message: string }>(`/admin/enviopack/orders/${order.id}/create`, token, {
-        method: 'POST', body: JSON.stringify({ carrierId, packages }),
-      })
-      setNotice(result.message)
-      await loadOrders(token)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo crear el envío en Envíopack.')
-    } finally { setShippingSaving(false) }
-  }
-
-  async function refreshEnviopack(order: Order) {
-    if (!token || shippingSaving) return
-    setShippingSaving(true); setError(''); setNotice('')
-    try {
-      await request(`/admin/enviopack/orders/${order.id}/refresh`, token, { method: 'POST' })
-      setNotice('Estado del envío actualizado desde Envíopack.')
-      await loadOrders(token)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo consultar Envíopack.')
-    } finally { setShippingSaving(false) }
-  }
-
-  async function downloadEnviopackLabel(order: Order) {
-    if (!token || shippingSaving) return
-    setShippingSaving(true); setError('')
-    try {
-      const response = await fetch(`${API_URL}/api/v1/admin/enviopack/orders/${order.id}/label`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}))
-        throw new Error(payload?.error?.message || 'No se pudo descargar la etiqueta.')
-      }
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement('a')
-      anchor.href = url; anchor.download = `etiqueta-${order.code}.pdf`
-      document.body.appendChild(anchor); anchor.click(); anchor.remove()
-      URL.revokeObjectURL(url)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo descargar la etiqueta.')
-    } finally { setShippingSaving(false) }
   }
 
   async function issueInvoiceC(order: Order, event: FormEvent<HTMLFormElement>) {
@@ -431,7 +378,7 @@ export default function AdminOrders() {
                   <td>{formatDate(order.createdAt)}</td><td>{order.items.reduce((sum, item) => sum + item.quantity, 0)}</td>
                   <td className="admin-price">{order.totalArs === null ? 'Pendiente de envío' : formatPrice(order.totalArs)}</td>
                   <td><span className={`admin-status order-status ${order.status.toLowerCase()}`}>{statusLabels[order.status]}</span></td>
-                  <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote(''); setPackageCount(order.enviopackPackages?.length || 1); setInvoiceReceiverName(''); setInvoiceReceiverAddress(''); setInvoicePaymentConfirmed(false) }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
+                  <td><button className="order-detail-button" onClick={() => { setSelected(selected === order.id ? null : order.id); setNote(''); setInvoiceReceiverName(''); setInvoiceReceiverAddress(''); setInvoicePaymentConfirmed(false) }}>{selected === order.id ? 'Cerrar' : 'Ver pedido'}</button></td>
                 </tr>)}
               </tbody></table></div>
             )}
@@ -442,7 +389,7 @@ export default function AdminOrders() {
             <div className="admin-form-heading"><div><span className="admin-kicker">PEDIDO {activeOrder.code}</span><h2>Detalle del pedido</h2></div><div className="admin-category-actions"><button type="button" className="admin-quiet-button" onClick={() => printCurrentOrder(activeOrder, 'receipt')}>Imprimir ticket</button><button type="button" className="admin-quiet-button" onClick={() => printCurrentOrder(activeOrder, 'prep')}>Etiqueta de preparación</button><button className="admin-quiet-button" onClick={() => setSelected(null)}>Cerrar</button></div></div>
             <div className="order-detail-grid">
               <div><span>CLIENTE</span><strong>{activeOrder.customerName}</strong><small>{activeOrder.customerPhone}</small><small>{activeOrder.customerEmail || 'Sin correo informado'}</small></div>
-              <div><span>MODALIDAD DE ENTREGA</span><strong>{activeOrder.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : 'Envíopack'}</strong><small>{activeOrder.deliveryInstructions || [activeOrder.addressLine, activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(' · ')}</small></div>
+              <div><span>MODALIDAD DE ENTREGA</span><strong>{activeOrder.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local'  : order.deliveryMethod === 'LEGACY_CARRIER' ? 'Proveedor anterior (histórico)' : 'OCA'}</strong><small>{activeOrder.deliveryInstructions || [activeOrder.addressLine, activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(' · ')}</small></div>
               <div><span>NOTAS</span><strong>{activeOrder.customerNotes || 'Sin indicaciones adicionales'}</strong></div>
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
@@ -487,13 +434,13 @@ export default function AdminOrders() {
             {activeOrder.deliveryMethod !== 'PICKUP' && activeOrder.shippingCarrier && <div className="order-shipping-meta"><span>OPERADOR</span><strong>{activeOrder.shippingCarrier}</strong>{activeOrder.shippingService && <><span>SERVICIO</span><strong>{activeOrder.shippingService}</strong></>}{activeOrder.shippingEstimatedHours && <><span>PLAZO ESTIMADO</span><strong>{Math.ceil(activeOrder.shippingEstimatedHours / 24)} días</strong></>}{activeOrder.trackingCode && <><span>SEGUIMIENTO</span><strong>{activeOrder.trackingCode}</strong></>}</div>}
             {activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingInternalCostArs !== null && <section className="order-logistics-breakdown"><div><span className="admin-kicker">INFORMACIÓN INTERNA · SOLO ADMINISTRACIÓN</span><h3>Costo estimado de entrega local</h3></div><div className="order-logistics-summary"><span>Costo interno estimado</span><strong>{formatPrice(activeOrder.shippingInternalCostArs)}</strong><small>Importe configurado para esta modalidad; no es una liquidación definitiva.</small></div></section>}
             {activeOrder.shippingCostOptions && <section className="order-logistics-breakdown">
-              <div><span className="admin-kicker">INFORMACIÓN INTERNA · SOLO ADMINISTRACIÓN</span><h3>Desglose de costos logísticos</h3><p>El comprador solo ve el precio de envío. Estos son los costos estimados que Envíopack informa para la tienda.</p></div>
+              <div><span className="admin-kicker">INFORMACIÓN INTERNA · SOLO ADMINISTRACIÓN</span><h3>Desglose de costos logísticos</h3><p>El comprador solo ve el precio de envío. Estos son los costos estimados que OCA informa para la tienda.</p></div>
               <div className="order-logistics-summary"><span>Precio cobrado al cliente</span><strong>{formatPrice(activeOrder.shippingCostOptions.priceArs ?? activeOrder.shippingCostArs ?? 0)}</strong></div>
-              {activeOrder.shippingCostOptions.sellerOptions?.length ? <div className="order-logistics-table"><div className="order-logistics-row order-logistics-head"><span>Transportista</span><span>Costo tienda</span><span>Diferencia estimada</span></div>{activeOrder.shippingCostOptions.sellerOptions.map((option) => <div className="order-logistics-row" key={option.carrierId}><span><strong>{option.carrierName}</strong><small>{option.fulfillmentMode === 'D' ? 'Retiro en depósito' : 'Despacho en sucursal'}{option.estimatedHours ? ` · ${Math.ceil(option.estimatedHours / 24)} días` : ''}</small></span><strong>{formatPrice(option.costArs)}</strong><strong className={((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs) >= 0 ? 'order-logistics-positive' : 'order-logistics-negative'}>{formatPrice((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs)}</strong></div>)}</div> : <p className="order-logistics-unavailable">Envíopack no devolvió costos por transportista para esta cotización. El precio al cliente sí quedó registrado.</p>}
+              {activeOrder.shippingCostOptions.sellerOptions?.length ? <div className="order-logistics-table"><div className="order-logistics-row order-logistics-head"><span>Transportista</span><span>Costo tienda</span><span>Diferencia estimada</span></div>{activeOrder.shippingCostOptions.sellerOptions.map((option) => <div className="order-logistics-row" key={option.carrierId}><span><strong>{option.carrierName}</strong><small>{option.fulfillmentMode === 'D' ? 'Retiro en depósito' : 'Despacho en sucursal'}{option.estimatedHours ? ` · ${Math.ceil(option.estimatedHours / 24)} días` : ''}</small></span><strong>{formatPrice(option.costArs)}</strong><strong className={((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs) >= 0 ? 'order-logistics-positive' : 'order-logistics-negative'}>{formatPrice((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs)}</strong></div>)}</div> : <p className="order-logistics-unavailable">OCA no devolvió costos por transportista para esta cotización. El precio al cliente sí quedó registrado.</p>}
               <p className="order-logistics-footnote">La diferencia es un margen logístico estimado, no una ganancia neta. El costo definitivo puede variar al generar la etiqueta.</p>
             </section>}
-            {activeOrder.deliveryMethod === 'ENVIOPACK' && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
-              <div><span className="admin-kicker">LOGÍSTICA NACIONAL</span><h3>Cotizar envío y seguimiento</h3><p>Este importe es el que se suma al total del comprador. El costo que cobra Envíopack se consulta y se muestra por separado en el desglose interno.</p></div>
+            {activeOrder.deliveryMethod === 'OCA' && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
+              <div><span className="admin-kicker">LOGÍSTICA NACIONAL</span><h3>Cotizar envío y seguimiento</h3><p>Este importe es el que se suma al total del comprador. El costo de OCA se gestionará por separado del importe cobrado al comprador.</p></div>
               <div className="order-shipping-fields">
                 <label>Precio de envío cobrado al cliente (ARS)<input name="shippingCostArs" type="number" min="0" max="2000000000" step="1" required defaultValue={activeOrder.shippingCostArs ?? ''} placeholder="Ej. 8500" /></label>
                 <label>Correo / transporte<input name="shippingCarrier" maxLength={100} defaultValue={activeOrder.shippingCarrier ?? ''} placeholder="Ej. Correo Argentino" /></label>
@@ -508,60 +455,14 @@ export default function AdminOrders() {
               </div>
               <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando costo...' : 'Guardar costo acordado'}</button>
             </form>}
-            {activeOrder.deliveryMethod === 'ENVIOPACK' && activeOrder.status !== 'CANCELLED' && <section className="order-logistics-breakdown">
-              <div><span className="admin-kicker">ENVÍOPACK</span><h3>Generación de envío y etiqueta</h3></div>
-              {activeOrder.enviopackShipmentId ? <div className="order-logistics-summary">
-                <span>Envío #{activeOrder.enviopackShipmentId} · Estado Envíopack: {activeOrder.enviopackShipmentStatus || 'Sin informar'}</span>
-                {activeOrder.enviopackTrackingNumber && <strong>Seguimiento: {activeOrder.enviopackTrackingNumber}</strong>}{activeOrder.enviopackLabelSavedAt && <small>Etiqueta archivada para reimpresión · {formatDate(activeOrder.enviopackLabelSavedAt)}</small>}
-                <div className="admin-category-actions">
-                  <button type="button" className="admin-quiet-button" disabled={shippingSaving} onClick={() => void refreshEnviopack(activeOrder)}>Actualizar estado</button>
-                  {(activeOrder.enviopackShipmentStatus === 'P' || activeOrder.enviopackLabelSavedAt) && <button type="button" className="admin-primary" disabled={shippingSaving} onClick={() => void downloadEnviopackLabel(activeOrder)}>Descargar etiqueta PDF</button>}
-                </div>
-                {Array.isArray(activeOrder.enviopackPackages) && <small>Bultos registrados: {activeOrder.enviopackPackages.length}</small>}
-              </div> : activeOrder.status === 'PREPARING' ? <form className="order-shipping-form" onSubmit={(event) => {
-                event.preventDefault()
-                const data = new FormData(event.currentTarget)
-                const packages = Array.from({ length: packageCount }, (_, index) => ({
-                  alto: Number(data.get(`package-${index}-alto`)),
-                  ancho: Number(data.get(`package-${index}-ancho`)),
-                  largo: Number(data.get(`package-${index}-largo`)),
-                  peso: Number(data.get(`package-${index}-peso`)),
-                }))
-                if (packages.some((item) => !Number.isInteger(item.alto) || !Number.isInteger(item.ancho) || !Number.isInteger(item.largo) || item.alto < 1 || item.ancho < 1 || item.largo < 1 || !Number.isFinite(item.peso) || item.peso <= 0)) {
-                  setError('Completá las dimensiones en centímetros y el peso en kilogramos para cada bulto.')
-                  return
-                }
-                void createEnviopack(activeOrder, String(data.get('carrierId') || ''), packages)
-              }}>
-                <p>Elegí el correo cotizado y indicá cómo preparaste físicamente el pedido. Cada fila representa un bulto real; no se genera un paquete por cada unidad comprada.</p>{activeOrder.enviopackPackages && !activeOrder.enviopackShipmentId && <p className="order-logistics-footnote">Hay bultos guardados de un intento anterior. Si Envíopack no llegó a crear el envío, podés corregirlos; si ya lo creó, el sistema recuperará el envío existente para evitar duplicados.</p>}
-                {activeOrder.shippingCostOptions?.sellerOptions?.length ? <>
-                  <label>Correo / operador
-                    <select name="carrierId" required defaultValue="">
-                      <option value="" disabled>Seleccionar transportista</option>
-                      {activeOrder.shippingCostOptions.sellerOptions.map((option) => <option key={option.carrierId} value={option.carrierId}>{option.carrierName} · costo tienda {formatPrice(option.costArs)}</option>)}
-                    </select>
-                  </label>
-                  <div className="order-shipping-fields">
-                    {Array.from({ length: packageCount }, (_, index) => <div key={index} className="order-logistics-summary">
-                      <strong>Bulto {index + 1}</strong>
-                      <label>Alto (cm)<input name={`package-${index}-alto`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.alto ?? ''} placeholder="Alto" /></label>
-                      <label>Ancho (cm)<input name={`package-${index}-ancho`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.ancho ?? ''} placeholder="Ancho" /></label>
-                      <label>Largo (cm)<input name={`package-${index}-largo`} type="number" min="1" max="300" step="1" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.largo ?? ''} placeholder="Largo" /></label>
-                      <label>Peso (kg)<input name={`package-${index}-peso`} type="number" min="0.01" max="1000" step="0.01" required readOnly={Boolean(activeOrder.enviopackShipmentId)} defaultValue={activeOrder.enviopackPackages?.[index]?.peso ?? ''} placeholder="Ej. 2.5" /></label>
-                    </div>)}
-                  </div>
-                  <div className="admin-category-actions">
-                    <button type="button" className="admin-quiet-button" disabled={Boolean(activeOrder.enviopackShipmentId) || packageCount <= 1 || shippingSaving} onClick={() => setPackageCount((count) => Math.max(1, count - 1))}>Quitar último bulto</button>
-                    <button type="button" className="admin-quiet-button" disabled={Boolean(activeOrder.enviopackShipmentId) || packageCount >= 20 || shippingSaving} onClick={() => setPackageCount((count) => Math.min(20, count + 1))}>Agregar bulto</button>
-                  </div>
-                  <button className="admin-primary" disabled={shippingSaving}>{shippingSaving ? 'Creando envío...' : 'Crear envío en Envíopack'}</button>
-                </> : <p className="order-logistics-unavailable">La cotización no guardó opciones de transportista con costo interno. No se puede generar el envío hasta contar con una opción válida.</p>}
-              </form> : <p>Para generar el envío, primero pasá el pedido a En preparación.</p>}
+            {activeOrder.deliveryMethod === 'OCA' && activeOrder.status !== 'CANCELLED' && <section className="order-logistics-breakdown">
+              <div><span className="admin-kicker">OCA E-PAK</span><h3>Despacho nacional</h3></div>
+              <p>La cotización se realiza con OCA. La admisión, descarga de etiqueta y seguimiento se completarán cuando estén confirmados el número de cuenta, centro de costo y modalidad de despacho de la cuenta.</p>
             </section>}
             <div className="order-history"><h3>Historial de actividad</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{historyEventLabel(entry)}{entry.fromStatus === entry.toStatus && <small>El pedido continúa {statusLabels[entry.toStatus].toLowerCase()}</small>}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingService === 'A coordinar' && activeOrder.status === 'PENDING' && next === 'CONFIRMED' ? 'Confirmar costo y continuar' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
           </section>}
-          <p className="admin-footnote">Los nuevos pedidos admiten retiro o entrega local según la configuración. Los envíos nacionales están pausados mientras se completa la integración con OCA. Mercado Pago solo estará disponible cuando sus credenciales y notificaciones estén configuradas.</p>
+          <p className="admin-footnote">Los pedidos admiten retiro, entrega local y envío nacional por OCA según la configuración. Mercado Pago solo estará disponible cuando sus credenciales y notificaciones estén configuradas.</p>
         </section>
       </main>
       {printKind && printOrders.length > 0 && <section className={`order-print-area ${printKind === 'receipt' ? 'receipt-print' : 'prep-print'}`} aria-hidden="true">
@@ -572,7 +473,7 @@ export default function AdminOrders() {
           {order.customerNotes && <section className="print-notes"><strong>Observaciones del comprador</strong><p>{order.customerNotes}</p></section>}
           <table><thead><tr><th>CANT.</th><th>PRODUCTO</th><th>SKU</th>{printKind === 'receipt' && <th>IMPORTE</th>}</tr></thead><tbody>{order.items.map((item) => <tr key={item.id}><td>{item.quantity}</td><td>{item.productName}</td><td>{item.productSku}</td>{printKind === 'receipt' && <td>{formatPrice(item.lineTotalArs)}</td>}</tr>)}</tbody></table>
           {printKind === 'receipt' ? <div className="print-totals"><p>Subtotal: <strong>{formatPrice(order.subtotalArs)}</strong></p><p>Entrega: <strong>{order.shippingCostArs === null ? 'A coordinar' : formatPrice(order.shippingCostArs)}</strong></p><p className="print-grand-total">TOTAL: <strong>{order.totalArs === null ? 'Pendiente de coordinación' : formatPrice(order.totalArs)}</strong></p></div> : <div className="print-checklist"><strong>CONTROL DE PREPARACIÓN</strong>{order.items.map((item) => <p key={item.id}>□ {item.quantity} × {item.productName} <span>SKU: {item.productSku}</span></p>)}</div>}
-          <footer>{order.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : order.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : 'Envíopack'} · Estado: {statusLabels[order.status]}{order.trackingCode ? ` · Seguimiento: ${order.trackingCode}` : ''}</footer>
+          <footer>{order.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : order.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : 'OCA'} · Estado: {statusLabels[order.status]}{order.trackingCode ? ` · Seguimiento: ${order.trackingCode}` : ''}</footer>
         </article>)}
       </section>}
     </div>

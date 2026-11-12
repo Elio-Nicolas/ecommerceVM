@@ -133,8 +133,8 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se puede cotizar el envío de un pedido cancelado.' } })
     return
   }
-  if (existing.deliveryMethod !== 'ENVIOPACK') {
-    res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'La edición manual del costo y seguimiento está disponible únicamente para pedidos Envíopack.' } })
+  if (existing.deliveryMethod !== 'OCA') {
+    res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'La edición manual del costo y seguimiento está disponible únicamente para envíos OCA.' } })
     return
   }
 
@@ -224,16 +224,8 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Primero registrá el costo acordado de entrega local. Después podrás confirmar el costo y continuar con el pedido.' } })
     return
   }
-  if (input.status === 'CANCELLED' && existing.deliveryMethod === 'ENVIOPACK' && existing.enviopackShipmentId) {
-    res.status(409).json({ error: { code: 'ENVIOPACK_SHIPMENT_ALREADY_CREATED', message: 'No se puede cancelar este pedido porque ya tiene un envío creado en Envíopack. Gestioná primero la cancelación con el transportista.' } })
-    return
-  }
-  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ENVIOPACK' && existing.enviopackShipmentStatus !== 'P') {
-    res.status(409).json({ error: { code: 'ENVIOPACK_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando Envíopack confirme el procesamiento y la etiqueta esté disponible.' } })
-    return
-  }
-  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ENVIOPACK' && (existing.shippingCostArs === null || !existing.shippingCarrier)) {
-    res.status(409).json({ error: { code: 'SHIPPING_NOT_CONFIGURED', message: 'Antes de marcar el pedido como enviado, registrá el costo y el transporte.' } })
+  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'OCA' && (existing.shippingCostArs === null || !existing.shippingCarrier)) {
+    res.status(409).json({ error: { code: 'SHIPPING_NOT_CONFIGURED', message: 'Antes de marcar el pedido como enviado, registrá el costo y el transporte OCA.' } })
     return
   }
   if (input.status === 'SHIPPED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
