@@ -15,7 +15,6 @@ import { adminOrdersRouter } from './routes/admin-orders.routes'
 import { adminShippingOriginsRouter } from './routes/admin-shipping-origins.routes'
 import { adminShippingSettingsRouter } from './routes/admin-shipping-settings.routes'
 import { shippingRouter } from './routes/shipping.routes'
-import { adminEnviopackRouter, enviopackWebhookRouter } from './routes/admin-enviopack.routes'
 import { adminArcaRouter } from './routes/admin-arca.routes'
 import { paymentsRouter } from './routes/payments.routes'
 
@@ -40,9 +39,7 @@ app.use('/api/v1/admin/products', adminProductsRouter)
 app.use('/api/v1/admin/categories', adminCategoriesRouter)
 app.use('/api/v1/admin/storage', adminStorageRouter)
 app.use('/api/v1/admin/orders', adminOrdersRouter)
-app.use('/api/v1/admin/enviopack', adminEnviopackRouter)
 app.use('/api/v1/admin/arca', adminArcaRouter)
-app.use('/api/v1/webhooks/enviopack', enviopackWebhookRouter)
 app.use('/api/v1/payments', paymentsRouter)
 app.use('/api/v1/admin/shipping-origins', adminShippingOriginsRouter)
 app.use('/api/v1/admin/shipping-settings', adminShippingSettingsRouter)

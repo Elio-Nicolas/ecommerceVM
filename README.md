@@ -10,7 +10,7 @@ La aplicación cuenta con storefront, API persistente, administración, gestión
 - Catálogo responsive conectado a PostgreSQL mediante la API.
 - Categorías, búsqueda, ordenamiento y fichas de producto.
 - Carrito persistido en el navegador.
-- Checkout para registrar pedidos con retiro o entrega local. Los envíos nacionales están temporalmente pausados mientras se completa la migración de Envíopack a OCA.
+- Checkout con cotización nacional OCA cuando la cuenta está configurada, además de retiro y entrega local.
 - Mercado Pago está integrado mediante Orders API, pero requiere credenciales y configuración de Webhook para habilitarse. Registrar un pedido no significa que esté cobrado.
 
 ### Administración
@@ -22,7 +22,7 @@ La aplicación cuenta con storefront, API persistente, administración, gestión
 - Integración ARCA para consultas, emisión manual de Factura C de homologación, conciliación y PDF de prueba.
 
 ### Integraciones y límites actuales
-- **Logística:** Envíopack está pausado para nuevos checkouts; sus datos y operaciones históricas se conservan en administración. OCA tiene configuraciones de cuenta cifradas, pero faltan credenciales comerciales, operativa asignada, validación QA y completar cotización, admisión, etiquetas y seguimiento. Hasta entonces, el checkout solo ofrece retiro y entrega local cuando están habilitados.
+- **Logística:** OCA es el único proveedor nacional. El cotizador y la configuración segura están preparados; la tarifa debe validarse con una respuesta real de la cuenta. Admisión, etiquetas y seguimiento requieren número de cuenta, centro de costo y modalidad confirmados. Los envíos antiguos se conservan como registros históricos neutrales.
 - **ARCA:** exclusivamente homologación. Requiere certificado X.509 de pruebas asociado a WSFE, CUIT y punto de venta habilitados. Los comprobantes de homologación no son facturas fiscales válidas para entregar a compradores.
 - **Pagos:** integración de código con Mercado Pago Checkout Pro mediante Orders API, persistencia de intentos, idempotencia, Webhook firmado y confirmación automática solo cuando la API verifica estado e importe. Requiere credenciales de prueba/producción y configurar el evento Order (Mercado Pago) en el panel del proveedor; no está activa sin esas variables.
 - **Catálogo:** el seed incluye diez productos demostrativos. Deben reemplazarse o revisarse antes de vender; sus precios, imágenes y disponibilidad no representan una oferta comercial real.
@@ -130,7 +130,6 @@ Administrativos (requieren Bearer token):
 - `/api/v1/admin/orders`
 - `/api/v1/admin/shipping-settings`
 - `/api/v1/admin/shipping-origins`
-- `/api/v1/admin/enviopack`
 - `/api/v1/admin/arca`
 
 Los detalles operativos de ARCA están en [api/docs/arca-wsaa.md](api/docs/arca-wsaa.md) y [api/docs/arca-wsfe-readonly.md](api/docs/arca-wsfe-readonly.md). La documentación de logística y configuración está en [api/README.md](api/README.md).
