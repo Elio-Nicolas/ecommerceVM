@@ -180,7 +180,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setSelectedOptionKey('')
     setQuoteError('')
     setQuoteLoading(false)
-    if (deliveryMethod !== 'OCA' || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
+    if (!deliveryMethods?.oca.enabled || deliveryMethod !== 'OCA' || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
       return () => controller.abort()
     }
 
@@ -213,7 +213,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     }, 500)
 
     return () => { window.clearTimeout(timeout); controller.abort() }
-  }, [provinceCode, postalCode, cartKey, deliveryMethod])
+  }, [provinceCode, postalCode, cartKey, deliveryMethod, deliveryMethods])
 
   async function startPayment(orderId: string) {
     if (paymentLoading) return
