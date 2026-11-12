@@ -37,6 +37,14 @@ const nextStatuses: Record<OrderStatus, OrderStatus[]> = {
   CANCELLED: [],
 }
 
+function historyEventLabel(entry: OrderHistory): string {
+  if (entry.fromStatus === null) return 'Pedido creado'
+  if (entry.fromStatus !== entry.toStatus) return statusLabels[entry.toStatus]
+  if (entry.note?.startsWith('Costo de entrega local coordinado:')) return 'Costo de entrega coordinado'
+  if (entry.note?.startsWith('Envío actualizado.')) return 'Datos de envío actualizados'
+  return 'Actualización del pedido'
+}
+
 function availableNextStatuses(order: Order): OrderStatus[] {
   const mpStatuses = (order.paymentAttempts || []).filter((payment) => payment.provider === 'MERCADO_PAGO').map((payment) => payment.status)
   if (order.status === 'PENDING' && mpStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
@@ -550,7 +558,7 @@ export default function AdminOrders() {
                 </> : <p className="order-logistics-unavailable">La cotización no guardó opciones de transportista con costo interno. No se puede generar el envío hasta contar con una opción válida.</p>}
               </form> : <p>Para generar el envío, primero pasá el pedido a En preparación.</p>}
             </section>}
-            <div className="order-history"><h3>Historial de estados</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{statusLabels[entry.toStatus]}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
+            <div className="order-history"><h3>Historial de actividad</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{historyEventLabel(entry)}{entry.fromStatus === entry.toStatus && <small>El pedido continúa {statusLabels[entry.toStatus].toLowerCase()}</small>}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingService === 'A coordinar' && activeOrder.status === 'PENDING' && next === 'CONFIRMED' ? 'Confirmar costo y continuar' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
           </section>}
           <p className="admin-footnote">Los pedidos pueden registrarse con retiro, entrega local o Envíopack. El pago todavía no está habilitado.</p>
