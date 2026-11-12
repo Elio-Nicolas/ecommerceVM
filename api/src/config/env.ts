@@ -34,9 +34,6 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
   SUPABASE_BUCKET: z.string().min(1).default('product-images'),
-  // Legacy bootstrap only: imported once into ShippingSettings, then managed in admin.
-  ENVIOPACK_API_KEY: z.string().min(1).optional(),
-  ENVIOPACK_SECRET_KEY: z.string().min(1).optional(),
   PICKUP_ENABLED: z.enum(['true', 'false']).default('true').transform((value) => value === 'true'),
   PICKUP_ADDRESS: z.string().default('Domicilio del vendedor'),
   PICKUP_INSTRUCTIONS: z.string().default('La dirección exacta y el horario se coordinarán luego de confirmar el pedido.'),
