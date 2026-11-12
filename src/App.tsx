@@ -226,7 +226,7 @@ export default function App() {
         <section className="closing-banner">
           <div><span className="eyebrow">TECNOLOGÍA SIN COMPLICACIONES</span><h2>Lo útil también<br /><em>puede sorprender.</em></h2></div>
           <a href="#catalogo" className="banner-link">Descubrí la selección <ArrowIcon /></a>
-          <span className="banner-decoration">eV</span>
+          <span className="banner-decoration">TV</span>
         </section>
       </main>
 
