@@ -65,7 +65,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
           <label>Entorno<select value={settings.ocaEnvironment} onChange={(e) => update('ocaEnvironment', e.target.value as 'QA' | 'PRODUCTION')}><option value="QA">Pruebas (QA)</option><option value="PRODUCTION">Producción</option></select></label>
           <label>Usuario e-Pak<input value={ocaUsername} onChange={(e) => setOcaUsername(e.target.value)} placeholder={settings.ocaConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Usuario asignado por OCA'} /></label>
           <label>Contraseña e-Pak<input type="password" autoComplete="new-password" value={ocaPassword} onChange={(e) => setOcaPassword(e.target.value)} placeholder={settings.ocaConfigured && !clearOcaCredentials ? 'Guardada · dejar vacío para conservar' : 'Contraseña asignada por OCA'} /></label>
-          <label>CUIT registrado en OCA<input inputMode="numeric" maxLength={11} value={ocaCuit} onChange={(e) => setOcaCuit(e.target.value.replace(/\\D/g, '').slice(0, 11))} placeholder="11 dígitos" /></label>
+          <label>CUIT registrado en OCA<input inputMode="numeric" maxLength={11} value={ocaCuit} onChange={(e) => setOcaCuit(e.target.value.replace(/\D/g, '').slice(0, 11))} placeholder="11 dígitos" /></label>
           <label>Número de operativa<input value={ocaOperative} onChange={(e) => setOcaOperative(e.target.value)} placeholder="Lo informa OCA" /></label>
         </div>
         <p className="shipping-settings-help">Para admisión y etiquetas también faltan número de cuenta, centro de costo y modalidad de despacho desde Villa Mercedes.</p>
