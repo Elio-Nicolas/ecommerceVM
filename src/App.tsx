@@ -145,7 +145,7 @@ export default function App() {
 
   return (
     <div className="site-shell">
-      <div className="announcement">Envíos a todo el país <span>·</span> Tecnología útil para todos los días</div>
+      <div className="announcement">Comprá online <span>·</span> Entrega según disponibilidad</div>
       <header className="header">
         <a className="brand" href="#" aria-label="Tu TiendaVM inicio">
           <span className="brand-mark">T<span>V</span></span>
@@ -185,7 +185,7 @@ export default function App() {
 
         <section className="benefits" aria-label="Ventajas">
           <div><span className="benefit-icon">01</span><p><strong>Elegidos con criterio</strong><small>Productos útiles, sin vueltas</small></p></div>
-          <div><span className="benefit-icon">02</span><p><strong>Comprá desde donde estés</strong><small>Envíos a toda Argentina</small></p></div>
+          <div><span className="benefit-icon">02</span><p><strong>Comprá desde donde estés</strong><small>Opciones de entrega según tu zona</small></p></div>
           <div><span className="benefit-icon">03</span><p><strong>Atención cercana</strong><small>Te ayudamos a elegir</small></p></div>
         </section>
 
@@ -267,7 +267,7 @@ export default function App() {
               </div>
               {selected.specs.length > 0 && <><h2>Características</h2><ul>{selected.specs.map((spec) => <li key={spec}>{spec}</li>)}</ul></>}
               <button className="primary-button product-page-add" disabled={selected.stock <= 0} onClick={() => addToCart(selected)}>{selected.stock > 0 ? 'Agregar al carrito' : 'Sin stock'} <ArrowIcon /></button>
-              <small>El envío se calculará en una próxima etapa. Los pagos todavía no están habilitados.</small>
+              <small>Consultá las opciones de entrega y pago al finalizar tu compra.</small>
             </div>
           </div>
         </section>
