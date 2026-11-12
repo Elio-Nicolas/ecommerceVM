@@ -1,0 +1,3 @@
+# Vercel project serves only the Vite frontend.
+# The API is deployed separately on Render.
+/api
