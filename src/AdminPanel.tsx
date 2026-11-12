@@ -295,7 +295,7 @@ export default function AdminPanel() {
 
   if (!authenticated) return (
     <main className="admin-login-page">
-      <a className="admin-brand" href="/"><span className="admin-brand-mark">eV</span><span>ecommerce<span>VM</span></span></a>
+      <a className="admin-brand" href="/"><span className="admin-brand-mark">TV</span><span>Tu Tienda<span>VM</span></span></a>
       <form className="admin-login-card" onSubmit={handleLogin}>
         <div className="admin-kicker">ÁREA PRIVADA</div>
         <h1>Bienvenido de nuevo.</h1>
@@ -306,14 +306,14 @@ export default function AdminPanel() {
         <button className="admin-primary" disabled={loading}>{loading ? 'Ingresando...' : 'Iniciar sesión'}</button>
         <a className="admin-back-link" href="/">Volver a la tienda</a>
       </form>
-      <span className="admin-login-caption">ecommerceVM · Administración</span>
+      <span className="admin-login-caption">Tu TiendaVM · Administración</span>
     </main>
   )
 
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <a className="admin-brand" href="/"><span className="admin-brand-mark">eV</span><span>ecommerce<span>VM</span></span></a>
+        <a className="admin-brand" href="/"><span className="admin-brand-mark">TV</span><span>Tu Tienda<span>VM</span></span></a>
         <div className="admin-nav-label">GESTIÓN</div>
         <a className="admin-nav-item active" href="/admin"><span className="admin-nav-icon">▦</span> Productos</a>
         <a className="admin-nav-item" href="/admin/pedidos"><span className="admin-nav-icon">▤</span> Pedidos</a>
@@ -321,7 +321,7 @@ export default function AdminPanel() {
       </aside>
 
       <main className="admin-main">
-        <header className="admin-topbar"><div><span>ECOMMERCEVM / ADMINISTRACIÓN</span><h1>Productos</h1></div><a href="/" className="admin-store-link">Ver tienda ↗</a></header>
+        <header className="admin-topbar"><div><span>TU TIENDAVM / ADMINISTRACIÓN</span><h1>Productos</h1></div><a href="/" className="admin-store-link">Ver tienda ↗</a></header>
         <section className="admin-content">
           <div className="admin-page-heading"><div><h2>Catálogo</h2><p>Administrá productos, precios, disponibilidad e imágenes.</p></div><button className="admin-primary admin-new-button" onClick={openNewProduct}>＋ Nuevo producto</button></div>
           <div className="admin-stats">
