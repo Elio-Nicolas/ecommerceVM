@@ -69,13 +69,13 @@ Luego, desde `api`:
 npm install
 npm run prisma:deploy
 npm run prisma:generate
-npm run db:seed
+npm run db:seed:admin # solo si necesitás crear el administrador inicial
 npm run dev
 ```
 
 La API queda en `http://localhost:7381`. El health check es `http://localhost:7381/api/v1/health`.
 
-El repositorio incluye el historial de migraciones. En una base nueva se usa `prisma:deploy`; no ejecutes `prisma migrate dev --name init` ni `db push` para reconstruir el esquema. El seed crea datos iniciales faltantes y configura el administrador si se definieron `ADMIN_EMAIL` y `ADMIN_PASSWORD`; no debe utilizarse como mecanismo para actualizar el catálogo comercial.
+El repositorio incluye el historial de migraciones. En una base nueva se usa `prisma:deploy`; no ejecutes `prisma migrate dev --name init` ni `db push` para reconstruir el esquema. `db:seed:admin` crea el administrador inicial solo si todavía no existe y no modifica el catálogo ni sobrescribe contraseñas existentes. `db:seed` es un seed de demostración: además de sincronizar el administrador, agrega diez productos ficticios. Usalo únicamente en una base descartable/local; no lo ejecutes en el entorno comercial.
 
 ### 3. Frontend
 
@@ -87,6 +87,10 @@ npm run dev
 ```
 
 Abrí `http://localhost:5287`. Para usar una API en otra dirección, configurá `VITE_API_URL` en el entorno de Vite.
+
+## Datos de demostración
+
+`npm run db:seed` crea diez productos de ejemplo y sus categorías, además de sincronizar el administrador configurado por variables de entorno. Ejecutalo solo en una base local descartable para desarrollo. No lo uses en el entorno comercial ni para cargar el catálogo real.
 
 ## Comandos habituales
 

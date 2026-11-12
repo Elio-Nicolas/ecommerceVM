@@ -13,11 +13,15 @@ Desde esta carpeta:
 npm install
 npm run prisma:deploy
 npm run prisma:generate
-npm run db:seed
+npm run db:seed:admin # solo si necesitás crear el administrador inicial
 npm run dev
 ```
 
-El repositorio incluye el historial completo de migraciones, desde el esquema inicial de catálogo hasta pedidos, logística y facturación. Para una base nueva, `prisma:deploy` crea el esquema en el orden correcto; no generes otra migración `admin_auth`. El seed crea o actualiza el administrador inicial si las dos variables ADMIN están definidas.
+El repositorio incluye el historial completo de migraciones, desde el esquema inicial de catálogo hasta pedidos, logística y facturación. Para una base nueva, `prisma:deploy` crea el esquema en el orden correcto; no generes otra migración `admin_auth`. `db:seed:admin` crea el administrador inicial si todavía no existe; requiere `ADMIN_EMAIL` y `ADMIN_PASSWORD` y no sobrescribe una contraseña existente ni toca el catálogo. `db:seed` es exclusivamente para datos de demostración: además del administrador, crea diez productos y sus categorías. No lo ejecutes en el entorno comercial.
+
+## Seed de demostración
+
+`npm run db:seed` agrega diez productos ficticios y categorías de ejemplo. Está reservado para bases locales descartables. Para crear el primer administrador sin poblar el catálogo, usá `npm run db:seed:admin`.
 
 ## Endpoints públicos
 - GET /api/v1
