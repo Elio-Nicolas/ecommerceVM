@@ -396,7 +396,7 @@ export default function AdminOrders() {
   return (
     <div className={`admin-layout${printKind ? ' printing-orders' : ''}`}>
       <aside className="admin-sidebar">
-        <a className="admin-brand" href="/"><span className="admin-brand-mark">eV</span><span>ecommerce<span>VM</span></span></a>
+        <a className="admin-brand" href="/"><span className="admin-brand-mark">TV</span><span>Tu Tienda<span>VM</span></span></a>
         <div className="admin-nav-label">GESTIÓN</div>
         <a className="admin-nav-item" href="/admin"><span className="admin-nav-icon">▦</span> Productos</a>
         <a className="admin-nav-item active" href="/admin/pedidos"><span className="admin-nav-icon">▤</span> Pedidos</a>
@@ -404,7 +404,7 @@ export default function AdminOrders() {
       </aside>
 
       <main className="admin-main">
-        <header className="admin-topbar"><div><span>ECOMMERCEVM / ADMINISTRACIÓN</span><h1>Pedidos</h1></div><a href="/" className="admin-store-link">Ver tienda ↗</a></header>
+        <header className="admin-topbar"><div><span>TU TIENDAVM / ADMINISTRACIÓN</span><h1>Pedidos</h1></div><a href="/" className="admin-store-link">Ver tienda ↗</a></header>
         <section className="admin-content">
           <div className="admin-page-heading"><div><h2>Gestión de pedidos</h2><p>Consultá pedidos, revisá sus datos y actualizá el estado de preparación y entrega.</p></div></div>
           <div className="admin-stats order-stats">
@@ -566,7 +566,7 @@ export default function AdminOrders() {
       </main>
       {printKind && printOrders.length > 0 && <section className={`order-print-area ${printKind === 'receipt' ? 'receipt-print' : 'prep-print'}`} aria-hidden="true">
         {printOrders.map((order) => <article className="print-sheet" key={order.id}>
-          <header><strong>ecommerceVM</strong><span>{printKind === 'receipt' ? 'COMPROBANTE DE PEDIDO' : 'PREPARACIÓN DE PEDIDO'}</span></header>
+          <header><strong>Tu TiendaVM</strong><span>{printKind === 'receipt' ? 'COMPROBANTE DE PEDIDO' : 'PREPARACIÓN DE PEDIDO'}</span></header>
           <div className="print-order-code"><strong>{order.code}</strong><span>{formatDate(order.createdAt)}</span></div>
           <section><h2>{order.customerName}</h2><p>{order.customerPhone}{order.customerEmail ? ` · ${order.customerEmail}` : ''}</p><p>{[order.addressLine, order.city, order.province, order.postalCode].filter(Boolean).join(' · ')}</p></section>
           {order.customerNotes && <section className="print-notes"><strong>Observaciones del comprador</strong><p>{order.customerNotes}</p></section>}
