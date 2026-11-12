@@ -1,4 +1,4 @@
-# ecommerceVM API
+# Tu TiendaVM API
 
 API REST para el catálogo y la administración de productos.
 
