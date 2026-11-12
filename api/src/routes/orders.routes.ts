@@ -28,7 +28,7 @@ const createOrderSchema = z.object({
   province: z.string().trim().min(2).max(100),
   postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
   provinceCode: z.string().length(1).regex(/^[A-Z]$/).optional(),
-  deliveryMethod: z.enum(['ENVIOPACK', 'LOCAL_DELIVERY', 'PICKUP']).default('ENVIOPACK'),
+  deliveryMethod: z.enum(['OCA', 'LOCAL_DELIVERY', 'PICKUP']).default('OCA'),
   shippingQuoteId: z.string().uuid().optional(),
   shippingOptionKey: z.string().trim().min(1).max(40).optional(),
   customerNotes: z.string().trim().max(1000).optional().transform((value) => value || null),
@@ -44,7 +44,7 @@ const createOrderSchema = z.object({
 })
 
 function isLegacyShippingMethod(method: string): boolean {
-  return method === 'ENVIOPACK'
+  return method === 'OCA'
 }
 
 class OrderConflictError extends Error {
@@ -112,16 +112,6 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
     }
   }
 
-  if (input.deliveryMethod === 'ENVIOPACK') {
-    res.status(503).json({
-      error: {
-        code: 'SHIPPING_PROVIDER_MIGRATION_PENDING',
-        message: 'Los envíos nacionales están en proceso de migración a OCA. Elegí retiro o entrega local si están disponibles.',
-      },
-    })
-    return
-  }
-
   try {
     const deliverySettings = await getShippingSettings()
     const order = await prisma.$transaction(async (tx) => {
@@ -151,7 +141,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         deliveryInstructions = deliverySettings.localDeliveryCoordinate ? 'El costo de entrega se coordinará luego de confirmar el pedido.' : null
       } else {
         if (!input.shippingQuoteId || !input.shippingOptionKey || !input.provinceCode) {
-          throw new OrderConflictError('Seleccioná una cotización vigente de Envíopack.')
+          throw new OrderConflictError('Seleccioná una cotización vigente de OCA.')
         }
         const quote = await tx.shippingQuote.findFirst({
           where: {
@@ -169,7 +159,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         ) as Prisma.JsonObject | undefined
         if (!selectedOption) throw new OrderConflictError('La opción de envío seleccionada ya no está disponible. Volvé a cotizar.')
         shippingCostArs = Number(selectedOption.priceArs)
-        shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : 'Envíopack'
+        shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : 'OCA'
         shippingService = typeof selectedOption.serviceLabel === 'string' ? selectedOption.serviceLabel : 'Envío estándar'
         shippingEstimatedHours = typeof selectedOption.estimatedHours === 'number' ? selectedOption.estimatedHours : null
         if (!Number.isSafeInteger(shippingCostArs) || shippingCostArs < 0) throw new OrderConflictError('El importe del envío no es válido. Volvé a cotizar.')
@@ -188,7 +178,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (products.length !== input.items.length) {
         throw new OrderConflictError('Uno o más productos ya no están disponibles. Actualizá el carrito.')
       }
-      if (input.deliveryMethod === 'ENVIOPACK') {
+      if (input.deliveryMethod === 'OCA') {
         const quote = input.shippingQuoteId ? await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } }) : null
         if (!quote || quote.cartFingerprint !== shippingCartFingerprint(input.items, products)) {
           throw new OrderConflictError('Los productos o sus paquetes cambiaron desde la cotización. Volvé a calcular el envío.')
@@ -215,7 +205,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
         throw new OrderConflictError('El importe del pedido no es válido.')
       }
-      if (input.deliveryMethod === 'ENVIOPACK' && input.shippingQuoteId) {
+      if (input.deliveryMethod === 'OCA' && input.shippingQuoteId) {
         const quote = await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } })
         if (!quote || quote.subtotalArs !== subtotalArs) throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
       }
