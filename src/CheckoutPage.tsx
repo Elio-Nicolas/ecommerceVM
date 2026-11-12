@@ -12,11 +12,11 @@ type ShippingOption = {
   priceArs: number
   estimatedHours: number | null
 }
-type DeliveryMethod = 'ENVIOPACK' | 'LOCAL_DELIVERY' | 'PICKUP'
+type DeliveryMethod = 'OCA' | 'LOCAL_DELIVERY' | 'PICKUP'
 type DeliveryMethods = {
   pickup: { enabled: boolean; address: string; instructions: string; priceArs: number }
   localDelivery: { enabled: boolean; postalCodes: string[]; priceArs: number | null; coordinate: boolean }
-  enviopack: { enabled: boolean }
+  oca: { enabled: boolean }
 }
 type ShippingQuote = {
   id: string
@@ -68,7 +68,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [postalCode, setPostalCode] = useState('')
   const [customerNotes, setCustomerNotes] = useState('')
   const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethods | null>(null)
-  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('ENVIOPACK')
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('OCA')
   const [quote, setQuote] = useState<ShippingQuote | null>(null)
   const [selectedOptionKey, setSelectedOptionKey] = useState('')
   const [quoteLoading, setQuoteLoading] = useState(false)
@@ -153,7 +153,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     fetch(`${API_URL}/api/v1/shipping/methods`).then((response) => response.json()).then((payload) => {
       const methods = payload.data as DeliveryMethods
       setDeliveryMethods(methods)
-      if (!methods.enviopack.enabled) {
+      if (!methods.oca.enabled) {
         if (methods.pickup.enabled) setDeliveryMethod('PICKUP')
         else if (methods.localDelivery.enabled) setDeliveryMethod('LOCAL_DELIVERY')
       }
@@ -180,7 +180,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setSelectedOptionKey('')
     setQuoteError('')
     setQuoteLoading(false)
-    if (deliveryMethod !== 'ENVIOPACK' || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
+    if (deliveryMethod !== 'OCA' || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
       return () => controller.abort()
     }
 
@@ -272,7 +272,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           postalCode: postalCode || (deliveryMethod === 'PICKUP' ? '5730' : postalCode),
           customerNotes,
           deliveryMethod,
-          ...(deliveryMethod === 'ENVIOPACK' && quote && selectedOption ? { shippingQuoteId: quote.id, shippingOptionKey: selectedOption.key } : {}),
+          ...(deliveryMethod === 'OCA' && quote && selectedOption ? { shippingQuoteId: quote.id, shippingOptionKey: selectedOption.key } : {}),
           items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
         }),
       })
@@ -342,7 +342,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <div className="checkout-fields">
               <label>Nombre y apellido<input required minLength={2} maxLength={120} autoComplete="name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
               <label>Teléfono / WhatsApp<input required type="tel" minLength={8} maxLength={30} autoComplete="tel" placeholder="Ej. 2657 123456" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} /></label>
-              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'ENVIOPACK' || paymentsEnabled ? <span>(obligatorio para el envío y el pago)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'ENVIOPACK' || paymentsEnabled} maxLength={deliveryMethod === 'ENVIOPACK' || paymentsEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
+              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'OCA' || paymentsEnabled ? <span>(obligatorio para el envío y el pago)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'OCA' || paymentsEnabled} maxLength={deliveryMethod === 'OCA' || paymentsEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
             </div>
           </section>
           <section className="checkout-card">
@@ -351,7 +351,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
               <label className="checkout-field-full">Calle y altura<input required={deliveryMethod !== 'PICKUP'} minLength={4} maxLength={180} autoComplete="street-address" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></label>
               <label>Localidad<input required={deliveryMethod !== 'PICKUP'} minLength={2} maxLength={100} autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} /></label>
               <label>Provincia
-                <select required={deliveryMethod === 'ENVIOPACK' || deliveryMethod === 'LOCAL_DELIVERY'} value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
+                <select required={deliveryMethod === 'OCA' || deliveryMethod === 'LOCAL_DELIVERY'} value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
                   <option value="">Seleccionar provincia</option>
                   {PROVINCES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                 </select>
@@ -371,17 +371,17 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
                 <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'LOCAL_DELIVERY'} onChange={() => setDeliveryMethod('LOCAL_DELIVERY')} />
                 <span className="checkout-shipping-option-copy"><strong>Entrega local</strong><small>{localDeliveryAvailable ? (deliveryMethods.localDelivery.coordinate ? 'Costo a coordinar luego de confirmar el pedido.' : 'Disponible para tu código postal.') : 'No disponible para este código postal.'}</small></span><strong className="checkout-shipping-price">{deliveryMethods.localDelivery.coordinate ? 'A coordinar' : formatPrice(deliveryMethods.localDelivery.priceArs || 0)}</strong>
               </label>}
-              {deliveryMethods.enviopack.enabled && <label className={deliveryMethod === 'ENVIOPACK' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
-                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'ENVIOPACK'} onChange={() => setDeliveryMethod('ENVIOPACK')} />
-                <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por Envíopack</strong><small>Un único bulto consolidado con el peso y las dimensiones estimadas de todo el pedido.</small></span>
+              {deliveryMethods.oca.enabled && <label className={deliveryMethod === 'OCA' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
+                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'OCA'} onChange={() => setDeliveryMethod('OCA')} />
+                <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por OCA</strong><small>Un único bulto consolidado con el peso y las dimensiones estimadas de todo el pedido.</small></span>
               </label>}
             </div>}
             {deliveryMethod === 'PICKUP' ? <p className="checkout-shipping-hint">El retiro no depende de tu localidad. Coordinaremos la entrega del pedido luego de confirmarlo.</p> : deliveryMethod === 'LOCAL_DELIVERY' ? <p className="checkout-shipping-hint">{localDeliveryAvailable ? 'La entrega local está disponible para tu destino.' : 'Ingresá un código postal cubierto por la entrega local.'}</p> : null}
-            {deliveryMethod === 'ENVIOPACK' && <>
+            {deliveryMethod === 'OCA' && <>
             {!provinceCode || !/^\d{4}$/.test(postalCode)
               ? <p className="checkout-shipping-hint">Ingresá provincia y código postal para calcular el envío.</p>
               : quoteLoading
-                ? <p className="checkout-shipping-hint">Consultando tarifas de Envíopack...</p>
+                ? <p className="checkout-shipping-hint">Consultando tarifas de OCA...</p>
                 : quoteError
                   ? <div className="checkout-error" role="alert">{quoteError}</div>
                   : quote?.options.length
