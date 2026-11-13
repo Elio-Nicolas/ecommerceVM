@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { formatPrice, type Product } from './products'
 import { fetchCategories, fetchProducts } from './catalog-api'
 import CheckoutPage from './CheckoutPage'
+import RegretPage from './RegretPage'
 
 type CartLine = { product: Product; quantity: number }
 
@@ -143,6 +144,8 @@ export default function App() {
       .filter((line) => line.quantity > 0))
   }
 
+  if (window.location.pathname.replace(/\/$/, '') === '/arrepentimiento') return <RegretPage />
+
   return (
     <div className="site-shell">
       <div className="announcement">Comprá online <span>·</span> Entrega según disponibilidad</div>
@@ -233,7 +236,7 @@ export default function App() {
       <footer className="footer">
         <a className="brand footer-brand" href="#"><span className="brand-mark">T<span>V</span></span><span className="brand-name">Tu Tienda<span>VM</span></span></a>
         <p>Una nueva forma de encontrar tecnología útil.</p>
-        <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span></div>
+        <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span><a href="/arrepentimiento">Arrepentimiento de compra</a></div>
       </footer>
 
       {cartOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
