@@ -208,7 +208,7 @@ export default function AdminOrders() {
     const rawShippingCost = formData.get('shippingCostArs')
     const hasShippingCost = rawShippingCost !== null && String(rawShippingCost).trim() !== ''
     const shippingCostArs = hasShippingCost ? Number(rawShippingCost) : undefined
-    if (hasShippingCost && (!Number.isSafeInteger(shippingCostArs) || (shippingCostArs as number) < 0)) {
+    if (hasShippingCost && (!Number.isSafeInteger(shippingCostArs as number) || (shippingCostArs as number) < 0)) {
       setError('Ingresá un costo de envío válido.')
       return
     }
