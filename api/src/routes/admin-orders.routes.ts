@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { OrderStatus, Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
+import { env } from '../config/env'
 import { requireAdmin } from '../middleware/require-admin'
 import { wouldChangeOrderTotal } from '../services/shipping-total-consistency'
 
@@ -30,6 +31,7 @@ const orderInclude = {
   fiscalDocuments: { orderBy: { createdAt: 'desc' as const }, select: { id: true, type: true, status: true, pointOfSale: true, voucherType: true, voucherNumber: true, cae: true, caeExpiresAt: true, lastErrorMessage: true, createdAt: true } },
   history: { orderBy: { createdAt: 'desc' as const }, include: { changedByAdmin: { select: { email: true } } } },
   shipments: { where: { provider: 'OCA' }, select: { provider: true, status: true, trackingNumber: true } },
+  cancellationRequest: true,
 }
 
 adminOrdersRouter.get('/', async (req, res) => {
@@ -278,5 +280,106 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       return
     }
     throw error
+  }
+})
+
+
+adminOrdersRouter.post('/:id/refund', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  if (!orderId.success) {
+    res.status(400).json({ error: { code: 'ORDER_ID_INVALID', message: 'El pedido no es válido.' } })
+    return
+  }
+  if (!env.MP_ACCESS_TOKEN) {
+    res.status(503).json({ error: { code: 'MP_NOT_CONFIGURED', message: 'Mercado Pago no está configurado.' } })
+    return
+  }
+
+  const request = await prisma.cancellationRequest.findUnique({
+    where: { orderId: orderId.data },
+    include: { order: { include: { paymentAttempts: { where: { provider: 'MERCADO_PAGO' }, orderBy: { createdAt: 'desc' } } } } },
+  })
+  if (!request) {
+    res.status(404).json({ error: { code: 'REGRET_REQUEST_NOT_FOUND', message: 'Este pedido no tiene una solicitud de arrepentimiento.' } })
+    return
+  }
+  if (request.status === 'REFUNDED') {
+    res.status(409).json({ error: { code: 'ALREADY_REFUNDED', message: 'Este pedido ya tiene un reembolso registrado.' } })
+    return
+  }
+
+  const payment = request.order.paymentAttempts.find((attempt) => attempt.providerOrderId && ['APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))
+  if (!payment?.providerOrderId) {
+    res.status(409).json({ error: { code: 'APPROVED_PAYMENT_NOT_FOUND', message: 'No encontramos un pago aprobado y conciliado para este pedido.' } })
+    return
+  }
+
+  try {
+    // If a previous request may have reached Mercado Pago, query the order first.
+    if (request.status === 'PROCESSING') {
+      const check = await fetch('https://api.mercadopago.com/v1/orders/' + encodeURIComponent(payment.providerOrderId), {
+        headers: { accept: 'application/json', authorization: 'Bearer ' + env.MP_ACCESS_TOKEN },
+        signal: AbortSignal.timeout(15000),
+      })
+      if (!check.ok) throw new Error('No se pudo consultar el estado del reembolso en Mercado Pago.')
+      const current = await check.json() as { status?: string; status_detail?: string; transactions?: { refunds?: Array<{ id?: string; status?: string }> } }
+      if (current.status === 'refunded' || current.transactions?.refunds?.some((refund) => refund.status === 'processed')) {
+        const refundId = current.transactions?.refunds?.[0]?.id || request.providerRefundId
+        await prisma.$transaction([
+          prisma.cancellationRequest.update({ where: { id: request.id }, data: { status: 'REFUNDED', providerRefundId: refundId || null, providerStatus: current.status || 'refunded', lastError: null } }),
+          prisma.paymentAttempt.update({ where: { id: payment.id }, data: { status: 'REFUNDED', statusDetail: 'refunded', lastError: null } }),
+          prisma.orderStatusHistory.create({ data: { orderId: request.orderId, fromStatus: request.order.status, toStatus: request.order.status, note: 'Reembolso total confirmado por Mercado Pago.', changedByAdminId: req.admin?.id || null } }),
+        ])
+        res.json({ data: { status: 'REFUNDED' }, message: 'Mercado Pago confirmó el reembolso.' })
+        return
+      }
+      res.status(202).json({ data: { status: 'PROCESSING' }, message: 'Mercado Pago todavía está procesando el reembolso. Volvé a consultar en unos minutos.' })
+      return
+    }
+
+    await prisma.cancellationRequest.update({ where: { id: request.id }, data: { status: 'PROCESSING', lastError: null } })
+    const response = await fetch('https://api.mercadopago.com/v1/orders/' + encodeURIComponent(payment.providerOrderId) + '/refund', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        authorization: 'Bearer ' + env.MP_ACCESS_TOKEN,
+        'x-idempotency-key': request.requestKey,
+      },
+      signal: AbortSignal.timeout(20000),
+    })
+    const payload = await response.json().catch(() => ({})) as { id?: string; status?: string; status_detail?: string; transactions?: { refunds?: Array<{ id?: string; status?: string }> }; message?: string }
+    if (!response.ok) {
+      if (response.status === 409 && ['order_already_refunded', 'order_refund_already_in_process'].includes(String((payload as any).error || ''))) {
+        await prisma.cancellationRequest.update({ where: { id: request.id }, data: { status: 'PROCESSING', providerStatus: 'processing', lastError: null } })
+        res.status(202).json({ data: { status: 'PROCESSING' }, message: 'Mercado Pago ya tiene un reembolso en curso. Consultá nuevamente en unos minutos.' })
+        return
+      }
+      throw new Error(payload.message || 'Mercado Pago no pudo procesar el reembolso.')
+    }
+
+    const refund = payload.transactions?.refunds?.[0]
+    const completed = payload.status === 'refunded' || refund?.status === 'processed'
+    await prisma.cancellationRequest.update({
+      where: { id: request.id },
+      data: {
+        status: completed ? 'REFUNDED' : 'PROCESSING',
+        providerRefundId: refund?.id || null,
+        providerStatus: payload.status || refund?.status || 'processing',
+        lastError: null,
+      },
+    })
+    if (completed) {
+      await prisma.paymentAttempt.update({ where: { id: payment.id }, data: { status: 'REFUNDED', statusDetail: 'refunded', lastError: null } })
+      await prisma.orderStatusHistory.create({ data: { orderId: request.orderId, fromStatus: request.order.status, toStatus: request.order.status, note: 'Reembolso total confirmado por Mercado Pago.', changedByAdminId: req.admin?.id || null } })
+    }
+    res.status(completed ? 200 : 202).json({
+      data: { status: completed ? 'REFUNDED' : 'PROCESSING' },
+      message: completed ? 'Mercado Pago confirmó el reembolso.' : 'Mercado Pago recibió el reembolso y lo está procesando. Consultá nuevamente en unos minutos.',
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudo procesar el reembolso.'
+    await prisma.cancellationRequest.update({ where: { id: request.id }, data: { status: 'FAILED', lastError: message.slice(0, 400) } }).catch(() => undefined)
+    res.status(502).json({ error: { code: 'MP_REFUND_FAILED', message } })
   }
 })
