@@ -285,3 +285,18 @@
 .search-submit:active{transform:scale(.97)}
 .search-submit:focus-visible{outline:3px solid #d84c35;outline-offset:2px}
 @media(max-width:650px){.search-box{padding-left:12px}.search-submit{min-width:68px;height:32px;padding:0 11px;font-size:10px}}
+
+
+/* Footer ampliado de la tienda */
+.footer{padding-top:58px}
+.footer-main{max-width:1236px;margin:0 auto 42px;display:grid;grid-template-columns:1.65fr 1fr 1.15fr 1fr;gap:42px}
+.footer-about>p{max-width:260px;color:#a4afb9;font-size:11px;line-height:1.8;margin:18px 0 18px}
+.footer-location{display:inline-flex;align-items:center;gap:8px;color:#c3cbd2;font-size:10px;letter-spacing:.02em}
+.footer-location-dot{width:7px;height:7px;border-radius:50%;background:#e47761;box-shadow:0 0 0 4px #e4776120}
+.footer-column{display:flex;flex-direction:column;align-items:flex-start;gap:13px;padding-top:5px}
+.footer-column h3{margin:0 0 5px;color:#fff;font:700 11px Manrope;letter-spacing:.04em}
+.footer-column a,.footer-column>span{color:#a4afb9;font-size:10px;line-height:1.5;transition:color .18s}
+.footer-column a:hover{color:#fff}
+.footer-bottom{max-width:1236px;margin:0 auto;padding-top:20px;gap:18px;flex-wrap:wrap}
+@media(max-width:850px){.footer-main{grid-template-columns:1.4fr 1fr 1fr;gap:30px}.footer-about{grid-column:1/-1}}
+@media(max-width:650px){.footer{padding-top:38px}.footer-main{grid-template-columns:1fr 1fr;gap:28px 18px;margin-bottom:30px}.footer-about{grid-column:1/-1}.footer-about>p{max-width:300px}.footer-column{gap:11px}.footer-column h3{margin-bottom:3px}.footer-bottom{gap:10px}}
