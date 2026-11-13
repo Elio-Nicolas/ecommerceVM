@@ -154,11 +154,11 @@ export default function App() {
           <span className="brand-mark">T<span>V</span></span>
           <span className="brand-name">Tu Tienda<span>VM</span></span>
         </a>
-        <label className="search-box">
+        <form className="search-box" role="search" onSubmit={(event) => { event.preventDefault(); document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' }) }}>
           <SearchIcon />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="¿Qué estás buscando?" aria-label="Buscar productos" />
-          <kbd>Buscar</kbd>
-        </label>
+          <button className="search-submit" type="submit">Buscar</button>
+        </form>
         <div className="header-actions">
           <button className="text-action" onClick={() => document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' })}>Explorar</button>
           <button className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Abrir carrito, ${cartCount} productos`}>
