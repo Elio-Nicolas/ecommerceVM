@@ -205,9 +205,18 @@ export default function AdminOrders() {
     event.preventDefault()
     if (!token || shippingSaving) return
     const formData = new FormData(event.currentTarget)
-    const shippingCostArs = Number(formData.get('shippingCostArs'))
-    if (!Number.isSafeInteger(shippingCostArs) || shippingCostArs < 0) {
+    const rawShippingCost = formData.get('shippingCostArs')
+    const hasShippingCost = rawShippingCost !== null && String(rawShippingCost).trim() !== ''
+    const shippingCostArs = hasShippingCost ? Number(rawShippingCost) : undefined
+    if (hasShippingCost && (!Number.isSafeInteger(shippingCostArs) || (shippingCostArs as number) < 0)) {
       setError('Ingresá un costo de envío válido.')
+      return
+    }
+    const shippingCarrier = String(formData.get('shippingCarrier') || '').trim() || null
+    const trackingCode = String(formData.get('trackingCode') || '').trim() || null
+    const deliveryNote = String(formData.get('deliveryNote') || '').trim() || undefined
+    if (!hasShippingCost && !shippingCarrier && !trackingCode && !deliveryNote) {
+      setError('Ingresá al menos un dato de entrega para guardar.')
       return
     }
     setShippingSaving(true)
@@ -217,12 +226,15 @@ export default function AdminOrders() {
       await request(`/admin/orders/${order.id}/shipping`, token, {
         method: 'PATCH',
         body: JSON.stringify({
-          shippingCostArs,
-          shippingCarrier: String(formData.get('shippingCarrier') || '').trim() || null,
-          trackingCode: String(formData.get('trackingCode') || '').trim() || null,
+          ...(hasShippingCost ? { shippingCostArs } : {}),
+          shippingCarrier,
+          trackingCode,
+          note: deliveryNote,
         }),
       })
-      setNotice(`Costo de entrega del pedido ${order.code} registrado. Total actualizado: ${formatPrice(order.subtotalArs + shippingCostArs)}. Ahora confirmá el costo para continuar.`)
+      setNotice(hasShippingCost
+        ? `Costo de entrega del pedido ${order.code} registrado. Total actualizado: ${formatPrice(order.subtotalArs + (shippingCostArs as number))}. Ahora confirmá el costo para continuar.`
+        : `Datos de entrega del pedido ${order.code} actualizados.`)
       await loadOrders(token)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el envío.')
@@ -530,6 +542,15 @@ export default function AdminOrders() {
                 <label className="tracking-field">Código de seguimiento<input name="trackingCode" maxLength={120} defaultValue={activeOrder.trackingCode ?? ''} placeholder="Código de envío" /></label>
               </div>
               <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando envío...' : 'Guardar cotización y seguimiento'}</button>
+            </form>}
+            {activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-local-delivery`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
+              <div><span className="admin-kicker">ENTREGA LOCAL</span><h3>Datos de entrega (todos opcionales)</h3><p>Si la entrega la hacés vos, no necesitás completar nada. Registrá cadetería, Uber o una referencia solo cuando te resulte útil.</p></div>
+              <div className="order-shipping-fields">
+                <label>Medio de entrega<input name="shippingCarrier" maxLength={100} defaultValue={activeOrder.shippingCarrier ?? ''} placeholder="Ej. Propia, cadetería, Uber..." /></label>
+                <label className="tracking-field">Referencia / identificación<input name="trackingCode" maxLength={120} defaultValue={activeOrder.trackingCode ?? ''} placeholder="Ej. nombre del cadete o referencia" /></label>
+                <label className="tracking-field">Observación (opcional)<input name="deliveryNote" maxLength={500} placeholder="Ej. Entrega coordinada para la tarde" /></label>
+              </div>
+              <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando...' : 'Guardar datos de entrega'}</button>
             </form>}
             {activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingService === 'A coordinar' && activeOrder.shippingCostArs === null && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(activeOrder.status) && <form className="order-shipping-form" key={`${activeOrder.id}-local-coordinate`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
               <div><span className="admin-kicker">ENTREGA LOCAL</span><h3>Registrar costo acordado</h3><p>Ingresá el importe que se coordinó con el comprador. Se sumará al total final del pedido; no requiere transportista ni seguimiento.</p></div>
