@@ -124,7 +124,12 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       res.status(409).json({ error: { code: 'ORDER_ALREADY_DISPATCHED', message: 'El costo de entrega local debe registrarse antes de despachar el pedido.' } })
       return
     }
-    const totalArs = existing.subtotalArs + input.shippingCostArs
+    const shippingCostArs = shippingCostArs
+    if (shippingCostArs === undefined) {
+      res.status(400).json({ error: { code: 'SHIPPING_COST_REQUIRED', message: 'Ingresá el costo acordado de entrega local.' } })
+      return
+    }
+    const totalArs = existing.subtotalArs + shippingCostArs
     if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
       res.status(400).json({ error: { code: 'INVALID_ORDER_TOTAL', message: 'El total del pedido supera el importe permitido.' } })
       return
@@ -136,8 +141,8 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
         select: { subtotalArs: true, shippingCostArs: true, totalArs: true },
       })
       if (!currentOrder) return null
-      const nextTotalArs = currentOrder.subtotalArs + input.shippingCostArs
-      if (wouldChangeOrderTotal(currentOrder.subtotalArs, input.shippingCostArs, currentOrder.totalArs)) {
+      const nextTotalArs = currentOrder.subtotalArs + shippingCostArs
+      if (wouldChangeOrderTotal(currentOrder.subtotalArs, shippingCostArs, currentOrder.totalArs)) {
         const blockingPayment = await tx.paymentAttempt.findFirst({
           where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
           select: { id: true },
@@ -146,14 +151,14 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       }
       await tx.order.update({
         where: { id: existing.id },
-        data: { shippingCostArs: input.shippingCostArs, totalArs: nextTotalArs, shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode },
+        data: { shippingCostArs: shippingCostArs, totalArs: nextTotalArs, shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode },
       })
       await tx.orderStatusHistory.create({
         data: {
           orderId: existing.id,
           fromStatus: existing.status,
           toStatus: existing.status,
-          note: `Costo de entrega local coordinado: ${input.shippingCostArs.toLocaleString('es-AR')}.${input.shippingCarrier ? ` Medio: ${input.shippingCarrier}.` : ''}${input.trackingCode ? ` Referencia: ${input.trackingCode}.` : ''}${input.note ? ` ${input.note}` : ''}`,
+          note: `Costo de entrega local coordinado: ${shippingCostArs.toLocaleString('es-AR')}.${input.shippingCarrier ? ` Medio: ${input.shippingCarrier}.` : ''}${input.trackingCode ? ` Referencia: ${input.trackingCode}.` : ''}${input.note ? ` ${input.note}` : ''}`,
           changedByAdminId: req.admin?.id || null,
         },
       })
@@ -179,7 +184,13 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     return
   }
 
-  const totalArs = existing.subtotalArs + input.shippingCostArs
+  const shippingCostArs = shippingCostArs
+  if (shippingCostArs === undefined) {
+    res.status(400).json({ error: { code: 'SHIPPING_COST_REQUIRED', message: 'Ingresá el precio de envío cobrado al cliente.' } })
+    return
+  }
+
+  const totalArs = existing.subtotalArs + shippingCostArs
   if (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000) {
     res.status(400).json({ error: { code: 'INVALID_ORDER_TOTAL', message: 'El total del pedido supera el importe permitido.' } })
     return
@@ -192,8 +203,8 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       select: { subtotalArs: true, shippingCostArs: true, totalArs: true },
     })
     if (!currentOrder) return null
-    const nextTotalArs = currentOrder.subtotalArs + input.shippingCostArs
-    if (wouldChangeOrderTotal(currentOrder.subtotalArs, input.shippingCostArs, currentOrder.totalArs)) {
+    const nextTotalArs = currentOrder.subtotalArs + shippingCostArs
+    if (wouldChangeOrderTotal(currentOrder.subtotalArs, shippingCostArs, currentOrder.totalArs)) {
       const blockingPayment = await tx.paymentAttempt.findFirst({
         where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
         select: { id: true },
@@ -203,7 +214,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     await tx.order.update({
       where: { id: existing.id },
       data: {
-        shippingCostArs: input.shippingCostArs,
+        shippingCostArs: shippingCostArs,
         totalArs: nextTotalArs,
         shippingCarrier: input.shippingCarrier,
         trackingCode: input.trackingCode,
@@ -218,7 +229,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
         orderId: existing.id,
         fromStatus: existing.status,
         toStatus: existing.status,
-        note: `Envío actualizado. Costo: ${input.shippingCostArs.toLocaleString('es-AR')}.${trackingDetails ? ` ${trackingDetails}.` : ''}`,
+        note: `Envío actualizado. Costo: ${shippingCostArs.toLocaleString('es-AR')}.${trackingDetails ? ` ${trackingDetails}.` : ''}`,
         changedByAdminId: req.admin?.id || null,
       },
     })
