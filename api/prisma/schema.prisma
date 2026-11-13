@@ -34,6 +34,12 @@ enum ArcaEnvironment {
   HOMOLOGATION
   PRODUCTION
 }
+enum CancellationRequestStatus {
+  REQUESTED
+  PROCESSING
+  REFUNDED
+  FAILED
+}
 enum PaymentAttemptStatus {
   CREATING
   PENDING
@@ -158,6 +164,7 @@ model Order {
   fiscalDocuments FiscalDocument[]
   paymentAttempts PaymentAttempt[]
   shipments ShippingShipment[]
+  cancellationRequest CancellationRequest?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])
@@ -313,4 +320,18 @@ model OrderStatusHistory {
   changedByAdmin AdminUser? @relation(fields: [changedByAdminId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   @@index([orderId, createdAt])
+}
+model CancellationRequest {
+  id String @id @default(uuid())
+  orderId String @unique
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  customerEmail String
+  status CancellationRequestStatus @default(REQUESTED)
+  requestKey String @unique @default(uuid())
+  providerRefundId String?
+  providerStatus String?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
 }
