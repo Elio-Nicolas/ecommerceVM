@@ -322,3 +322,13 @@
 .footer-bottom{max-width:1236px;margin:0 auto;padding-top:19px;gap:12px;flex-wrap:wrap;color:#82909c;font-size:9px}
 @media(max-width:900px){.footer-main{grid-template-columns:1.4fr 1fr 1fr;gap:30px}.footer-about{grid-column:1/-1}.footer-about>p{max-width:440px}}
 @media(max-width:650px){.footer{padding:0 6% 26px}.footer-trust{grid-template-columns:1fr;gap:18px;padding:22px 0}.footer-trust-item{gap:12px}.footer-main{grid-template-columns:1fr 1fr;gap:29px 18px;padding:32px 0}.footer-about{grid-column:1/-1}.footer-about>p{max-width:330px}.footer-column{gap:11px}.footer-column h3{margin-bottom:2px}.footer-note{flex-direction:column;gap:7px}.footer-bottom{gap:8px}}
+
+
+/* Contacto directo por WhatsApp */
+.whatsapp-floating-link{position:fixed;right:20px;bottom:76px;z-index:49;display:inline-flex;align-items:center;gap:9px;min-height:48px;padding:0 17px;border-radius:999px;background:#16834b;color:#fff;font-size:12px;font-weight:700;box-shadow:0 6px 22px #0f172a30;transition:background .18s,transform .18s}
+.whatsapp-floating-link:hover{background:#116b3c;transform:translateY(-2px)}
+.whatsapp-floating-link>span:first-child{display:grid;place-items:center;width:23px;height:23px;border:2px solid #fff;border-radius:50%;font-size:17px;line-height:1}
+.whatsapp-floating-link:focus-visible,.checkout-whatsapp-contact:focus-visible{outline:3px solid #e47761;outline-offset:3px}
+.checkout-whatsapp-contact{display:flex;align-items:center;justify-content:center;min-height:46px;margin:12px 0;padding:0 16px;border:1px solid #16834b;border-radius:6px;color:#116b3c;font-size:12px;font-weight:700;text-align:center}
+.checkout-whatsapp-contact:hover{background:#effaf3}
+@media(max-width:650px){.whatsapp-floating-link{right:12px;bottom:68px;min-height:44px;padding:0 13px;font-size:11px}.checkout-whatsapp-contact{font-size:11px}}
