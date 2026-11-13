@@ -294,6 +294,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   }
 
   if (createdOrder) {
+    const whatsappOrderUrl = `https://wa.me/5492657240170?text=${encodeURIComponent(`Hola, consulto por mi pedido ${createdOrder.code} de Tu TiendaVM.`)}`
     return (
       <main className="checkout-page">
         <section className="checkout-success">
@@ -312,6 +313,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           {paymentError && <div className="checkout-error" role="alert">{paymentError}</div>}
           {paymentsEnabled && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : 'Pagar con Mercado Pago'}</button>}
           <p className="checkout-small">El pedido solo se confirma cuando Mercado Pago informa un pago aprobado y la API verifica su importe.</p>
+          <a className="checkout-whatsapp-contact" href={whatsappOrderUrl} target="_blank" rel="noreferrer">Consultar por WhatsApp sobre este pedido</a>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
         </section>
       </main>
