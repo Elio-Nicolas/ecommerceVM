@@ -70,9 +70,10 @@ adminOrdersRouter.get('/:id', async (req, res) => {
 
 adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
   const input = z.object({
-    shippingCostArs: z.number().int().min(0).max(2_000_000_000),
+    shippingCostArs: z.number().int().min(0).max(2_000_000_000).optional(),
     shippingCarrier: z.string().trim().max(100).nullable().optional().transform((value) => value || null),
     trackingCode: z.string().trim().max(120).nullable().optional().transform((value) => value || null),
+    note: z.string().trim().max(500).optional(),
   }).parse(req.body)
 
   const existing = await prisma.order.findUnique({ where: { id: req.params.id } })
@@ -81,6 +82,40 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     return
   }
   if (existing.deliveryMethod === 'LOCAL_DELIVERY') {
+    if (input.shippingCostArs === undefined) {
+      if (existing.status === 'CANCELLED') {
+        res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se pueden modificar los datos de entrega de un pedido cancelado.' } })
+        return
+      }
+      const trackingDetails = [
+        input.shippingCarrier ? `Medio de entrega: ${input.shippingCarrier}` : null,
+        input.trackingCode ? `Referencia: ${input.trackingCode}` : null,
+        input.note ? `Observación: ${input.note}` : null,
+      ].filter(Boolean).join(' · ')
+      if (!trackingDetails) {
+        res.status(400).json({ error: { code: 'EMPTY_DELIVERY_UPDATE', message: 'Ingresá al menos un dato para guardar.' } })
+        return
+      }
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
+        await tx.order.update({
+          where: { id: existing.id },
+          data: { shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode },
+        })
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: existing.id,
+            fromStatus: existing.status,
+            toStatus: existing.status,
+            note: `Entrega local actualizada. ${trackingDetails}`,
+            changedByAdminId: req.admin?.id || null,
+          },
+        })
+        return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
+      })
+      res.json({ data: updated, message: 'Datos de entrega local actualizados.' })
+      return
+    }
     if (existing.shippingService !== 'A coordinar') {
       res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'El costo manual solo se puede registrar para entregas locales configuradas como A coordinar.' } })
       return
@@ -111,14 +146,14 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       }
       await tx.order.update({
         where: { id: existing.id },
-        data: { shippingCostArs: input.shippingCostArs, totalArs: nextTotalArs },
+        data: { shippingCostArs: input.shippingCostArs, totalArs: nextTotalArs, shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode },
       })
       await tx.orderStatusHistory.create({
         data: {
           orderId: existing.id,
           fromStatus: existing.status,
           toStatus: existing.status,
-          note: `Costo de entrega local coordinado: ${input.shippingCostArs.toLocaleString('es-AR')}.`,
+          note: `Costo de entrega local coordinado: ${input.shippingCostArs.toLocaleString('es-AR')}.${input.shippingCarrier ? ` Medio: ${input.shippingCarrier}.` : ''}${input.trackingCode ? ` Referencia: ${input.trackingCode}.` : ''}${input.note ? ` ${input.note}` : ''}`,
           changedByAdminId: req.admin?.id || null,
         },
       })
