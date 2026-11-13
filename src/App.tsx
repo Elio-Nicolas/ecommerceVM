@@ -244,9 +244,46 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <a className="brand footer-brand" href="#"><LocationMark /><span className="brand-name">Tu Tienda<span>VM</span></span></a>
-        <p>Una nueva forma de encontrar tecnología útil.</p>
-        <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span><a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Botón de arrepentimiento</a></div>
+        <div className="footer-trust">
+          <div className="footer-trust-item"><span className="footer-trust-icon">✓</span><div><strong>Pagá con confianza</strong><small>El pago se procesa en Mercado Pago</small></div></div>
+          <div className="footer-trust-item"><span className="footer-trust-icon">⌖</span><div><strong>Somos de Villa Mercedes</strong><small>Atención y operación local</small></div></div>
+          <div className="footer-trust-item"><span className="footer-trust-icon">↗</span><div><strong>Elegí cómo recibirlo</strong><small>Retiro o entrega según tu zona</small></div></div>
+        </div>
+        <div className="footer-main">
+          <div className="footer-about">
+            <a className="brand footer-brand" href="/" aria-label="Tu TiendaVM inicio"><LocationMark /><span className="brand-name">Tu Tienda<span>VM</span></span></a>
+            <p>Tecnología práctica, accesorios y gadgets elegidos para hacer más simple tu día. Una tienda online nacida en Villa Mercedes.</p>
+            <span className="footer-location"><span className="footer-location-dot" /> Villa Mercedes · San Luis · Argentina</span>
+          </div>
+          <div className="footer-column">
+            <h3>Explorá</h3>
+            <a href="/#catalogo">Todos los productos</a>
+            <a href="/#catalogo">Categorías</a>
+            <a href="/#catalogo">Productos destacados</a>
+          </div>
+          <div className="footer-column">
+            <h3>Tu compra</h3>
+            <a href="/#catalogo">Cómo comprar</a>
+            <span>Pago online con Mercado Pago</span>
+            <span>Retiro o entrega local</span>
+            <span>Disponibilidad y costo informados al comprar</span>
+          </div>
+          <div className="footer-column">
+            <h3>Ayuda e información</h3>
+            <a href="/arrepentimiento">Botón de arrepentimiento</a>
+            <a href="/arrepentimiento">Derecho de arrepentimiento</a>
+            <span>Consultas sobre productos y pedidos</span>
+          </div>
+        </div>
+        <div className="footer-note">
+          <span>Comprá online, elegí cómo recibir tu pedido y consultanos si necesitás ayuda.</span>
+          <span>Tu TiendaVM · Tecnología para tu día a día</span>
+        </div>
+        <div className="footer-bottom">
+          <span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span>
+          <span>Villa Mercedes, San Luis · Argentina</span>
+        </div>
+        <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Botón de arrepentimiento</a>
       </footer>
 
       {cartOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
