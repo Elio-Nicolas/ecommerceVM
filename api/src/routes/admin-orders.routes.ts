@@ -197,6 +197,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   const input = z.object({
     status: z.nativeEnum(OrderStatus),
     note: z.string().trim().max(500).optional(),
+    forceCancelUnpaidTest: z.boolean().optional(),
   }).parse(req.body)
   const existing = await prisma.order.findUnique({
     where: { id: req.params.id },
@@ -214,9 +215,21 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(409).json({ error: { code: 'PAYMENT_PARTIALLY_REFUNDED', message: 'El pago tuvo un reembolso parcial. Revisá la operación en Mercado Pago antes de cambiar el estado del pedido.' } })
     return
   }
-  if (input.status === 'CANCELLED' && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status))) {
-    res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'No se puede cancelar el pedido mientras exista un pago de Mercado Pago pendiente, incierto o aprobado. Primero resolvé el cobro o gestioná la devolución correspondiente.' } })
-    return
+  if (input.status === 'CANCELLED') {
+    const blockingPayments = existing.paymentAttempts.filter((payment) =>
+      payment.provider === 'MERCADO_PAGO'
+      && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status),
+    )
+    const unsafePayments = blockingPayments.some((payment) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status))
+    const hasUnresolvedPayments = blockingPayments.length > 0
+    if (unsafePayments || (hasUnresolvedPayments && !input.forceCancelUnpaidTest)) {
+      res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'No se puede cancelar: hay un pago aprobado, parcialmente reembolsado o pendiente de resolución. Para pedidos de prueba no pagados, usá la acción administrativa específica.' } })
+      return
+    }
+    if (input.forceCancelUnpaidTest && existing.status !== 'PENDING') {
+      res.status(409).json({ error: { code: 'TEST_CANCELLATION_NOT_ALLOWED', message: 'La cancelación excepcional solo está disponible para pedidos pendientes.' } })
+      return
+    }
   }
   if (input.status === 'CONFIRMED' && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) {
     res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'Este pedido tiene un pago de Mercado Pago pendiente o sin resultado concluyente. Verificá el estado del pago antes de confirmarlo manualmente.' } })
@@ -247,13 +260,34 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
+      // Serialize cancellation with payment reconciliation/webhooks so stock is restored once
+      // and a concurrently approved payment cannot be silently cancelled.
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
+      const currentOrder = await tx.order.findUnique({
+        where: { id: existing.id },
+        include: { items: true, paymentAttempts: { select: { provider: true, status: true } } },
+      })
+      if (!currentOrder || currentOrder.status !== existing.status) throw new Error('ORDER_STATUS_CONFLICT')
+      if (input.status === 'CANCELLED') {
+        const currentBlockingPayments = currentOrder.paymentAttempts.filter((payment) =>
+          payment.provider === 'MERCADO_PAGO'
+          && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status),
+        )
+        const currentUnsafePayment = currentBlockingPayments.some((payment) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status))
+        if (currentUnsafePayment || (currentBlockingPayments.length > 0 && !input.forceCancelUnpaidTest)) {
+          throw new Error('PAYMENT_NOT_RESOLVED')
+        }
+        if (input.forceCancelUnpaidTest && currentOrder.status !== 'PENDING') {
+          throw new Error('TEST_CANCELLATION_NOT_ALLOWED')
+        }
+      }
       const changed = await tx.order.updateMany({
-        where: { id: existing.id, status: existing.status },
+        where: { id: existing.id, status: currentOrder.status },
         data: { status: input.status },
       })
       if (changed.count !== 1) throw new Error('ORDER_STATUS_CONFLICT')
       if (input.status === 'CANCELLED') {
-        for (const item of existing.items) {
+        for (const item of currentOrder.items) {
           if (item.productId) {
             await tx.product.update({
               where: { id: item.productId },
@@ -265,7 +299,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       await tx.orderStatusHistory.create({
         data: {
           orderId: existing.id,
-          fromStatus: existing.status,
+          fromStatus: currentOrder.status,
           toStatus: input.status,
           note: input.note || null,
           changedByAdminId: req.admin?.id || null,
@@ -277,6 +311,14 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'ORDER_STATUS_CONFLICT') {
       res.status(409).json({ error: { code: 'ORDER_STATUS_CONFLICT', message: 'El pedido fue actualizado por otra sesión. Recargá e intentá nuevamente.' } })
+      return
+    }
+    if (error instanceof Error && error.message === 'PAYMENT_NOT_RESOLVED') {
+      res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'El pago cambió mientras se cancelaba el pedido. No se modificó el stock.' } })
+      return
+    }
+    if (error instanceof Error && error.message === 'TEST_CANCELLATION_NOT_ALLOWED') {
+      res.status(409).json({ error: { code: 'TEST_CANCELLATION_NOT_ALLOWED', message: 'La cancelación excepcional solo está disponible para pedidos pendientes.' } })
       return
     }
     throw error
