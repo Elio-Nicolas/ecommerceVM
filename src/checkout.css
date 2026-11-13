@@ -26,3 +26,14 @@
 .checkout-modal h2{margin:0 0 12px;color:#17212d;font:800 20px Manrope,sans-serif}
 .checkout-modal p{margin:0 0 22px;color:#65717c;font-size:13px;line-height:1.7}
 .checkout-modal .checkout-submit{min-width:140px}
+
+
+/* Ajustes de legibilidad del checkout y del botón del carrito */
+.checkout-eyebrow{font-size:10px}
+.checkout-fields label{font-size:12px}
+.checkout-fields input,.checkout-fields select,.checkout-fields textarea{font-size:13px}
+.checkout-shipping-option-copy strong{font-size:12px}
+.checkout-shipping-option-copy small{font-size:11px}
+.checkout-shipping-hint,.checkout-disclaimer,.checkout-small{font-size:11px}
+.cart-summary .checkout-continue{font-size:12px;gap:9px}
+.cart-summary .checkout-continue svg{width:14px;height:14px;flex:0 0 14px}
