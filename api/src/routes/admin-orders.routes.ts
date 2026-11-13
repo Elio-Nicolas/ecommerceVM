@@ -323,7 +323,7 @@ adminOrdersRouter.post('/:id/refund', async (req, res) => {
       })
       if (!check.ok) throw new Error('No se pudo consultar el estado del reembolso en Mercado Pago.')
       const current = await check.json() as { status?: string; status_detail?: string; transactions?: { refunds?: Array<{ id?: string; status?: string }> } }
-      if (current.status === 'refunded' || current.transactions?.refunds?.some((refund) => refund.status === 'processed')) {
+      if (current.status === 'refunded' || current.status_detail === 'refunded') {
         const refundId = current.transactions?.refunds?.[0]?.id || request.providerRefundId
         await prisma.$transaction([
           prisma.cancellationRequest.update({ where: { id: request.id }, data: { status: 'REFUNDED', providerRefundId: refundId || null, providerStatus: current.status || 'refunded', lastError: null } }),
@@ -359,7 +359,7 @@ adminOrdersRouter.post('/:id/refund', async (req, res) => {
     }
 
     const refund = payload.transactions?.refunds?.[0]
-    const completed = payload.status === 'refunded' || refund?.status === 'processed'
+    const completed = payload.status === 'refunded' || payload.status_detail === 'refunded'
     await prisma.cancellationRequest.update({
       where: { id: request.id },
       data: {
