@@ -357,6 +357,42 @@ export default function AdminOrders() {
     }
   }
 
+  function hasUnpaidTestPayment(order: Order) {
+    return order.status === 'PENDING'
+      && (order.paymentAttempts || []).some((payment) =>
+        payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status),
+      )
+  }
+
+  async function cancelUnpaidTestOrder(order: Order) {
+    if (!token || updating || !hasUnpaidTestPayment(order)) return
+    const confirmed = window.confirm(
+      `Vas a cancelar el pedido de prueba ${order.code} y devolver al stock las cantidades reservadas. Esta acción no consulta ni reembolsa Mercado Pago. Confirmás que este pedido nunca fue pagado?`,
+    )
+    if (!confirmed) return
+    setUpdating(true)
+    setError('')
+    setNotice('')
+    try {
+      await request(`/admin/orders/${order.id}/status`, token, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'CANCELLED',
+          forceCancelUnpaidTest: true,
+          note: 'Cancelación administrativa de pedido de prueba confirmado como no pagado; stock repuesto.',
+        }),
+      })
+      setSelected(null)
+      setNote('')
+      setNotice(`Pedido ${order.code} cancelado. El stock reservado fue repuesto.`)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo cancelar el pedido de prueba.')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   function togglePrintSelection(id: string) {
     setPrintSelection((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
   }
@@ -508,6 +544,7 @@ export default function AdminOrders() {
             </section>}
             <div className="order-history"><h3>Historial de actividad</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{historyEventLabel(entry)}{entry.fromStatus === entry.toStatus && <small>El pedido continúa {statusLabels[entry.toStatus].toLowerCase()}</small>}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingService === 'A coordinar' && activeOrder.status === 'PENDING' && next === 'CONFIRMED' ? 'Confirmar costo y continuar' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
+            {hasUnpaidTestPayment(activeOrder) && <div className="order-update-status"><p>Pedido de prueba con pago pendiente. Si confirmás que nunca se cobró, podés cancelarlo y reponer automáticamente las unidades reservadas.</p><button type="button" disabled={updating} className="order-cancel-button" onClick={() => void cancelUnpaidTestOrder(activeOrder)}>{updating ? 'Cancelando y reponiendo stock...' : 'Cancelar prueba y reponer stock'}</button></div>}
           </section>}
           <p className="admin-footnote">Los pedidos admiten retiro, entrega local y envío nacional por OCA según la configuración. Mercado Pago solo estará disponible cuando sus credenciales y notificaciones estén configuradas.</p>
         </section>
