@@ -61,7 +61,7 @@ async function createMercadoPagoOrder(input: {
     type: 'online',
     processing_mode: 'manual',
     capture_mode: 'automatic_async',
-    expiration_time: 'PT30M',
+    expiration_time: 'P1D',
     total_amount: toAmount(input.order.totalArs),
     external_reference: input.order.code,
     description: 'Pedido ' + input.order.code,
