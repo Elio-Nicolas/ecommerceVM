@@ -270,10 +270,11 @@
 .add-button{font-size:11px}
 .product-stock{font-size:10px}
 .product-page-copy>small{font-size:11px}
-.regret-floating-link{position:fixed;right:20px;bottom:18px;z-index:50;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 17px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#0a2540;font-size:12px;font-weight:700;box-shadow:0 5px 22px #0f172a24;transition:background .2s,border-color .2s,transform .2s}
+.floating-actions{position:fixed;right:20px;bottom:18px;z-index:50;display:flex;align-items:center;gap:10px}
+.regret-floating-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 15px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;color:#0a2540;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 5px 22px #0f172a24;transition:background .2s,border-color .2s,transform .2s}
 .regret-floating-link:hover{background:#f1f5f9;border-color:#0a2540;transform:translateY(-1px)}
 .regret-floating-link:focus-visible{outline:3px solid #d84c35;outline-offset:3px}
-@media(max-width:650px){.category-tab{font-size:11px}.product-name{font-size:12px}.add-button{font-size:10px}.regret-floating-link{right:12px;bottom:12px;min-height:42px;padding:0 13px;font-size:11px}}
+@media(max-width:650px){.category-tab{font-size:11px}.product-name{font-size:12px}.add-button{font-size:10px}.floating-actions{right:12px;bottom:12px;gap:7px}.regret-floating-link{min-height:42px;padding:0 11px;font-size:10px}.whatsapp-floating-link{min-height:42px;padding:0 11px;font-size:10px;gap:6px}.whatsapp-floating-link>span:first-child{width:20px;height:20px;font-size:15px}}
 
 
 /* Barra de búsqueda funcional y más clara */
