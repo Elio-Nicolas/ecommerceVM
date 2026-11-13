@@ -179,12 +179,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'La edición manual del costo y seguimiento está disponible únicamente para envíos OCA.' } })
     return
   }
-  if (input.shippingCostArs === undefined) {
-    res.status(400).json({ error: { code: 'SHIPPING_COST_REQUIRED', message: 'Ingresá el precio de envío cobrado al cliente.' } })
-    return
-  }
-
-  const shippingCostArs = shippingCostArs
+  const shippingCostArs = input.shippingCostArs
   if (shippingCostArs === undefined) {
     res.status(400).json({ error: { code: 'SHIPPING_COST_REQUIRED', message: 'Ingresá el precio de envío cobrado al cliente.' } })
     return
