@@ -309,3 +309,57 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
     throw error
   }
 })
+
+
+const regretRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: { code: 'REGRET_RATE_LIMIT', message: 'Se alcanzó el límite de solicitudes. Intentá nuevamente más tarde.' } },
+})
+
+ordersRouter.post('/regret', regretRequestLimiter, async (req, res) => {
+  const input = z.object({
+    orderCode: z.string().trim().min(8).max(40),
+    email: z.string().trim().email().max(160),
+  }).safeParse(req.body)
+  if (!input.success) {
+    res.status(400).json({ error: { code: 'REGRET_INPUT_INVALID', message: 'Ingresá un código de pedido y un correo válidos.' } })
+    return
+  }
+
+  const order = await prisma.order.findFirst({
+    where: { code: { equals: input.data.orderCode, mode: 'insensitive' }, customerEmail: { equals: input.data.email, mode: 'insensitive' } },
+    select: {
+      id: true,
+      status: true,
+      paymentAttempts: { where: { provider: 'MERCADO_PAGO', status: { in: ['APPROVED', 'PARTIALLY_REFUNDED'] } }, select: { id: true }, take: 1 },
+    },
+  })
+  if (!order || order.paymentAttempts.length === 0) {
+    res.status(404).json({ error: { code: 'REGRET_ORDER_NOT_FOUND', message: 'No encontramos un pedido con esos datos y un pago aprobado. Revisá el código y el correo.' } })
+    return
+  }
+  if (order.status === 'CANCELLED') {
+    res.status(409).json({ error: { code: 'REGRET_ORDER_CANCELLED', message: 'Este pedido ya figura cancelado.' } })
+    return
+  }
+
+  try {
+    const request = await prisma.cancellationRequest.upsert({
+      where: { orderId: order.id },
+      create: { orderId: order.id, customerEmail: input.data.email, status: 'REQUESTED' },
+      update: {},
+      select: { status: true },
+    })
+    res.setHeader('Cache-Control', 'no-store')
+    if (request.status !== 'REQUESTED') {
+      res.status(200).json({ data: { status: request.status }, message: 'La solicitud ya está registrada y se encuentra en revisión.' })
+      return
+    }
+    res.status(201).json({ data: { status: request.status }, message: 'Recibimos tu solicitud de arrepentimiento. La tienda revisará el pedido y gestionará el reembolso cuando corresponda.' })
+  } catch {
+    res.status(500).json({ error: { code: 'REGRET_REQUEST_FAILED', message: 'No pudimos registrar la solicitud. Intentá nuevamente más tarde.' } })
+  }
+})
