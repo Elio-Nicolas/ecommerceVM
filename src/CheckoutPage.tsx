@@ -68,7 +68,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [postalCode, setPostalCode] = useState('')
   const [customerNotes, setCustomerNotes] = useState('')
   const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethods | null>(null)
-  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('OCA')
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod | ''>('')
   const [quote, setQuote] = useState<ShippingQuote | null>(null)
   const [selectedOptionKey, setSelectedOptionKey] = useState('')
   const [quoteLoading, setQuoteLoading] = useState(false)
@@ -153,10 +153,6 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     fetch(`${API_URL}/api/v1/shipping/methods`).then((response) => response.json()).then((payload) => {
       const methods = payload.data as DeliveryMethods
       setDeliveryMethods(methods)
-      if (!methods.oca.enabled) {
-        if (methods.pickup.enabled) setDeliveryMethod('PICKUP')
-        else if (methods.localDelivery.enabled) setDeliveryMethod('LOCAL_DELIVERY')
-      }
     }).catch(() => setDeliveryMethods(null))
   }, [])
 
@@ -349,21 +345,6 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             </div>
           </section>
           <section className="checkout-card">
-            <h2>Dirección de entrega</h2>
-            <div className="checkout-fields">
-              <label className="checkout-field-full">Calle y altura<input required={deliveryMethod !== 'PICKUP'} minLength={4} maxLength={180} autoComplete="street-address" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></label>
-              <label>Localidad<input required={deliveryMethod !== 'PICKUP'} minLength={2} maxLength={100} autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} /></label>
-              <label>Provincia
-                <select required={deliveryMethod === 'OCA' || deliveryMethod === 'LOCAL_DELIVERY'} value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
-                  <option value="">Seleccionar provincia</option>
-                  {PROVINCES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-                </select>
-              </label>
-              <label>Código postal<input required={deliveryMethod !== 'PICKUP'} maxLength={4} minLength={4} inputMode="numeric" pattern="\d{4}" autoComplete="postal-code" value={postalCode} onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 4))} /></label>
-              <label className="checkout-field-full">Indicaciones adicionales <span>(opcional)</span><textarea maxLength={1000} rows={3} value={customerNotes} onChange={(event) => setCustomerNotes(event.target.value)} placeholder="Piso, departamento, referencias para la entrega..." /></label>
-            </div>
-          </section>
-          <section className="checkout-card">
             <h2>Cómo querés recibir tu pedido</h2>
             {!deliveryMethods ? <p className="checkout-shipping-hint">Consultando modalidades disponibles...</p> : <div className="checkout-shipping-options">
               {deliveryMethods.pickup.enabled && <label className={deliveryMethod === 'PICKUP' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
@@ -405,6 +386,24 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
                     : <p className="checkout-shipping-hint">El costo se calculará automáticamente al completar el destino.</p>}
             </>}
           </section>
+          {deliveryMethod !== '' && deliveryMethod !== 'PICKUP' && (
+            <section className="checkout-card">
+              <h2>{deliveryMethod === 'OCA' ? 'Dirección de envío' : 'Dirección de entrega local'}</h2>
+              <div className="checkout-fields">
+                <label className="checkout-field-full">Calle y altura<input required={deliveryMethod !== 'PICKUP'} minLength={4} maxLength={180} autoComplete="street-address" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></label>
+                <label>Localidad<input required={deliveryMethod !== 'PICKUP'} minLength={2} maxLength={100} autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} /></label>
+                <label>Provincia
+                  <select required={deliveryMethod === 'OCA' || deliveryMethod === 'LOCAL_DELIVERY'} value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
+                    <option value="">Seleccionar provincia</option>
+                    {PROVINCES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                  </select>
+                </label>
+                <label>Código postal<input required={deliveryMethod !== 'PICKUP'} maxLength={4} minLength={4} inputMode="numeric" pattern="\d{4}" autoComplete="postal-code" value={postalCode} onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 4))} /></label>
+                <label className="checkout-field-full">Indicaciones adicionales <span>(opcional)</span><textarea maxLength={1000} rows={3} value={customerNotes} onChange={(event) => setCustomerNotes(event.target.value)} placeholder="Piso, departamento, referencias para la entrega..." /></label>
+              </div>
+            </section>
+          )}
+          {deliveryMethod === '' && <p className="checkout-shipping-hint">Elegí primero cómo querés recibir tu pedido para completar los datos que correspondan.</p>}
           {error && <div className="checkout-error" role="alert">{error}</div>}
           <button className="checkout-submit" type="submit" disabled={!paymentsConfigLoaded || submitting || cart.length === 0 || !canSubmit}>
             {submitting ? 'Registrando pedido...' : 'Confirmar pedido'}
@@ -422,8 +421,8 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             ))}
           </div>
           <div className="checkout-summary-total"><span>Subtotal</span><strong>{formatPrice(displayedSubtotal)}</strong></div>
-          <div className="checkout-summary-total"><span>Envío</span><strong>{deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate ? 'A coordinar' : canSubmit ? formatPrice(selectedShippingPrice) : 'A calcular'}</strong></div>
-          <div className="checkout-summary-grand-total"><span>Total</span><strong>{deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate ? 'A confirmar' : formatPrice(displayedSubtotal + selectedShippingPrice)}</strong></div>
+          <div className="checkout-summary-total"><span>Envío</span><strong>{deliveryMethod === '' ? 'A elegir' : deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate ? 'A coordinar' : canSubmit ? formatPrice(selectedShippingPrice) : 'A calcular'}</strong></div>
+          <div className="checkout-summary-grand-total"><span>Total</span><strong>{deliveryMethod === '' || (deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate) ? 'A confirmar' : formatPrice(displayedSubtotal + selectedShippingPrice)}</strong></div>
           <p className="checkout-summary-note">El importe se calcula según la modalidad seleccionada. El total queda confirmado al registrar el pedido.</p>
         </aside>
       </div>
