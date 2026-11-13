@@ -149,7 +149,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
   if (!attempt) return false
 
   await prisma.$transaction(async (tx) => {
-    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', attempt.orderId)
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', attempt.orderId)
     const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
     const currentOrder = await tx.order.findUnique({
       where: { id: attempt.orderId },
@@ -248,7 +248,7 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
   }
 
   const prepared = await prisma.$transaction(async (tx) => {
-    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', orderId.data)
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', orderId.data)
     const order = await tx.order.findUnique({
       where: { id: orderId.data },
       include: { items: true },
