@@ -244,9 +244,35 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <a className="brand footer-brand" href="#"><LocationMark /><span className="brand-name">Tu Tienda<span>VM</span></span></a>
-        <p>Una nueva forma de encontrar tecnología útil.</p>
-        <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span><a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Botón de arrepentimiento</a></div>
+        <div className="footer-main">
+          <div className="footer-about">
+            <a className="brand footer-brand" href="#" aria-label="Tu TiendaVM inicio"><LocationMark /><span className="brand-name">Tu Tienda<span>VM</span></span></a>
+            <p>Tecnología práctica, accesorios y gadgets para hacer más simple tu día.</p>
+            <span className="footer-location"><span className="footer-location-dot" /> Villa Mercedes · San Luis</span>
+          </div>
+          <div className="footer-column">
+            <h3>La tienda</h3>
+            <a href="#catalogo">Explorar productos</a>
+            <a href="#catalogo">Ver categorías</a>
+            <a href="#catalogo">Ofertas y destacados</a>
+          </div>
+          <div className="footer-column">
+            <h3>Tu compra</h3>
+            <span>Comprá online de forma simple</span>
+            <span>Retiro o entrega local</span>
+            <span>Pagá con Mercado Pago</span>
+          </div>
+          <div className="footer-column">
+            <h3>Ayuda</h3>
+            <a href="/arrepentimiento">Botón de arrepentimiento</a>
+            <a href="#catalogo">Consultar productos</a>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span>
+          <span>Una marca independiente · Villa Mercedes, San Luis</span>
+        </div>
+        <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Botón de arrepentimiento</a>
       </footer>
 
       {cartOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
