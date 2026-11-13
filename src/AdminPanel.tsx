@@ -295,7 +295,7 @@ export default function AdminPanel() {
 
   if (!authenticated) return (
     <main className="admin-login-page">
-      <a className="admin-brand" href="/"><span className="admin-brand-mark">TV</span><span>Tu Tienda<span>VM</span></span></a>
+      <a className="admin-brand" href="/"><svg className="admin-brand-mark" viewBox="0 0 40 48" role="img" aria-label="VM, Villa Mercedes"><path d="M20 2.5C10.2 2.5 2.5 10.2 2.5 20c0 12.2 17.5 25.3 17.5 25.3S37.5 32.2 37.5 20C37.5 10.2 29.8 2.5 20 2.5Z" fill="#E04B2F" /><circle cx="20" cy="19.5" r="11.5" fill="#fff" /><text x="20" y="23.2" textAnchor="middle" fill="#E04B2F" fontFamily="Manrope, sans-serif" fontSize="9.5" fontWeight="800" letterSpacing="-.4">VM</text></svg><span>Tu Tienda<span>VM</span></span></a>
       <form className="admin-login-card" onSubmit={handleLogin}>
         <div className="admin-kicker">ÁREA PRIVADA</div>
         <h1>Bienvenido de nuevo.</h1>
@@ -313,7 +313,7 @@ export default function AdminPanel() {
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
-        <a className="admin-brand" href="/"><span className="admin-brand-mark">TV</span><span>Tu Tienda<span>VM</span></span></a>
+        <a className="admin-brand" href="/"><svg className="admin-brand-mark" viewBox="0 0 40 48" role="img" aria-label="VM, Villa Mercedes"><path d="M20 2.5C10.2 2.5 2.5 10.2 2.5 20c0 12.2 17.5 25.3 17.5 25.3S37.5 32.2 37.5 20C37.5 10.2 29.8 2.5 20 2.5Z" fill="#E04B2F" /><circle cx="20" cy="19.5" r="11.5" fill="#fff" /><text x="20" y="23.2" textAnchor="middle" fill="#E04B2F" fontFamily="Manrope, sans-serif" fontSize="9.5" fontWeight="800" letterSpacing="-.4">VM</text></svg><span>Tu Tienda<span>VM</span></span></a>
         <div className="admin-nav-label">GESTIÓN</div>
         <a className="admin-nav-item active" href="/admin"><span className="admin-nav-icon">▦</span> Productos</a>
         <a className="admin-nav-item" href="/admin/pedidos"><span className="admin-nav-icon">▤</span> Pedidos</a>
