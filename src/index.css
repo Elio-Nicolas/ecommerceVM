@@ -257,3 +257,20 @@
 .arca-diagnostics-list span{flex:1;color:#53606c}
 .arca-diagnostics-list small{font-size:9px;color:#7c8791}
 @media(max-width:760px){.arca-diagnostics-summary{grid-template-columns:1fr}.arca-diagnostics-grid{grid-template-columns:1fr}.arca-diagnostics-heading{align-items:flex-start;flex-direction:column}}
+
+
+/* Ajustes de legibilidad y acceso al arrepentimiento */
+.eyebrow{font-size:10px}
+.category-tab{font-size:12px}
+.sort-control,.sort-control select{font-size:11px}
+.results-line{font-size:10px}
+.product-category{font-size:10px}
+.product-badge{font-size:9px;padding:8px 10px}
+.product-name{font-size:14px}
+.add-button{font-size:11px}
+.product-stock{font-size:10px}
+.product-page-copy>small{font-size:11px}
+.regret-floating-link{position:fixed;right:20px;bottom:18px;z-index:50;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 17px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#0a2540;font-size:12px;font-weight:700;box-shadow:0 5px 22px #0f172a24;transition:background .2s,border-color .2s,transform .2s}
+.regret-floating-link:hover{background:#f1f5f9;border-color:#0a2540;transform:translateY(-1px)}
+.regret-floating-link:focus-visible{outline:3px solid #d84c35;outline-offset:3px}
+@media(max-width:650px){.category-tab{font-size:11px}.product-name{font-size:12px}.add-button{font-size:10px}.regret-floating-link{right:12px;bottom:12px;min-height:42px;padding:0 13px;font-size:11px}}
