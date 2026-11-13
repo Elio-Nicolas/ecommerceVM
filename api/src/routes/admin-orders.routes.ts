@@ -124,7 +124,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       res.status(409).json({ error: { code: 'ORDER_ALREADY_DISPATCHED', message: 'El costo de entrega local debe registrarse antes de despachar el pedido.' } })
       return
     }
-    const shippingCostArs = shippingCostArs
+    const shippingCostArs = input.shippingCostArs
     if (shippingCostArs === undefined) {
       res.status(400).json({ error: { code: 'SHIPPING_COST_REQUIRED', message: 'Ingresá el costo acordado de entrega local.' } })
       return
