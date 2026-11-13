@@ -7,6 +7,7 @@ import RegretPage from './RegretPage'
 type CartLine = { product: Product; quantity: number }
 
 const CART_STORAGE_KEY = 'ecommercevm:cart:v1'
+const WHATSAPP_URL = 'https://wa.me/5492657240170'
 
 function getProductSlugFromPath() {
   const match = window.location.pathname.match(/^\/producto\/([^/]+)\/?$/)
@@ -272,7 +273,7 @@ export default function App() {
             <h3>Ayuda e información</h3>
             <a href="/arrepentimiento">Botón de arrepentimiento</a>
             <a href="/arrepentimiento">Derecho de arrepentimiento</a>
-            <span>Consultas sobre productos y pedidos</span>
+            <a href={WHATSAPP_URL} target="_blank" rel="noreferrer">Contactanos por WhatsApp</a>
           </div>
         </div>
         <div className="footer-note">
@@ -284,6 +285,7 @@ export default function App() {
           <span>Villa Mercedes, San Luis · Argentina</span>
         </div>
         <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Botón de arrepentimiento</a>
+        <a className="whatsapp-floating-link" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Contactar a Tu TiendaVM por WhatsApp"><span aria-hidden="true">◔</span><span>¿Necesitás ayuda?</span></a>
       </footer>
 
       {cartOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
