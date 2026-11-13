@@ -227,8 +227,8 @@ export default function AdminOrders() {
         method: 'PATCH',
         body: JSON.stringify({
           ...(hasShippingCost ? { shippingCostArs } : {}),
-          shippingCarrier,
-          trackingCode,
+          ...(formData.has('shippingCarrier') ? { shippingCarrier } : {}),
+          ...(formData.has('trackingCode') ? { trackingCode } : {}),
           note: deliveryNote,
         }),
       })
