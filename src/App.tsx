@@ -285,8 +285,8 @@ export default function App() {
           <span>Villa Mercedes, San Luis · Argentina</span>
         </div>
         <div className="floating-actions">
+          <a className="whatsapp-floating-link" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Contactar a Tu TiendaVM por WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.4-4.7A8.5 8.5 0 1 1 20.5 11.7Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M8.2 7.8c-.3.4-.6.8-.5 1.4.2 1.1 1.4 3 3.1 4.2 1.2.9 2.5 1.4 3.1 1.2.5-.2 1-.8 1.1-1.2l-1.8-.9-.8.9c-.9-.4-1.8-1.2-2.3-2.1l.7-.9-.9-1.8c-.5-.2-1.3-.2-1.7.2Z" fill="currentColor"/></svg></a>
           <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Arrepentimiento</a>
-          <a className="whatsapp-floating-link" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Contactar a Tu TiendaVM por WhatsApp"><span aria-hidden="true">◔</span><span>WhatsApp</span></a>
         </div>
       </footer>
 
