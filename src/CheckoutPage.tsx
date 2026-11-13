@@ -219,8 +219,8 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     if (paymentLoading) return
     setPaymentLoading(true)
     setPaymentError('')
+    const storageKey = `ecommercevm:payment-request:${orderId}`
     try {
-      const storageKey = `ecommercevm:payment-request:${orderId}`
       let requestKey = ''
       try {
         requestKey = sessionStorage.getItem(storageKey) || ''
@@ -238,9 +238,12 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       })
       const payload = await response.json() as {
         data?: { checkoutUrl?: string }
-        error?: { message?: string }
+        error?: { code?: string; message?: string }
       }
       if (!response.ok || !payload.data?.checkoutUrl) {
+        if (payload.error?.code === 'ATTEMPT_CLOSED') {
+          try { sessionStorage.removeItem(storageKey) } catch { /* El próximo intento generará una clave nueva. */ }
+        }
         throw new Error(payload.error?.message || 'No pudimos iniciar el pago con Mercado Pago.')
       }
       window.location.assign(payload.data.checkoutUrl)

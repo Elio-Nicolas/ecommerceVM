@@ -2,9 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../src/services/payment-validation'
 
-test('acepta importes enteros en ARS como número o texto', () => {
+test('acepta importes enteros en ARS y decimales con centavos en cero', () => {
   assert.equal(parsePaymentAmount(12500), 12500)
   assert.equal(parsePaymentAmount('12500'), 12500)
+  assert.equal(parsePaymentAmount('12500.00'), 12500)
+  assert.equal(parsePaymentAmount('12500.0'), 12500)
+  assert.equal(parsePaymentAmount(12500.00), 12500)
 })
 
 test('rechaza importes negativos, fraccionarios, infinitos y no numéricos', () => {
