@@ -390,15 +390,15 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <section className="checkout-card">
               <h2>{deliveryMethod === 'OCA' ? 'Dirección de envío' : 'Dirección de entrega local'}</h2>
               <div className="checkout-fields">
-                <label className="checkout-field-full">Calle y altura<input required={deliveryMethod !== 'PICKUP'} minLength={4} maxLength={180} autoComplete="street-address" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></label>
-                <label>Localidad<input required={deliveryMethod !== 'PICKUP'} minLength={2} maxLength={100} autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} /></label>
+                <label className="checkout-field-full">Calle y altura<input required minLength={4} maxLength={180} autoComplete="street-address" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></label>
+                <label>Localidad<input required minLength={2} maxLength={100} autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} /></label>
                 <label>Provincia
                   <select required={deliveryMethod === 'OCA' || deliveryMethod === 'LOCAL_DELIVERY'} value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
                     <option value="">Seleccionar provincia</option>
                     {PROVINCES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                   </select>
                 </label>
-                <label>Código postal<input required={deliveryMethod !== 'PICKUP'} maxLength={4} minLength={4} inputMode="numeric" pattern="\d{4}" autoComplete="postal-code" value={postalCode} onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 4))} /></label>
+                <label>Código postal<input required maxLength={4} minLength={4} inputMode="numeric" pattern="\d{4}" autoComplete="postal-code" value={postalCode} onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 4))} /></label>
                 <label className="checkout-field-full">Indicaciones adicionales <span>(opcional)</span><textarea maxLength={1000} rows={3} value={customerNotes} onChange={(event) => setCustomerNotes(event.target.value)} placeholder="Piso, departamento, referencias para la entrega..." /></label>
               </div>
             </section>
