@@ -236,7 +236,7 @@ export default function App() {
       <footer className="footer">
         <a className="brand footer-brand" href="#"><span className="brand-mark">T<span>V</span></span><span className="brand-name">Tu Tienda<span>VM</span></span></a>
         <p>Una nueva forma de encontrar tecnología útil.</p>
-        <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span><a href="/arrepentimiento">Arrepentimiento de compra</a></div>
+        <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span><a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Botón de arrepentimiento</a></div>
       </footer>
 
       {cartOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
