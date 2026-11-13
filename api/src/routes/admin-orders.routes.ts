@@ -95,7 +95,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       return
     }
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
       const currentOrder = await tx.order.findUnique({
         where: { id: existing.id },
         select: { subtotalArs: true, shippingCostArs: true, totalArs: true },
@@ -147,7 +147,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
     const currentOrder = await tx.order.findUnique({
       where: { id: existing.id },
       select: { subtotalArs: true, shippingCostArs: true, totalArs: true },
@@ -262,7 +262,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     const updated = await prisma.$transaction(async (tx) => {
       // Serialize cancellation with payment reconciliation/webhooks so stock is restored once
       // and a concurrently approved payment cannot be silently cancelled.
-      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))', existing.id)
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
       const currentOrder = await tx.order.findUnique({
         where: { id: existing.id },
         include: { items: true, paymentAttempts: { select: { provider: true, status: true } } },
