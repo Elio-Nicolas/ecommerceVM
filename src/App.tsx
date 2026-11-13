@@ -13,6 +13,16 @@ function getProductSlugFromPath() {
   return match ? decodeURIComponent(match[1]) : null
 }
 
+function LocationMark() {
+  return (
+    <svg className="brand-mark" viewBox="0 0 40 48" role="img" aria-label="VM, Villa Mercedes">
+      <path d="M20 2.5C10.2 2.5 2.5 10.2 2.5 20c0 12.2 17.5 25.3 17.5 25.3S37.5 32.2 37.5 20C37.5 10.2 29.8 2.5 20 2.5Z" fill="#E04B2F" />
+      <circle cx="20" cy="19.5" r="11.5" fill="#fff" />
+      <text x="20" y="23.2" textAnchor="middle" fill="#E04B2F" fontFamily="Manrope, sans-serif" fontSize="9.5" fontWeight="800" letterSpacing="-.4">VM</text>
+    </svg>
+  )
+}
+
 function SearchIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 5 5" /></svg>
 }
@@ -151,7 +161,7 @@ export default function App() {
       <div className="announcement">Comprá online <span>·</span> Entrega según disponibilidad</div>
       <header className="header">
         <a className="brand" href="#" aria-label="Tu TiendaVM inicio">
-          <span className="brand-mark">T<span>V</span></span>
+          <LocationMark />
           <span className="brand-name">Tu Tienda<span>VM</span></span>
         </a>
         <form className="search-box" role="search" onSubmit={(event) => { event.preventDefault(); document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' }) }}>
@@ -234,7 +244,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <a className="brand footer-brand" href="#"><span className="brand-mark">T<span>V</span></span><span className="brand-name">Tu Tienda<span>VM</span></span></a>
+        <a className="brand footer-brand" href="#"><LocationMark /><span className="brand-name">Tu Tienda<span>VM</span></span></a>
         <p>Una nueva forma de encontrar tecnología útil.</p>
         <div className="footer-bottom"><span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span><span>Una marca independiente · Tecnología para todos</span><a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Botón de arrepentimiento</a></div>
       </footer>
