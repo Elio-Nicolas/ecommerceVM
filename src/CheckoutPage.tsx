@@ -348,15 +348,15 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <h2>Cómo querés recibir tu pedido</h2>
             {!deliveryMethods ? <p className="checkout-shipping-hint">Consultando modalidades disponibles...</p> : <div className="checkout-shipping-options">
               {deliveryMethods.pickup.enabled && <label className={deliveryMethod === 'PICKUP' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
-                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'PICKUP'} onChange={() => setDeliveryMethod('PICKUP')} />
+                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'PICKUP'} onClick={(event) => { if (deliveryMethod === 'PICKUP') { event.preventDefault(); setDeliveryMethod('') } }} onChange={() => setDeliveryMethod('PICKUP')} />
                 <span className="checkout-shipping-option-copy"><strong>Retirar por domicilio del vendedor</strong><small>{deliveryMethods.pickup.address}. {deliveryMethods.pickup.instructions}</small></span><strong className="checkout-shipping-price">Sin cargo</strong>
               </label>}
               {deliveryMethods.localDelivery.enabled && <label className={deliveryMethod === 'LOCAL_DELIVERY' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
-                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'LOCAL_DELIVERY'} onChange={() => setDeliveryMethod('LOCAL_DELIVERY')} />
+                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'LOCAL_DELIVERY'} onClick={(event) => { if (deliveryMethod === 'LOCAL_DELIVERY') { event.preventDefault(); setDeliveryMethod('') } }} onChange={() => setDeliveryMethod('LOCAL_DELIVERY')} />
                 <span className="checkout-shipping-option-copy"><strong>Entrega local</strong><small>{localDeliveryAvailable ? (deliveryMethods.localDelivery.coordinate ? 'Costo a coordinar luego de confirmar el pedido.' : 'Disponible para tu código postal.') : 'No disponible para este código postal.'}</small></span><strong className="checkout-shipping-price">{deliveryMethods.localDelivery.coordinate ? 'A coordinar' : formatPrice(deliveryMethods.localDelivery.priceArs || 0)}</strong>
               </label>}
               {deliveryMethods.oca.enabled && <label className={deliveryMethod === 'OCA' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
-                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'OCA'} onChange={() => setDeliveryMethod('OCA')} />
+                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'OCA'} onClick={(event) => { if (deliveryMethod === 'OCA') { event.preventDefault(); setDeliveryMethod('') } }} onChange={() => setDeliveryMethod('OCA')} />
                 <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por OCA</strong><small>Un único bulto consolidado con el peso y las dimensiones estimadas de todo el pedido.</small></span>
               </label>}
             </div>}
