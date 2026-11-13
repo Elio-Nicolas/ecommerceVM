@@ -17,6 +17,7 @@ type Order = {
   shipments?: { provider: string; status: string; trackingNumber: string | null }[]
   shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
+  cancellationRequest?: { id: string; status: 'REQUESTED' | 'PROCESSING' | 'REFUNDED' | 'FAILED'; providerRefundId: string | null; providerStatus: string | null; lastError: string | null; createdAt: string } | null
   paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'REFUNDED' | 'PARTIALLY_REFUNDED'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
   fiscalDocuments?: { id: string; type: 'INVOICE_C' | 'CREDIT_NOTE_C' | 'DEBIT_NOTE_C'; status: 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'; pointOfSale: number | null; voucherType: number; voucherNumber: number | null; cae: string | null; caeExpiresAt: string | null; lastErrorMessage: string | null; createdAt: string }[]
 }
@@ -99,6 +100,7 @@ export default function AdminOrders() {
   const [invoiceDownloadingId, setInvoiceDownloadingId] = useState<string | null>(null)
   const [paymentReconcilingId, setPaymentReconcilingId] = useState<string | null>(null)
   const [paymentReconcileFeedback, setPaymentReconcileFeedback] = useState<Record<string, string>>({})
+  const [refundProcessing, setRefundProcessing] = useState(false)
 
   const loadOrders = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -174,6 +176,28 @@ export default function AdminOrders() {
       setError(message)
     } finally {
       setPaymentReconcilingId(null)
+    }
+  }
+
+  async function processRefund(order: Order) {
+    if (!token || refundProcessing || !order.cancellationRequest) return
+    const isRetry = order.cancellationRequest.status === 'PROCESSING'
+    const prompt = isRetry
+      ? 'Se consultará el estado del reembolso en Mercado Pago. ¿Continuar?'
+      : `Se solicitará a Mercado Pago el reembolso total del pedido ${order.code}. Esta acción devuelve el dinero al comprador. ¿Continuar?`
+    if (!window.confirm(prompt)) return
+    setRefundProcessing(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await request<{ data: { status: string }; message: string }>(`/admin/orders/${order.id}/refund`, token, { method: 'POST' })
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo procesar el reembolso.')
+      await loadOrders(token)
+    } finally {
+      setRefundProcessing(false)
     }
   }
 
@@ -418,6 +442,16 @@ export default function AdminOrders() {
               </div>)}
               {!(activeOrder.paymentAttempts || []).length && <p className="order-payment-empty">Este pedido no tiene intentos de pago online registrados.</p>}
             </section>
+            {activeOrder.cancellationRequest && <section className="order-payment-card">
+              <div className="order-payment-heading"><div><span className="admin-kicker">ARREPENTIMIENTO DE COMPRA</span><h3>Solicitud del comprador</h3></div><small>{formatDate(activeOrder.cancellationRequest.createdAt)}</small></div>
+              <div className="order-payment-attempt">
+                <strong>{activeOrder.cancellationRequest.status === 'REQUESTED' ? 'Solicitud recibida' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Reembolso en proceso' : activeOrder.cancellationRequest.status === 'REFUNDED' ? 'Reembolso confirmado' : 'Reembolso con error'}</strong>
+                <small>{activeOrder.cancellationRequest.providerStatus || activeOrder.cancellationRequest.lastError || 'El comprador solicitó arrepentirse de la compra.'}</small>
+                {activeOrder.cancellationRequest.providerRefundId && <small className="order-payment-reference">Reembolso MP: {activeOrder.cancellationRequest.providerRefundId}</small>}
+                {activeOrder.cancellationRequest.status !== 'REFUNDED' && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void processRefund(activeOrder)}>{refundProcessing ? 'Consultando Mercado Pago…' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Consultar estado del reembolso' : 'Procesar reembolso en Mercado Pago'}</button>}
+              </div>
+              <p className="order-payment-empty">El reembolso se procesa a través de Mercado Pago. No se repone stock automáticamente; gestioná la devolución física del producto por separado.</p>
+            </section>}
             <section className="order-fiscal-card">
               <div className="order-fiscal-heading"><div><span className="admin-kicker">ARCA · HOMOLOGACIÓN</span><h3>Factura C</h3></div><small>Emisión manual de prueba</small></div>
               {(activeOrder.fiscalDocuments || []).filter((document) => document.type === 'INVOICE_C').map((document) => <div className={`order-fiscal-document ${document.status.toLowerCase()}`} key={document.id}>
