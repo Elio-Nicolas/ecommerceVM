@@ -333,3 +333,12 @@
 .checkout-whatsapp-contact{display:flex;align-items:center;justify-content:center;min-height:46px;margin:12px 0;padding:0 16px;border:1px solid #16834b;border-radius:6px;color:#116b3c;font-size:12px;font-weight:700;text-align:center}
 .checkout-whatsapp-contact:hover{background:#effaf3}
 @media(max-width:650px){.whatsapp-floating-link{right:12px;bottom:68px;min-height:44px;padding:0 13px;font-size:11px}.checkout-whatsapp-contact{font-size:11px}}
+
+
+/* WhatsApp como burbuja compacta, encima del botón de arrepentimiento */
+.floating-actions{position:fixed;right:20px;bottom:18px;z-index:50;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+.whatsapp-floating-link{position:static;width:52px;height:52px;min-height:52px;padding:0;display:grid;place-items:center;border-radius:50%;background:#16834b;color:#fff;box-shadow:0 6px 22px #0f172a30;transition:background .18s,transform .18s}
+.whatsapp-floating-link:hover{background:#116b3c;transform:translateY(-2px)}
+.whatsapp-floating-link svg{display:block;width:27px;height:27px}
+.whatsapp-floating-link:focus-visible{outline:3px solid #e47761;outline-offset:3px}
+@media(max-width:650px){.floating-actions{right:12px;bottom:12px;gap:10px}.whatsapp-floating-link{position:static;width:46px;height:46px;min-height:46px;padding:0}.whatsapp-floating-link svg{width:24px;height:24px}}
