@@ -58,7 +58,7 @@ export default function RegretPage() {
         .regret-card>p{color:#475569;line-height:1.6;margin:0 0 26px}
         .regret-card form{display:grid;gap:18px}
         .regret-card label{display:grid;gap:8px;font-size:14px;font-weight:650}
-        .regret-card input{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:14px 15px;font:15px inherit;color:#0f172a}
+        .regret-card input{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:14px 15px;font:inherit;font-size:15px;color:#0f172a}
         .regret-card button{border:0;border-radius:10px;background:#0a2540;color:#fff;padding:14px 18px;font:inherit;font-weight:700;cursor:pointer}
         .regret-card button:disabled{opacity:.6;cursor:wait}
         .regret-card small{display:block;color:#64748b;font-size:11px;line-height:1.6;margin-top:22px}
