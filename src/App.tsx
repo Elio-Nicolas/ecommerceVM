@@ -284,8 +284,10 @@ export default function App() {
           <span>© 2026 Tu TiendaVM. Todos los derechos reservados.</span>
           <span>Villa Mercedes, San Luis · Argentina</span>
         </div>
-        <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Botón de arrepentimiento</a>
-        <a className="whatsapp-floating-link" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Contactar a Tu TiendaVM por WhatsApp"><span aria-hidden="true">◔</span><span>¿Necesitás ayuda?</span></a>
+        <div className="floating-actions">
+          <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Arrepentimiento</a>
+          <a className="whatsapp-floating-link" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Contactar a Tu TiendaVM por WhatsApp"><span aria-hidden="true">◔</span><span>WhatsApp</span></a>
+        </div>
       </footer>
 
       {cartOpen && <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setCartOpen(false) }}>
