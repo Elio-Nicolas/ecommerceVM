@@ -19,6 +19,9 @@ import { adminArcaRouter } from './routes/admin-arca.routes'
 import { paymentsRouter } from './routes/payments.routes'
 
 export const app = express()
+// Render terminates TLS and forwards requests through one trusted proxy.
+// Trust only the nearest proxy hop so express-rate-limit can use the client IP.
+app.set('trust proxy', 1)
 app.disable('x-powered-by')
 app.use(helmet())
 
