@@ -166,3 +166,12 @@ Pendiente de validación:
 - Revisar el resultado visual del checkout y hacer una compra controlada con efectivo; no realizar cobros reales.
 - GOcuotas Sandbox sigue bloqueado por el HTTP 401 previo. Reintentar autenticación después de la hora de habilitación informada por GOcuotas (15/11/2026 07:59 hora Argentina).
 - No hacer merge ni desplegar producción hasta validar CI y el flujo. No modificar credenciales productivas.
+
+Validación CI:
+- GitHub Actions run #611: **success**.
+- `prisma migrate deploy`: success (incluye la migración nueva).
+- `prisma generate`: success.
+- Tests API: 46/46 passed.
+- TypeScript build API: success.
+- Frontend build: success.
+- Preview Vercel del último ajuste de checkout: success.
