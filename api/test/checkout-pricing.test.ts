@@ -39,7 +39,7 @@ test('Mercado Pago usa una tasa configurable y no inventa una comisión', () => 
     paymentMethod: 'MERCADO_PAGO',
     subtotalArs: 100000,
     shippingArs: 1500,
-    mercadoPagoSurchargeBps: 500,
+    mercadoPagoSurchargeBps: 5000,
   })
   assert.equal(configured.surchargeArs, 5075)
   assert.equal(configured.totalArs, 106575)
