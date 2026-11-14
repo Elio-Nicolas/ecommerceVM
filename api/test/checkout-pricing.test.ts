@@ -11,7 +11,7 @@ test('efectivo mantiene el precio publicado y no agrega recargo', () => {
     paymentMethod: 'CASH',
     subtotalArs: 100000,
     shippingArs: 2500,
-    surchargeRateBps: 0,
+    surchargeRateMilliPercent: 0,
     surchargeArs: 0,
     totalArs: 102500,
   })
@@ -23,7 +23,7 @@ test('GOcuotas aplica 9,9% más IVA sobre productos y envío', () => {
     subtotalArs: 100000,
     shippingArs: 0,
   })
-  assert.equal(result.surchargeRateBps, 11979)
+  assert.equal(result.surchargeRateMilliPercent, 11979)
   assert.equal(result.surchargeArs, 11979)
   assert.equal(result.totalArs, 111979)
 })
@@ -39,7 +39,7 @@ test('Mercado Pago usa una tasa configurable y no inventa una comisión', () => 
     paymentMethod: 'MERCADO_PAGO',
     subtotalArs: 100000,
     shippingArs: 1500,
-    mercadoPagoSurchargeBps: 5000,
+    mercadoPagoSurchargeMilliPercent: 5000,
   })
   assert.equal(configured.surchargeArs, 5075)
   assert.equal(configured.totalArs, 106575)
@@ -60,6 +60,6 @@ test('redondea el recargo al peso y rechaza importes/tasas inválidos', () => {
     paymentMethod: 'MERCADO_PAGO',
     subtotalArs: 100,
     shippingArs: 0,
-    mercadoPagoSurchargeBps: -1,
+    mercadoPagoSurchargeMilliPercent: -1,
   }))
 })
