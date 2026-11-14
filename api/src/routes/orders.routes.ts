@@ -7,6 +7,8 @@ import { prisma } from '../lib/prisma'
 import { getShippingSettings } from '../services/shipping-settings'
 import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 import { createCheckoutFingerprint } from '../services/order-checkout-fingerprint'
+import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
+import { env } from '../config/env'
 
 export const ordersRouter = Router()
 
@@ -29,6 +31,7 @@ const createOrderSchema = z.object({
   postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
   provinceCode: z.string().length(1).regex(/^[A-Z]$/).optional(),
   deliveryMethod: z.enum(['OCA', 'LOCAL_DELIVERY', 'PICKUP']).default('OCA'),
+  paymentMethod: z.enum(['CASH', 'MERCADO_PAGO', 'GOCUOTAS']).default('CASH'),
   shippingQuoteId: z.string().uuid().optional(),
   shippingOptionKey: z.string().trim().min(1).max(40).optional(),
   customerNotes: z.string().trim().max(1000).optional().transform((value) => value || null),
@@ -65,7 +68,7 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
   }
   const order = await prisma.order.findUnique({
     where: { id: id.data },
-    select: { shippingCostArs: true, totalArs: true },
+    select: { shippingCostArs: true, totalArs: true, paymentSurchargeArs: true, paymentSurchargeMilliPercent: true },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -98,6 +101,9 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           subtotalArs: previousOrder.subtotalArs,
           shippingCostArs: previousOrder.shippingCostArs,
           totalArs: previousOrder.totalArs,
+          paymentMethod: previousOrder.paymentMethod,
+          paymentSurchargeMilliPercent: previousOrder.paymentSurchargeMilliPercent,
+          paymentSurchargeArs: previousOrder.paymentSurchargeArs,
           createdAt: previousOrder.createdAt,
           items: previousOrder.items,
         },
@@ -205,7 +211,13 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         const quote = await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } })
         if (!quote || quote.subtotalArs !== subtotalArs) throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
       }
-      const totalArs = shippingCostArs === null ? null : subtotalArs + shippingCostArs
+      const pricing = shippingCostArs === null ? null : calculateCheckoutPrice({
+        paymentMethod: input.paymentMethod as CheckoutPaymentMethod,
+        subtotalArs,
+        shippingArs: shippingCostArs,
+        mercadoPagoSurchargeMilliPercent: env.MP_CHECKOUT_SURCHARGE_MILLIPERCENT,
+      })
+      const totalArs = pricing?.totalArs ?? null
       if (totalArs !== null && (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000)) {
         throw new OrderConflictError('El total del pedido supera el importe permitido.')
       }
@@ -236,6 +248,9 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           subtotalArs,
           shippingCostArs,
           totalArs,
+          paymentMethod: input.paymentMethod,
+          paymentSurchargeMilliPercent: pricing?.surchargeRateMilliPercent ?? 0,
+          paymentSurchargeArs: pricing?.surchargeArs ?? 0,
           shippingCarrier,
           shippingService,
           shippingEstimatedHours,
@@ -259,6 +274,9 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         subtotalArs: order.subtotalArs,
         shippingCostArs: order.shippingCostArs,
         totalArs: order.totalArs,
+        paymentMethod: order.paymentMethod,
+        paymentSurchargeMilliPercent: order.paymentSurchargeMilliPercent,
+        paymentSurchargeArs: order.paymentSurchargeArs,
         createdAt: order.createdAt,
         items: order.items,
       },

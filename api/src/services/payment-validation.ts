@@ -18,7 +18,9 @@ export function isValidPaymentCheckoutUrl(value: unknown): value is string {
       && (url.hostname === 'mercadopago.com.ar'
         || url.hostname.endsWith('.mercadopago.com.ar')
         || url.hostname === 'mercadopago.com'
-        || url.hostname.endsWith('.mercadopago.com'))
+        || url.hostname.endsWith('.mercadopago.com')
+        || url.hostname === 'gocuotas.com'
+        || url.hostname.endsWith('.gocuotas.com'))
   } catch {
     return false
   }

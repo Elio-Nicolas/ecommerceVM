@@ -148,6 +148,9 @@ model Order {
   subtotalArs Int
   shippingCostArs Int?
   totalArs Int?
+  paymentMethod String @default("MERCADO_PAGO")
+  paymentSurchargeMilliPercent Int @default(0)
+  paymentSurchargeArs Int @default(0)
   shippingCarrier String?
   trackingCode String?
   shippingService String?
