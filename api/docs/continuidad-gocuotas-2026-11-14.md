@@ -145,3 +145,24 @@ Siguiente implementación obligatoria:
 5. Habilitar efectivo como pedido sin pasarela; Mercado Pago y GOcuotas deben crear PaymentAttempt con el mismo importe final guardado en Order.
 6. Actualizar checkout y comprobante para mostrar desglose y total actualizado en cuanto se cambia el medio. Reintentos y cambio de proveedor deben impedir intentos cobrables simultáneos.
 7. Ejecutar pruebas API, Prisma generate, TypeScript build y CI. Revisar migración antes de cualquier despliegue.
+
+## Continuación 2026-11-14 — checkout y precios por medio de pago
+
+Implementado en esta rama:
+- Selector de efectivo/transferencia coordinada, Mercado Pago y GOcuotas (los medios online solo aparecen cuando su configuración está habilitada).
+- Efectivo conserva el precio publicado y no suma recargo.
+- GOcuotas aplica 11,979% sobre productos + envío.
+- Mercado Pago usa `MP_CHECKOUT_SURCHARGE_MILLIPERCENT`; valor por defecto 0 porque no se definió todavía una comisión para trasladar al comprador. La unidad es milésima de punto porcentual: 5000 equivale a 5%.
+- El checkout muestra subtotal, envío, recargo y total estimado al cambiar el medio.
+- El backend vuelve a calcular el importe con los precios reales de catálogo y la cotización de envío validada; no confía en importes enviados por el navegador.
+- La orden persiste `paymentMethod`, `paymentSurchargeMilliPercent` y `paymentSurchargeArs`.
+- Los endpoints de Mercado Pago y GOcuotas rechazan iniciar un pago si el proveedor no coincide con el medio guardado en la orden.
+- Al confirmar un costo de entrega local “a coordinar”, el backend recalcula total y recargo con el medio de pago original. Si ya hay un intento de pago abierto/cerrado que bloquea cambios, no permite modificar el total.
+- Migración nueva: `20261114190000_checkout_payment_pricing`.
+
+Pendiente de validación:
+- CI del último commit y build de Vercel.
+- Ejecutar Prisma deploy/generate, tests y build en CI.
+- Revisar el resultado visual del checkout y hacer una compra controlada con efectivo; no realizar cobros reales.
+- GOcuotas Sandbox sigue bloqueado por el HTTP 401 previo. Reintentar autenticación después de la hora de habilitación informada por GOcuotas (15/11/2026 07:59 hora Argentina).
+- No hacer merge ni desplegar producción hasta validar CI y el flujo. No modificar credenciales productivas.
