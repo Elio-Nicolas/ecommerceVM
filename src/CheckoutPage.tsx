@@ -331,7 +331,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           {createdOrder.shippingCostArs === null && <p className="checkout-small">Estamos esperando que se registre el costo acordado. El envío y el total se actualizarán automáticamente en este comprobante.</p>}
           {paymentError && <div className="checkout-error" role="alert">{paymentError}</div>}
           {paymentMethod !== 'CASH' && (paymentsEnabled || goCuotasEnabled) && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : `Pagar con ${paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}`}</button>}
-          <p className="checkout-small">El pedido solo se confirma cuando el proveedor informa un pago aprobado y la API verifica la operación.</p>
+          <p className="checkout-small">{paymentMethod === 'CASH' ? 'La tienda se comunicará para coordinar el pago y la entrega.' : 'El pedido solo se confirma cuando el proveedor informa un pago aprobado y la API verifica la operación.'}</p>
           <a className="checkout-whatsapp-contact" href={whatsappOrderUrl} target="_blank" rel="noreferrer">Consultar por WhatsApp sobre este pedido</a>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
         </section>
@@ -430,7 +430,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <button className="checkout-submit" type="submit" disabled={!paymentsConfigLoaded || submitting || cart.length === 0 || !canSubmit}>
             {submitting ? 'Registrando pedido...' : 'Confirmar pedido'}
           </button>
-          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. {(paymentsEnabled || goCuotasEnabled) ? 'El pago se completa de forma segura en la plataforma seleccionada.' : 'El pago online no está habilitado en este entorno.'}</p>
+          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. {paymentMethod === 'CASH' ? 'El pago se coordinará directamente con la tienda.' : 'El pago se completa de forma segura en la plataforma seleccionada.'}</p>
         </form>
         <aside className="checkout-summary">
           <h2>Tu pedido</h2>
