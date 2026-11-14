@@ -66,6 +66,7 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', orderId.data)
     const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { items: true } })
     if (!order) return { error: 'NOT_FOUND' as const }
+    if (order.paymentMethod !== 'GOCUOTAS') return { error: 'PAYMENT_METHOD_MISMATCH' as const }
     if (!['PENDING', 'CONFIRMED'].includes(order.status) || !order.totalArs || !order.customerEmail) return { error: 'ORDER_NOT_PAYABLE' as const }
     const paid = await tx.paymentAttempt.findFirst({ where: { orderId: order.id, status: 'APPROVED' } })
     if (paid) return { error: 'ALREADY_PAID' as const }
