@@ -27,6 +27,7 @@ const envSchema = z.object({
   ARCA_OPENSSL_PATH: z.string().min(1).default('openssl'),
   MP_ACCESS_TOKEN: optionalTrimmedString(20),
   MP_WEBHOOK_SECRET: optionalTrimmedString(20),
+  MP_CHECKOUT_SURCHARGE_BPS: z.coerce.number().int().min(0).max(100000).default(0),
   GOCUOTAS_API_BASE_URL: optionalHttpsUrl,
   GOCUOTAS_EMAIL: optionalTrimmedString(5),
   GOCUOTAS_PASSWORD: optionalTrimmedString(8),
