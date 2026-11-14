@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma'
 import { env } from '../config/env'
 import { requireAdmin } from '../middleware/require-admin'
 import { wouldChangeOrderTotal } from '../services/shipping-total-consistency'
+import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -138,20 +139,21 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
       const currentOrder = await tx.order.findUnique({
         where: { id: existing.id },
-        select: { subtotalArs: true, shippingCostArs: true, totalArs: true },
+        select: { subtotalArs: true, shippingCostArs: true, totalArs: true, paymentMethod: true },
       })
       if (!currentOrder) return null
-      const nextTotalArs = currentOrder.subtotalArs + shippingCostArs
+      const pricing = calculateCheckoutPrice({ paymentMethod: currentOrder.paymentMethod as CheckoutPaymentMethod, subtotalArs: currentOrder.subtotalArs, shippingArs: shippingCostArs, mercadoPagoSurchargeMilliPercent: env.MP_CHECKOUT_SURCHARGE_MILLIPERCENT })
+      const nextTotalArs = pricing.totalArs
       if (wouldChangeOrderTotal(currentOrder.subtotalArs, shippingCostArs, currentOrder.totalArs)) {
         const blockingPayment = await tx.paymentAttempt.findFirst({
-          where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
+          where: { orderId: existing.id, provider: { in: ['MERCADO_PAGO', 'GOCUOTAS'] }, status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
           select: { id: true },
         })
         if (blockingPayment) return null
       }
       await tx.order.update({
         where: { id: existing.id },
-        data: { shippingCostArs: shippingCostArs, totalArs: nextTotalArs, shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode },
+        data: { shippingCostArs, totalArs: nextTotalArs, paymentSurchargeMilliPercent: pricing.surchargeRateMilliPercent, paymentSurchargeArs: pricing.surchargeArs, shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode },
       })
       await tx.orderStatusHistory.create({
         data: {
@@ -165,7 +167,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       return tx.order.findUnique({ where: { id: existing.id }, include: orderInclude })
     })
     if (!updated) {
-      res.status(409).json({ error: { code: 'PAYMENT_ALREADY_STARTED', message: 'No se puede modificar el costo de entrega porque el pedido tiene un pago iniciado o registrado. Primero resolvé el pago en Mercado Pago.' } })
+      res.status(409).json({ error: { code: 'PAYMENT_ALREADY_STARTED', message: 'No se puede modificar el costo de entrega porque el pedido tiene un pago iniciado o registrado. Primero resolvé el pago pendiente.' } })
       return
     }
     res.json({ data: updated, message: 'Costo de entrega local registrado.' })
@@ -209,8 +211,10 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     await tx.order.update({
       where: { id: existing.id },
       data: {
-        shippingCostArs: shippingCostArs,
+        shippingCostArs,
         totalArs: nextTotalArs,
+        paymentSurchargeMilliPercent: pricing.surchargeRateMilliPercent,
+        paymentSurchargeArs: pricing.surchargeArs,
         shippingCarrier: input.shippingCarrier,
         trackingCode: input.trackingCode,
       },
