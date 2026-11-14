@@ -48,7 +48,7 @@ test('Mercado Pago usa una tasa configurable y no inventa una comisión', () => 
 test('redondea el recargo al peso y rechaza importes/tasas inválidos', () => {
   assert.equal(calculateCheckoutPrice({
     paymentMethod: 'GOCUOTAS',
-    subtotalArs: 1,
+    subtotalArs: 5,
     shippingArs: 0,
   }).surchargeArs, 1)
   assert.throws(() => calculateCheckoutPrice({
