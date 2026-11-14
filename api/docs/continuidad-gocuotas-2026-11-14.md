@@ -157,7 +157,7 @@ Implementado en esta rama:
 - El backend vuelve a calcular el importe con los precios reales de catálogo y la cotización de envío validada; no confía en importes enviados por el navegador.
 - La orden persiste `paymentMethod`, `paymentSurchargeMilliPercent` y `paymentSurchargeArs`.
 - Los endpoints de Mercado Pago y GOcuotas rechazan iniciar un pago si el proveedor no coincide con el medio guardado en la orden.
-- Al confirmar un costo de entrega local “a coordinar”, el backend recalcula total y recargo con el medio de pago original. Si ya hay un intento de pago abierto/cerrado que bloquea cambios, no permite modificar el total.
+- Al confirmar o corregir manualmente un costo de entrega local u OCA, el backend recalcula total y recargo con el medio de pago original. Si ya hay un intento de pago abierto/cerrado que bloquea cambios, no permite modificar el total.
 - Migración nueva: `20261114190000_checkout_payment_pricing`.
 
 Pendiente de validación:
