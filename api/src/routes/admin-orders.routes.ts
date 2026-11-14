@@ -197,13 +197,14 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
     const currentOrder = await tx.order.findUnique({
       where: { id: existing.id },
-      select: { subtotalArs: true, shippingCostArs: true, totalArs: true },
+      select: { subtotalArs: true, shippingCostArs: true, totalArs: true, paymentMethod: true },
     })
     if (!currentOrder) return null
-    const nextTotalArs = currentOrder.subtotalArs + shippingCostArs
+    const pricing = calculateCheckoutPrice({ paymentMethod: currentOrder.paymentMethod as CheckoutPaymentMethod, subtotalArs: currentOrder.subtotalArs, shippingArs: shippingCostArs, mercadoPagoSurchargeMilliPercent: env.MP_CHECKOUT_SURCHARGE_MILLIPERCENT })
+    const nextTotalArs = pricing.totalArs
     if (wouldChangeOrderTotal(currentOrder.subtotalArs, shippingCostArs, currentOrder.totalArs)) {
       const blockingPayment = await tx.paymentAttempt.findFirst({
-        where: { orderId: existing.id, provider: 'MERCADO_PAGO', status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
+        where: { orderId: existing.id, provider: { in: ['MERCADO_PAGO', 'GOCUOTAS'] }, status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
         select: { id: true },
       })
       if (blockingPayment) return null
