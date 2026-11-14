@@ -20,7 +20,7 @@ function paymentConfiguration() {
   return {
     enabled: Boolean(env.MP_ACCESS_TOKEN && env.MP_WEBHOOK_SECRET && env.PUBLIC_APP_URL && env.PUBLIC_API_URL),
     provider: 'MERCADO_PAGO' as const,
-    surchargeRateBps: env.MP_CHECKOUT_SURCHARGE_BPS,
+    surchargeRateMilliPercent: env.MP_CHECKOUT_SURCHARGE_MILLIPERCENT,
   }
 }
 
