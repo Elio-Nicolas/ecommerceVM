@@ -154,7 +154,7 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', attempt.orderId)
       const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
       if (!current) return
-      const effective = current.status === 'APPROVED' && next !== 'REFUNDED' ? 'APPROVED' : next
+      const effective = current.status === 'APPROVED' ? 'APPROVED' : next
       await tx.paymentAttempt.update({ where: { id: current.id }, data: {
         status: effective,
         statusDetail: String(payload.status || (payload.delivered_at ? 'delivered' : payload.discarded_at ? 'discarded' : 'pending')).slice(0, 200),
