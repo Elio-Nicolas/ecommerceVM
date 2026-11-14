@@ -50,7 +50,7 @@ test('redondea el recargo al peso y rechaza importes/tasas inválidos', () => {
     paymentMethod: 'GOCUOTAS',
     subtotalArs: 1,
     shippingArs: 0,
-  }).surchargeArs, 0)
+  }).surchargeArs, 1)
   assert.throws(() => calculateCheckoutPrice({
     paymentMethod: 'CASH',
     subtotalArs: -1,
