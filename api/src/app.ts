@@ -17,6 +17,7 @@ import { adminShippingSettingsRouter } from './routes/admin-shipping-settings.ro
 import { shippingRouter } from './routes/shipping.routes'
 import { adminArcaRouter } from './routes/admin-arca.routes'
 import { paymentsRouter } from './routes/payments.routes'
+import { goCuotasRouter } from './routes/gocuotas.routes'
 
 export const app = express()
 // Render terminates TLS and forwards requests through one trusted proxy.
@@ -43,6 +44,7 @@ app.use('/api/v1/admin/storage', adminStorageRouter)
 app.use('/api/v1/admin/orders', adminOrdersRouter)
 app.use('/api/v1/admin/arca', adminArcaRouter)
 app.use('/api/v1/payments', paymentsRouter)
+app.use('/api/v1/payments/gocuotas', goCuotasRouter)
 app.use('/api/v1/admin/shipping-origins', adminShippingOriginsRouter)
 app.use('/api/v1/admin/shipping-settings', adminShippingSettingsRouter)
 app.use('/api/v1/categories', categoriesRouter)
