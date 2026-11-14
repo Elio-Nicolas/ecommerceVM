@@ -54,28 +54,43 @@ La documentación compartida confirma el dominio Sandbox `https://sandbox.gocuot
 - La ruta de creación de checkout registra un `PaymentAttempt`; además, las URLs públicas configuradas localmente apuntaban a los dominios productivos. Por eso no se debe usar esa ruta hasta aislar y confirmar un backend/base de datos de pruebas.
 - No mergear PR #88 hasta resolver autenticación y completar las pruebas de Sandbox.
 
-## Checkout e importes — revisión pendiente
+## Checkout e importes — auditoría inicial del código (14/11/2026)
 
-Mientras GOcuotas queda bloqueado, revisar el checkout existente sin alterar integraciones productivas.
+Revisión estática de `src/CheckoutPage.tsx`, `api/src/routes/orders.routes.ts`, `api/src/routes/payments.routes.ts` y `api/src/routes/gocuotas.routes.ts`, sobre la rama `feat/gocuotas-redirect-v1`. No se ejecutaron compras ni se modificó lógica de negocio.
 
-Criterios comerciales conversados:
-- El comprador debe elegir el medio de pago antes de confirmar.
+### Hallazgos confirmados
+
+1. **No existe opción de efectivo en el selector actual.** El checkout solo ofrece Mercado Pago y GOcuotas cuando están habilitados.
+2. **No se calcula recargo por proveedor en el checkout.** El backend de órdenes calcula `totalArs` como subtotal de productos + envío. No recibe ni calcula un medio de pago ni un recargo.
+3. **El importe enviado a ambos proveedores es el total base del pedido.** Mercado Pago usa `order.totalArs`; GOcuotas usa `prepared.order.totalArs * 100`. No se observa en estos flujos un ajuste del 9,9% + IVA ni otro recargo según medio de pago.
+4. **El pedido se crea antes de iniciar el pago.** Al confirmar, el frontend registra el pedido y luego llama automáticamente al proveedor seleccionado. La selección entre Mercado Pago y GOcuotas queda en estado del frontend; el endpoint de creación de orden no recibe el proveedor. El proveedor queda asociado al `PaymentAttempt` cuando se inicia el pago.
+5. **No hay una pantalla previa que presente el total ajustado por medio de pago antes de registrar el pedido.** El comprobante posterior muestra el total base del pedido.
+6. **Riesgo de reintento/cambio de proveedor a revisar.** La interfaz permite iniciar nuevamente el pago desde el comprobante usando el proveedor actualmente seleccionado. Debe definirse cómo se evita que un mismo pedido termine con intentos activos de distintos proveedores y cómo se informa el importe final al comprador.
+
+### Qué significa
+
+La integración técnica de GOcuotas en el PR no implementa todavía el modelo comercial conversado de precio final según medio de pago. Tampoco está implementado el flujo de efectivo en el selector actual. Estos son faltantes de producto/backend, independientes del 401 de Sandbox.
+
+### Criterios comerciales que deben guiar la corrección
+
 - Efectivo conserva el precio publicado como referencia.
 - Mercado Pago y GOcuotas deben reflejar al comprador el costo/recargo correspondiente al medio de pago, de forma visible e inmediata antes de confirmar.
-- Se conversó para GOcuotas un recargo del 9,9% + IVA; verificar cómo está expresado y calculado en el código antes de darlo por implementado.
-- Verificar también las condiciones/plazos de financiación de GOcuotas y que el total mostrado coincida con el importe enviado al proveedor.
-- El pedido debe guardar correctamente el medio de pago y el importe final cobrado.
-- No asumir que estos criterios ya están implementados: **son puntos de auditoría y prueba**.
+- Para GOcuotas se conversó un recargo del 9,9% + IVA; validar la base y fórmula exactas antes de implementarlo.
+- Verificar las condiciones/plazos de financiación de GOcuotas y que el total mostrado coincida con el importe enviado al proveedor.
+- El backend debe calcular/validar el importe final; no confiar únicamente en el frontend.
+- El pedido y el intento de pago deben conservar proveedor, importe final y estado de forma coherente.
+- Definir explícitamente el comportamiento ante reintentos, cambio de medio de pago, cancelación o rechazo.
 
 ## Secuencia recomendada de trabajo
 
-1. Revisar en código el cálculo de precio por medio de pago y su presentación en checkout.
-2. Verificar que el precio/recargo se recalcula al cambiar el medio de pago y antes de confirmar.
-3. Verificar que el backend vuelve a calcular/validar el importe; no confiar únicamente en el frontend.
-4. Confirmar que el pedido conserva proveedor, importe y estado de pago correctos.
-5. Ejecutar pruebas de efectivo y Mercado Pago únicamente en un entorno de pruebas aislado.
-6. Retomar GOcuotas cuando Sandbox autentique.
-7. Revisar CI/PR y recién entonces decidir merge y despliegue.
+1. Definir la fórmula comercial exacta para efectivo, Mercado Pago y GOcuotas (incluyendo qué significa 9,9% + IVA y sobre qué importe se aplica).
+2. Diseñar el flujo para elegir medio de pago y ver el total final **antes** de registrar el pedido o reservar stock.
+3. Implementar el cálculo autoritativo en backend y reflejarlo en checkout.
+4. Persistir de forma consistente el proveedor elegido y el importe aplicable al pedido/intento.
+5. Definir y probar idempotencia y reglas para cambiar/reintentar proveedor sin duplicar cobros.
+6. Ejecutar pruebas de efectivo y Mercado Pago únicamente en un entorno de pruebas aislado.
+7. Retomar GOcuotas cuando Sandbox autentique; probar checkout, retorno y webhook.
+8. Revisar CI/PR y recién entonces decidir merge y despliegue.
 
 ## Estado local de Git al pausar
 
@@ -99,4 +114,4 @@ No guardar valores reales en este documento, en Git ni en capturas. La configura
 
 ---
 
-**Punto de reanudación:** revisar primero el estado local de Git; luego reintentar autenticación Sandbox después del horario anunciado. En paralelo, auditar checkout y cálculo de importes sin hacer compras reales ni desplegar cambios.
+**Punto de reanudación:** primero revisar el estado local de Git; luego reintentar autenticación Sandbox después del horario anunciado. En paralelo, definir fórmula y flujo de importes por medio de pago antes de modificar el checkout. No hacer compras reales ni desplegar cambios durante esta etapa.
