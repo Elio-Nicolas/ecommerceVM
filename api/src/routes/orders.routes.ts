@@ -68,7 +68,7 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
   }
   const order = await prisma.order.findUnique({
     where: { id: id.data },
-    select: { shippingCostArs: true, totalArs: true, paymentSurchargeArs: true, paymentSurchargeRateBps: true },
+    select: { shippingCostArs: true, totalArs: true, paymentSurchargeArs: true, paymentSurchargeMilliPercent: true },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -102,7 +102,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           shippingCostArs: previousOrder.shippingCostArs,
           totalArs: previousOrder.totalArs,
           paymentMethod: previousOrder.paymentMethod,
-          paymentSurchargeRateBps: previousOrder.paymentSurchargeRateBps,
+          paymentSurchargeMilliPercent: previousOrder.paymentSurchargeMilliPercent,
           paymentSurchargeArs: previousOrder.paymentSurchargeArs,
           createdAt: previousOrder.createdAt,
           items: previousOrder.items,
@@ -215,7 +215,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         paymentMethod: input.paymentMethod as CheckoutPaymentMethod,
         subtotalArs,
         shippingArs: shippingCostArs,
-        mercadoPagoSurchargeBps: env.MP_CHECKOUT_SURCHARGE_BPS,
+        mercadoPagoSurchargeMilliPercent: env.MP_CHECKOUT_SURCHARGE_MILLIPERCENT,
       })
       const totalArs = pricing?.totalArs ?? null
       if (totalArs !== null && (!Number.isSafeInteger(totalArs) || totalArs > 2_000_000_000)) {
@@ -249,7 +249,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           shippingCostArs,
           totalArs,
           paymentMethod: input.paymentMethod,
-          paymentSurchargeRateBps: pricing?.surchargeRateBps ?? 0,
+          paymentSurchargeMilliPercent: pricing?.surchargeRateMilliPercent ?? 0,
           paymentSurchargeArs: pricing?.surchargeArs ?? 0,
           shippingCarrier,
           shippingService,
@@ -275,7 +275,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         shippingCostArs: order.shippingCostArs,
         totalArs: order.totalArs,
         paymentMethod: order.paymentMethod,
-        paymentSurchargeRateBps: order.paymentSurchargeRateBps,
+        paymentSurchargeMilliPercent: order.paymentSurchargeMilliPercent,
         paymentSurchargeArs: order.paymentSurchargeArs,
         createdAt: order.createdAt,
         items: order.items,
