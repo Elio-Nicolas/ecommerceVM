@@ -84,7 +84,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [paymentsEnabled, setPaymentsEnabled] = useState(false)
   const [goCuotasEnabled, setGoCuotasEnabled] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'MERCADO_PAGO' | 'GOCUOTAS'>('CASH')
-  const [mpSurchargeMilliPercent, setMpSurchargeRateBps] = useState(0)
+  const [mpSurchargeMilliPercent, setMpSurchargeMilliPercent] = useState(0)
   const [paymentsConfigLoaded, setPaymentsConfigLoaded] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
@@ -159,7 +159,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     ]).then(([mp, go]) => {
       setPaymentsEnabled(Boolean(mp.data?.enabled))
       setGoCuotasEnabled(Boolean(go.data?.enabled))
-      setMpSurchargeRateBps(Number.isSafeInteger(mp.data?.surchargeRateMilliPercent) ? Math.max(0, mp.data.surchargeRateMilliPercent) : 0)
+      setMpSurchargeMilliPercent(Number.isSafeInteger(mp.data?.surchargeRateMilliPercent) ? Math.max(0, mp.data.surchargeRateMilliPercent) : 0)
       if (!mp.data?.enabled && go.data?.enabled) setPaymentMethod('GOCUOTAS')
     }).catch(() => { setPaymentsEnabled(false); setGoCuotasEnabled(false) })
       .finally(() => setPaymentsConfigLoaded(true))
