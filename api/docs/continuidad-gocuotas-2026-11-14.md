@@ -124,3 +124,24 @@ No guardar valores reales en este documento, en Git ni en capturas. La configura
 ---
 
 **Punto de reanudación:** primero revisar el estado local de Git; luego reintentar autenticación Sandbox después del horario anunciado. En paralelo, definir fórmula y flujo de importes por medio de pago antes de modificar el checkout. No hacer compras reales ni desplegar cambios durante esta etapa.
+
+
+## Avance de checkout iniciado
+
+Commits posteriores al diagnóstico:
+
+- `26e2ca6`: se agregó `api/src/services/checkout-pricing.ts`, calculador puro de precios en servidor para efectivo, Mercado Pago y GOcuotas.
+- `5b659b6` / `a889d55`: pruebas unitarias para precio en efectivo, recargo GOcuotas, tasa configurable de Mercado Pago, redondeo y validaciones.
+- `2cf58d2`: actualización visual de `src/checkout.css` con fondo `#F8FAFC`, azul `#0A2540`, texto `#0F172A`, acento `#E11D48`, tarjetas seleccionadas más claras y tipografía más legible.
+
+**Importante: avance parcial, todavía no integrado al flujo de compra.** El calculador aún no está conectado a `orders.routes.ts`, no hay endpoint de cotización de total por medio de pago, no se persistieron medio/recargo/total final en `Order`, y el checkout todavía no ofrece efectivo ni muestra el total dinámico por medio. Tampoco se ejecutaron CI ni pruebas desde este entorno. No mergear ni desplegar este estado.
+
+Siguiente implementación obligatoria:
+
+1. Agregar configuración validada para tasa de recargo de Mercado Pago; mantenerla en cero/deshabilitada hasta confirmar costo real, sin inventar porcentaje.
+2. Crear cotización de checkout en backend que valide productos/stock y modalidad/envío, calcule el precio según medio y devuelva subtotal, envío, recargo y total. La cotización no descuenta stock.
+3. Persistir en `Order` el medio elegido, importe base, recargo y total cobrado; migración Prisma correspondiente.
+4. Cambiar creación de pedido para recalcular todo dentro de la transacción, verificar que la cotización siga vigente y recién ahí reservar stock. Idempotencia debe incluir medio de pago.
+5. Habilitar efectivo como pedido sin pasarela; Mercado Pago y GOcuotas deben crear PaymentAttempt con el mismo importe final guardado en Order.
+6. Actualizar checkout y comprobante para mostrar desglose y total actualizado en cuanto se cambia el medio. Reintentos y cambio de proveedor deben impedir intentos cobrables simultáneos.
+7. Ejecutar pruebas API, Prisma generate, TypeScript build y CI. Revisar migración antes de cualquier despliegue.
