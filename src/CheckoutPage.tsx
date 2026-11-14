@@ -308,7 +308,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-mark">✓</div>
           <span className="checkout-eyebrow">PEDIDO REGISTRADO</span>
           <h1>¡Gracias por tu pedido!</h1>
-          <p>{paymentsEnabled && createdOrder.totalArs !== null ? (paymentLoading ? 'Conectando con el proveedor de pago seleccionado...' : paymentError ? 'El pedido quedó registrado, pero todavía no pudimos iniciar el pago.' : 'Tu pedido quedó registrado. Te estamos redirigiendo a la plataforma de pago.') : createdOrder.totalArs === null ? 'Tu pedido quedó registrado. Primero debemos confirmar el costo de entrega.' : 'Tu pedido quedó registrado. El pago se coordinará luego de confirmar el pedido.'}</p>
+          <p>{(paymentsEnabled || goCuotasEnabled) && createdOrder.totalArs !== null ? (paymentLoading ? 'Conectando con el proveedor de pago seleccionado...' : paymentError ? 'El pedido quedó registrado, pero todavía no pudimos iniciar el pago.' : 'Tu pedido quedó registrado. Te estamos redirigiendo a la plataforma de pago.') : createdOrder.totalArs === null ? 'Tu pedido quedó registrado. Primero debemos confirmar el costo de entrega.' : 'Tu pedido quedó registrado. El pago se coordinará luego de confirmar el pedido.'}</p>
           <div className="checkout-order-code">
             <span>CÓDIGO DE PEDIDO</span>
             <strong>{createdOrder.code}</strong>
@@ -350,7 +350,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <div className="checkout-fields">
               <label>Nombre y apellido<input required minLength={2} maxLength={120} autoComplete="name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
               <label>Teléfono / WhatsApp<input required type="tel" minLength={8} maxLength={30} autoComplete="tel" placeholder="Ej. 2657 123456" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} /></label>
-              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'OCA' || paymentsEnabled ? <span>(obligatorio para el envío y el pago)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'OCA' || paymentsEnabled} maxLength={deliveryMethod === 'OCA' || paymentsEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
+              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'OCA' || paymentsEnabled || goCuotasEnabled ? <span>(obligatorio para el envío y el pago)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'OCA' || paymentsEnabled || goCuotasEnabled} maxLength={deliveryMethod === 'OCA' || paymentsEnabled || goCuotasEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
             </div>
           </section>
           <section className="checkout-card">
@@ -418,7 +418,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <button className="checkout-submit" type="submit" disabled={!paymentsConfigLoaded || submitting || cart.length === 0 || !canSubmit}>
             {submitting ? 'Registrando pedido...' : 'Confirmar pedido'}
           </button>
-          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. {paymentsEnabled ? 'El pago se completa de forma segura en la plataforma seleccionada.' : 'El pago online no está habilitado en este entorno.'}</p>
+          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. {(paymentsEnabled || goCuotasEnabled) ? 'El pago se completa de forma segura en la plataforma seleccionada.' : 'El pago online no está habilitado en este entorno.'}</p>
         </form>
         <aside className="checkout-summary">
           <h2>Tu pedido</h2>
