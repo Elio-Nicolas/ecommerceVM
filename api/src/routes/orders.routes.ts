@@ -68,7 +68,7 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
   }
   const order = await prisma.order.findUnique({
     where: { id: id.data },
-    select: { shippingCostArs: true, totalArs: true },
+    select: { shippingCostArs: true, totalArs: true, paymentSurchargeArs: true, paymentSurchargeRateBps: true },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -101,6 +101,9 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           subtotalArs: previousOrder.subtotalArs,
           shippingCostArs: previousOrder.shippingCostArs,
           totalArs: previousOrder.totalArs,
+          paymentMethod: previousOrder.paymentMethod,
+          paymentSurchargeRateBps: previousOrder.paymentSurchargeRateBps,
+          paymentSurchargeArs: previousOrder.paymentSurchargeArs,
           createdAt: previousOrder.createdAt,
           items: previousOrder.items,
         },
@@ -271,6 +274,9 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         subtotalArs: order.subtotalArs,
         shippingCostArs: order.shippingCostArs,
         totalArs: order.totalArs,
+        paymentMethod: order.paymentMethod,
+        paymentSurchargeRateBps: order.paymentSurchargeRateBps,
+        paymentSurchargeArs: order.paymentSurchargeArs,
         createdAt: order.createdAt,
         items: order.items,
       },
