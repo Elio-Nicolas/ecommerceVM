@@ -319,7 +319,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-mark">✓</div>
           <span className="checkout-eyebrow">PEDIDO REGISTRADO</span>
           <h1>¡Gracias por tu pedido!</h1>
-          <p>{(paymentsEnabled || goCuotasEnabled) && createdOrder.totalArs !== null ? (paymentLoading ? 'Conectando con el proveedor de pago seleccionado...' : paymentError ? 'El pedido quedó registrado, pero todavía no pudimos iniciar el pago.' : 'Tu pedido quedó registrado. Te estamos redirigiendo a la plataforma de pago.') : createdOrder.totalArs === null ? 'Tu pedido quedó registrado. Primero debemos confirmar el costo de entrega.' : 'Tu pedido quedó registrado. El pago se coordinará luego de confirmar el pedido.'}</p>
+          <p>{paymentMethod !== 'CASH' && (paymentsEnabled || goCuotasEnabled) && createdOrder.totalArs !== null ? (paymentLoading ? 'Conectando con el proveedor de pago seleccionado...' : paymentError ? 'El pedido quedó registrado, pero todavía no pudimos iniciar el pago.' : 'Tu pedido quedó registrado. Te estamos redirigiendo a la plataforma de pago.') : createdOrder.totalArs === null ? 'Tu pedido quedó registrado. Primero debemos confirmar el costo de entrega.' : 'Tu pedido quedó registrado. El pago se coordinará luego de confirmar el pedido.'}</p>
           <div className="checkout-order-code">
             <span>CÓDIGO DE PEDIDO</span>
             <strong>{createdOrder.code}</strong>
@@ -330,7 +330,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-total"><span>Total</span><strong>{createdOrder.totalArs === null ? 'A confirmar' : formatPrice(createdOrder.totalArs)}</strong></div>
           {createdOrder.shippingCostArs === null && <p className="checkout-small">Estamos esperando que se registre el costo acordado. El envío y el total se actualizarán automáticamente en este comprobante.</p>}
           {paymentError && <div className="checkout-error" role="alert">{paymentError}</div>}
-          {(paymentsEnabled || goCuotasEnabled) && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : `Pagar con ${paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}`}</button>}
+          {paymentMethod !== 'CASH' && (paymentsEnabled || goCuotasEnabled) && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : `Pagar con ${paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}`}</button>}
           <p className="checkout-small">El pedido solo se confirma cuando el proveedor informa un pago aprobado y la API verifica la operación.</p>
           <a className="checkout-whatsapp-contact" href={whatsappOrderUrl} target="_blank" rel="noreferrer">Consultar por WhatsApp sobre este pedido</a>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
