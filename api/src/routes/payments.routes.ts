@@ -20,6 +20,7 @@ function paymentConfiguration() {
   return {
     enabled: Boolean(env.MP_ACCESS_TOKEN && env.MP_WEBHOOK_SECRET && env.PUBLIC_APP_URL && env.PUBLIC_API_URL),
     provider: 'MERCADO_PAGO' as const,
+    surchargeRateBps: env.MP_CHECKOUT_SURCHARGE_BPS,
   }
 }
 
@@ -254,6 +255,7 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
       include: { items: true },
     })
     if (!order) return { error: 'NOT_FOUND' as const }
+    if (order.paymentMethod !== 'MERCADO_PAGO') return { error: 'PAYMENT_METHOD_MISMATCH' as const }
     if (!['PENDING', 'CONFIRMED'].includes(order.status)) return { error: 'ORDER_NOT_PAYABLE' as const }
     if (!order.customerEmail) return { error: 'EMAIL_REQUIRED' as const }
     if (!order.totalArs || order.totalArs <= 0) return { error: 'TOTAL_NOT_FINAL' as const }
@@ -298,6 +300,7 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
     const errors: Record<string, { status: number; message: string }> = {
       NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
       ORDER_NOT_PAYABLE: { status: 409, message: 'El pedido ya no está disponible para iniciar un pago.' },
+      PAYMENT_METHOD_MISMATCH: { status: 409, message: 'El medio de pago seleccionado para este pedido no es Mercado Pago.' },
       EMAIL_REQUIRED: { status: 409, message: 'Ingresá un correo electrónico válido para pagar con Mercado Pago.' },
       TOTAL_NOT_FINAL: { status: 409, message: 'El total todavía no está confirmado. Coordiná primero el costo de entrega.' },
       REQUEST_KEY_CONFLICT: { status: 409, message: 'La clave de pago ya fue utilizada para otro pedido.' },
