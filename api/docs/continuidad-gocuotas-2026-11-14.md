@@ -71,15 +71,24 @@ Revisión estática de `src/CheckoutPage.tsx`, `api/src/routes/orders.routes.ts`
 
 La integración técnica de GOcuotas en el PR no implementa todavía el modelo comercial conversado de precio final según medio de pago. Tampoco está implementado el flujo de efectivo en el selector actual. Estos son faltantes de producto/backend, independientes del 401 de Sandbox.
 
-### Criterios comerciales que deben guiar la corrección
+### Criterios comerciales definidos para implementar
 
-- Efectivo conserva el precio publicado como referencia.
-- Mercado Pago y GOcuotas deben reflejar al comprador el costo/recargo correspondiente al medio de pago, de forma visible e inmediata antes de confirmar.
-- Para GOcuotas se conversó un recargo del 9,9% + IVA; validar la base y fórmula exactas antes de implementarlo.
-- Verificar las condiciones/plazos de financiación de GOcuotas y que el total mostrado coincida con el importe enviado al proveedor.
-- El backend debe calcular/validar el importe final; no confiar únicamente en el frontend.
-- El pedido y el intento de pago deben conservar proveedor, importe final y estado de forma coherente.
-- Definir explícitamente el comportamiento ante reintentos, cambio de medio de pago, cancelación o rechazo.
+- **Efectivo:** conserva exactamente el precio publicado. No se le agrega recargo.
+- **GOcuotas:** se suma al precio base un 11,979% (9,9% + IVA del 21% aplicado sobre esa comisión). Ejemplo: base $100.000 → recargo $11.979 → total comprador $111.979. El recargo se calcula sobre el subtotal de productos más el envío confirmado.
+- **Mercado Pago:** el checkout debe mostrar un importe final calculado con la comisión configurada para la modalidad/costo real de MP. No inventar una tasa fija: dejarla parametrizada y documentar el valor pendiente de confirmar antes de habilitar cobros.
+- Los importes se expresan en pesos enteros; redondeo al peso más cercano y validación de límites en backend.
+- El backend calcula y valida el precio final; el frontend solo muestra una cotización previa.
+- El pedido debe persistir medio elegido, subtotal, envío, recargo y total final. El intento de pago debe usar exactamente ese total.
+- Reintentos del mismo medio reutilizan el importe/orden; cambiar de medio exige recalcular y evitar dos intentos cobrables simultáneos.
+- El stock no se descuenta al mostrar la cotización. Se valida y descuenta dentro de la transacción al confirmar el pedido.
+
+## Diseño visual requerido para el checkout
+
+- Interfaz moderna, limpia y de alto contraste; tipografía sans-serif legible (preferencia Poppins/Manrope) y jerarquía tipográfica clara.
+- Paleta de referencia: fondo claro `#F8FAFC`, texto oscuro `#0F172A`, azul profundo `#0A2540` y acento coral/rojo `#E11D48`.
+- Tarjetas de selección para cada medio de pago, con estado seleccionado claramente visible, precio final grande y recargo desglosado en texto legible.
+- Resumen del pedido actualizado inmediatamente al cambiar el medio de pago. Efectivo debe destacar como precio sin recargo; GOcuotas debe indicar explícitamente el 11,979% adicional.
+- Evitar textos diminutos, grises de bajo contraste, estilos genéricos de plantilla y cambios visuales que mezclen la marca de la tienda con IORed.
 
 ## Secuencia recomendada de trabajo
 
