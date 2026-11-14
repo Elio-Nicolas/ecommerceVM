@@ -18,7 +18,7 @@ function configured() {
 
 async function authenticate() {
   if (!configured()) throw new Error('GOcuotas Sandbox no está configurado.')
-  const response = await fetch(new URL('authentication', env.GOCUOTAS_API_BASE_URL), {
+  const response = await fetch(new URL('authentication', env.GOCUOTAS_API_BASE_URL!), {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json' },
     body: JSON.stringify({ email: env.GOCUOTAS_EMAIL, password: env.GOCUOTAS_PASSWORD }),
