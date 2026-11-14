@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { env } from '../config/env'
 import { requireAdmin } from '../middleware/require-admin'
-import { wouldChangeOrderTotal } from '../services/shipping-total-consistency'
 import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
 
 export const adminOrdersRouter = Router()
@@ -144,7 +143,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       if (!currentOrder) return null
       const pricing = calculateCheckoutPrice({ paymentMethod: currentOrder.paymentMethod as CheckoutPaymentMethod, subtotalArs: currentOrder.subtotalArs, shippingArs: shippingCostArs, mercadoPagoSurchargeMilliPercent: env.MP_CHECKOUT_SURCHARGE_MILLIPERCENT })
       const nextTotalArs = pricing.totalArs
-      if (wouldChangeOrderTotal(currentOrder.subtotalArs, shippingCostArs, currentOrder.totalArs)) {
+      if (pricing.totalArs !== currentOrder.totalArs) {
         const blockingPayment = await tx.paymentAttempt.findFirst({
           where: { orderId: existing.id, provider: { in: ['MERCADO_PAGO', 'GOCUOTAS'] }, status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
           select: { id: true },
@@ -202,7 +201,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     if (!currentOrder) return null
     const pricing = calculateCheckoutPrice({ paymentMethod: currentOrder.paymentMethod as CheckoutPaymentMethod, subtotalArs: currentOrder.subtotalArs, shippingArs: shippingCostArs, mercadoPagoSurchargeMilliPercent: env.MP_CHECKOUT_SURCHARGE_MILLIPERCENT })
     const nextTotalArs = pricing.totalArs
-    if (wouldChangeOrderTotal(currentOrder.subtotalArs, shippingCostArs, currentOrder.totalArs)) {
+    if (pricing.totalArs !== currentOrder.totalArs) {
       const blockingPayment = await tx.paymentAttempt.findFirst({
         where: { orderId: existing.id, provider: { in: ['MERCADO_PAGO', 'GOCUOTAS'] }, status: { in: ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] } },
         select: { id: true },
