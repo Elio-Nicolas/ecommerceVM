@@ -445,7 +445,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-summary-total"><span>Subtotal</span><strong>{formatPrice(displayedSubtotal)}</strong></div>
           <div className="checkout-summary-total"><span>Envío</span><strong>{deliveryMethod === '' ? 'A elegir' : deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate ? 'A coordinar' : canSubmit ? formatPrice(selectedShippingPrice) : 'A calcular'}</strong></div>
           {paymentSurchargeMilliPercent > 0 && <div className="checkout-summary-total"><span>Recargo por medio de pago ({(paymentSurchargeMilliPercent / 1000).toFixed(3)}%)</span><strong>{formatPrice(estimatedPaymentSurcharge)}</strong></div>}
-          <div className="checkout-summary-grand-total"><span>Total</span><strong>{deliveryMethod === '' || (deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate) ? 'A confirmar' : formatPrice(estimatedPaymentTotal)}</strong></div>
+          <div className="checkout-summary-grand-total"><span>Total</span><strong>{!canSubmit || (deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate) ? 'A confirmar' : formatPrice(estimatedPaymentTotal)}</strong></div>
           <p className="checkout-summary-note">El importe se calcula según la modalidad seleccionada. El total queda confirmado al registrar el pedido.</p>
         </aside>
       </div>
