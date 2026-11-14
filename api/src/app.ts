@@ -25,12 +25,11 @@ app.set('trust proxy', 1)
 app.disable('x-powered-by')
 app.use(helmet())
 
-// Keep the production storefront available even when Render still has the
-// local-development CORS_ORIGIN value configured. Additional origins remain
-// configurable through CORS_ORIGIN (comma-separated).
+// Keep both the original Vercel URL and the custom storefront domain available.
 const allowedOrigins = [...new Set([
   ...env.CORS_ORIGIN,
   'https://ecommerce-vm.vercel.app',
+  'https://tienda.iored.com.ar',
 ])]
 app.use(cors({ origin: allowedOrigins }))
 
