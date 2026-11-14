@@ -79,6 +79,8 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
   const [coverageNoticeOpen, setCoverageNoticeOpen] = useState(false)
   const [paymentsEnabled, setPaymentsEnabled] = useState(false)
+  const [goCuotasEnabled, setGoCuotasEnabled] = useState(false)
+  const [paymentProvider, setPaymentProvider] = useState<'MERCADO_PAGO' | 'GOCUOTAS'>('MERCADO_PAGO')
   const [paymentsConfigLoaded, setPaymentsConfigLoaded] = useState(false)
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState('')
@@ -142,10 +144,14 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   }, [deliveryMethod, postalCode, deliveryMethods, localDeliveryAvailable])
 
   useEffect(() => {
-    fetch(`${API_URL}/api/v1/payments/config`)
-      .then((response) => response.json())
-      .then((payload) => setPaymentsEnabled(Boolean(payload.data?.enabled)))
-      .catch(() => setPaymentsEnabled(false))
+    Promise.all([
+      fetch(`${API_URL}/api/v1/payments/config`).then((response) => response.json()),
+      fetch(`${API_URL}/api/v1/payments/gocuotas/config`).then((response) => response.json()),
+    ]).then(([mp, go]) => {
+      setPaymentsEnabled(Boolean(mp.data?.enabled))
+      setGoCuotasEnabled(Boolean(go.data?.enabled))
+      if (!mp.data?.enabled && go.data?.enabled) setPaymentProvider('GOCUOTAS')
+    }).catch(() => { setPaymentsEnabled(false); setGoCuotasEnabled(false) })
       .finally(() => setPaymentsConfigLoaded(true))
   }, [])
 
@@ -211,7 +217,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     return () => { window.clearTimeout(timeout); controller.abort() }
   }, [provinceCode, postalCode, cartKey, deliveryMethod, deliveryMethods])
 
-  async function startPayment(orderId: string) {
+  async function startPayment(orderId: string, provider = paymentProvider) {
     if (paymentLoading) return
     setPaymentLoading(true)
     setPaymentError('')
@@ -227,7 +233,8 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       } catch {
         requestKey = crypto.randomUUID()
       }
-      const response = await fetch(`${API_URL}/api/v1/payments/orders/${encodeURIComponent(orderId)}`, {
+      const paymentPath = provider === 'GOCUOTAS' ? '/api/v1/payments/gocuotas/orders/' : '/api/v1/payments/orders/'
+      const response = await fetch(`${API_URL}${paymentPath}${encodeURIComponent(orderId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestKey }),
@@ -240,7 +247,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
         if (payload.error?.code === 'ATTEMPT_CLOSED') {
           try { sessionStorage.removeItem(storageKey) } catch { /* El próximo intento generará una clave nueva. */ }
         }
-        throw new Error(payload.error?.message || 'No pudimos iniciar el pago con Mercado Pago.')
+        throw new Error(payload.error?.message || 'No pudimos iniciar el pago con el proveedor seleccionado.')
       }
       window.location.assign(payload.data.checkoutUrl)
     } catch (cause) {
@@ -285,7 +292,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       try { sessionStorage.removeItem(checkoutStorageKey) } catch { /* El pedido ya quedó registrado; el almacenamiento es opcional. */ }
       setCreatedOrder(payload.data)
       onOrderCreated()
-      if (paymentsEnabled && payload.data.totalArs !== null) await startPayment(payload.data.id)
+      if ((paymentsEnabled || goCuotasEnabled) && payload.data.totalArs !== null) await startPayment(payload.data.id)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Ocurrió un error al enviar el pedido.')
     } finally {
@@ -301,7 +308,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-mark">✓</div>
           <span className="checkout-eyebrow">PEDIDO REGISTRADO</span>
           <h1>¡Gracias por tu pedido!</h1>
-          <p>{paymentsEnabled && createdOrder.totalArs !== null ? (paymentLoading ? 'Conectando con Mercado Pago para completar el pago...' : paymentError ? 'El pedido quedó registrado, pero todavía no pudimos iniciar el pago.' : 'Tu pedido quedó registrado. Te estamos redirigiendo a Mercado Pago.') : createdOrder.totalArs === null ? 'Tu pedido quedó registrado. Primero debemos confirmar el costo de entrega.' : 'Tu pedido quedó registrado. El pago se coordinará luego de confirmar el pedido.'}</p>
+          <p>{paymentsEnabled && createdOrder.totalArs !== null ? (paymentLoading ? 'Conectando con el proveedor de pago seleccionado...' : paymentError ? 'El pedido quedó registrado, pero todavía no pudimos iniciar el pago.' : 'Tu pedido quedó registrado. Te estamos redirigiendo a la plataforma de pago.') : createdOrder.totalArs === null ? 'Tu pedido quedó registrado. Primero debemos confirmar el costo de entrega.' : 'Tu pedido quedó registrado. El pago se coordinará luego de confirmar el pedido.'}</p>
           <div className="checkout-order-code">
             <span>CÓDIGO DE PEDIDO</span>
             <strong>{createdOrder.code}</strong>
@@ -311,8 +318,8 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-total"><span>Total</span><strong>{createdOrder.totalArs === null ? 'A confirmar' : formatPrice(createdOrder.totalArs)}</strong></div>
           {createdOrder.shippingCostArs === null && <p className="checkout-small">Estamos esperando que se registre el costo acordado. El envío y el total se actualizarán automáticamente en este comprobante.</p>}
           {paymentError && <div className="checkout-error" role="alert">{paymentError}</div>}
-          {paymentsEnabled && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : 'Pagar con Mercado Pago'}</button>}
-          <p className="checkout-small">El pedido solo se confirma cuando Mercado Pago informa un pago aprobado y la API verifica su importe.</p>
+          {paymentsEnabled && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : 'Pagar con {paymentProvider === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}'}</button>}
+          <p className="checkout-small">El pedido solo se confirma cuando el proveedor informa un pago aprobado y la API verifica la operación.</p>
           <a className="checkout-whatsapp-contact" href={whatsappOrderUrl} target="_blank" rel="noreferrer">Consultar por WhatsApp sobre este pedido</a>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
         </section>
@@ -406,11 +413,12 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             </section>
           )}
           {deliveryMethod === '' && <p className="checkout-shipping-hint">Elegí primero cómo querés recibir tu pedido para completar los datos que correspondan.</p>}
+          {(paymentsEnabled || goCuotasEnabled) && <section className="checkout-card"><h2>Medio de pago</h2><div className="checkout-shipping-options">{paymentsEnabled && <label className={paymentProvider === 'MERCADO_PAGO' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentProvider" checked={paymentProvider === 'MERCADO_PAGO'} onChange={() => setPaymentProvider('MERCADO_PAGO')} /><span className="checkout-shipping-option-copy"><strong>Mercado Pago</strong><small>Pagá de forma segura con Mercado Pago.</small></span></label>}{goCuotasEnabled && <label className={paymentProvider === 'GOCUOTAS' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentProvider" checked={paymentProvider === 'GOCUOTAS'} onChange={() => setPaymentProvider('GOCUOTAS')} /><span className="checkout-shipping-option-copy"><strong>GOcuotas</strong><small>Pagá en cuotas con tarjeta de débito.</small></span></label>}</div></section>}
           {error && <div className="checkout-error" role="alert">{error}</div>}
           <button className="checkout-submit" type="submit" disabled={!paymentsConfigLoaded || submitting || cart.length === 0 || !canSubmit}>
             {submitting ? 'Registrando pedido...' : 'Confirmar pedido'}
           </button>
-          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. {paymentsEnabled ? 'El pago se completa de forma segura en Mercado Pago.' : 'El pago online no está habilitado en este entorno.'}</p>
+          <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. {paymentsEnabled ? 'El pago se completa de forma segura en la plataforma seleccionada.' : 'El pago online no está habilitado en este entorno.'}</p>
         </form>
         <aside className="checkout-summary">
           <h2>Tu pedido</h2>
