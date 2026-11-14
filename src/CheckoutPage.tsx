@@ -107,7 +107,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const localDeliveryAvailable = Boolean(deliveryMethods?.localDelivery.enabled && deliveryMethods.localDelivery.postalCodes.includes(postalCode))
   const selectedShippingPrice = deliveryMethod === 'PICKUP' ? 0 : deliveryMethod === 'LOCAL_DELIVERY' ? (deliveryMethods?.localDelivery.priceArs ?? 0) : (selectedOption?.priceArs ?? 0)
   const paymentSurchargeRateBps = paymentMethod === 'GOCUOTAS' ? 11979 : paymentMethod === 'MERCADO_PAGO' ? mpSurchargeRateBps : 0
-  const estimatedPaymentSurcharge = Math.round((displayedSubtotal + selectedShippingPrice) * paymentSurchargeRateBps / 10000)
+  const estimatedPaymentSurcharge = Math.round((displayedSubtotal + selectedShippingPrice) * paymentSurchargeRateBps / 100000)
   const estimatedPaymentTotal = displayedSubtotal + selectedShippingPrice + estimatedPaymentSurcharge
   const canSubmit = deliveryMethod === 'PICKUP' ? Boolean(deliveryMethods?.pickup.enabled) : deliveryMethod === 'LOCAL_DELIVERY' ? localDeliveryAvailable : Boolean(quote && selectedOption && !quoteExpired)
 
@@ -122,13 +122,15 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
         })
         if (!response.ok) return
         const payload = await response.json() as {
-          data?: { shippingCostArs: number | null; totalArs: number | null }
+          data?: { shippingCostArs: number | null; totalArs: number | null; paymentSurchargeArs: number; paymentSurchargeRateBps: number }
         }
         if (payload.data && payload.data.shippingCostArs !== null) {
           setCreatedOrder((current) => current ? {
             ...current,
             shippingCostArs: payload.data!.shippingCostArs,
             totalArs: payload.data!.totalArs,
+            paymentSurchargeArs: payload.data!.paymentSurchargeArs,
+            paymentSurchargeRateBps: payload.data!.paymentSurchargeRateBps,
           } : current)
         }
       } catch {
@@ -324,6 +326,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           </div>
           <div className="checkout-success-total"><span>Productos</span><strong>{formatPrice(createdOrder.subtotalArs)}</strong></div>
           <div className="checkout-success-total"><span>Envío</span><strong>{createdOrder.shippingCostArs === null ? 'A coordinar' : formatPrice(createdOrder.shippingCostArs)}</strong></div>
+          <div className="checkout-success-total"><span>Recargo por medio de pago</span><strong>{formatPrice(createdOrder.paymentSurchargeArs)}</strong></div>
           <div className="checkout-success-total"><span>Total</span><strong>{createdOrder.totalArs === null ? 'A confirmar' : formatPrice(createdOrder.totalArs)}</strong></div>
           {createdOrder.shippingCostArs === null && <p className="checkout-small">Estamos esperando que se registre el costo acordado. El envío y el total se actualizarán automáticamente en este comprobante.</p>}
           {paymentError && <div className="checkout-error" role="alert">{paymentError}</div>}
@@ -422,7 +425,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             </section>
           )}
           {deliveryMethod === '' && <p className="checkout-shipping-hint">Elegí primero cómo querés recibir tu pedido para completar los datos que correspondan.</p>}
-          <section className="checkout-card"><h2>Medio de pago</h2><div className="checkout-shipping-options"><label className={paymentMethod === 'CASH' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'CASH'} onChange={() => setPaymentMethod('CASH')} /><span className="checkout-shipping-option-copy"><strong>Efectivo / transferencia coordinada</strong><small>Sin recargo. Se mantiene el precio publicado.</small></span></label>{paymentsEnabled && <label className={paymentMethod === 'MERCADO_PAGO' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'MERCADO_PAGO'} onChange={() => setPaymentMethod('MERCADO_PAGO')} /><span className="checkout-shipping-option-copy"><strong>Mercado Pago</strong><small>{mpSurchargeRateBps > 0 ? `Recargo configurado: ${(mpSurchargeRateBps / 100).toFixed(2)}%.` : 'Pagá de forma segura. Sin recargo configurado.'}</small></span></label>}{goCuotasEnabled && <label className={paymentMethod === 'GOCUOTAS' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'GOCUOTAS'} onChange={() => setPaymentMethod('GOCUOTAS')} /><span className="checkout-shipping-option-copy"><strong>GOcuotas</strong><small>Cuotas con tarjeta de débito. Recargo 11,979%.</small></span></label>}</div></section>
+          <section className="checkout-card"><h2>Medio de pago</h2><div className="checkout-shipping-options"><label className={paymentMethod === 'CASH' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'CASH'} onChange={() => setPaymentMethod('CASH')} /><span className="checkout-shipping-option-copy"><strong>Efectivo / transferencia coordinada</strong><small>Sin recargo. Se mantiene el precio publicado.</small></span></label>{paymentsEnabled && <label className={paymentMethod === 'MERCADO_PAGO' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'MERCADO_PAGO'} onChange={() => setPaymentMethod('MERCADO_PAGO')} /><span className="checkout-shipping-option-copy"><strong>Mercado Pago</strong><small>{mpSurchargeRateBps > 0 ? `Recargo configurado: ${(mpSurchargeRateBps / 1000).toFixed(3)}%.` : 'Pagá de forma segura. Sin recargo configurado.'}</small></span></label>}{goCuotasEnabled && <label className={paymentMethod === 'GOCUOTAS' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'GOCUOTAS'} onChange={() => setPaymentMethod('GOCUOTAS')} /><span className="checkout-shipping-option-copy"><strong>GOcuotas</strong><small>Cuotas con tarjeta de débito. Recargo 11,979%.</small></span></label>}</div></section>
           {error && <div className="checkout-error" role="alert">{error}</div>}
           <button className="checkout-submit" type="submit" disabled={!paymentsConfigLoaded || submitting || cart.length === 0 || !canSubmit}>
             {submitting ? 'Registrando pedido...' : 'Confirmar pedido'}
@@ -441,7 +444,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           </div>
           <div className="checkout-summary-total"><span>Subtotal</span><strong>{formatPrice(displayedSubtotal)}</strong></div>
           <div className="checkout-summary-total"><span>Envío</span><strong>{deliveryMethod === '' ? 'A elegir' : deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate ? 'A coordinar' : canSubmit ? formatPrice(selectedShippingPrice) : 'A calcular'}</strong></div>
-          {paymentSurchargeRateBps > 0 && <div className="checkout-summary-total"><span>Recargo por medio de pago ({(paymentSurchargeRateBps / 100).toFixed(3)}%)</span><strong>{formatPrice(estimatedPaymentSurcharge)}</strong></div>}
+          {paymentSurchargeRateBps > 0 && <div className="checkout-summary-total"><span>Recargo por medio de pago ({(paymentSurchargeRateBps / 1000).toFixed(3)}%)</span><strong>{formatPrice(estimatedPaymentSurcharge)}</strong></div>}
           <div className="checkout-summary-grand-total"><span>Total</span><strong>{deliveryMethod === '' || (deliveryMethod === 'LOCAL_DELIVERY' && deliveryMethods?.localDelivery.coordinate) ? 'A confirmar' : formatPrice(estimatedPaymentTotal)}</strong></div>
           <p className="checkout-summary-note">El importe se calcula según la modalidad seleccionada. El total queda confirmado al registrar el pedido.</p>
         </aside>
