@@ -318,7 +318,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           <div className="checkout-success-total"><span>Total</span><strong>{createdOrder.totalArs === null ? 'A confirmar' : formatPrice(createdOrder.totalArs)}</strong></div>
           {createdOrder.shippingCostArs === null && <p className="checkout-small">Estamos esperando que se registre el costo acordado. El envío y el total se actualizarán automáticamente en este comprobante.</p>}
           {paymentError && <div className="checkout-error" role="alert">{paymentError}</div>}
-          {paymentsEnabled && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : 'Pagar con {paymentProvider === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}'}</button>}
+          {(paymentsEnabled || goCuotasEnabled) && createdOrder.totalArs !== null && <button className="checkout-submit" onClick={() => void startPayment(createdOrder.id)} disabled={paymentLoading}>{paymentLoading ? 'Conectando...' : `Pagar con ${paymentProvider === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}`}</button>}
           <p className="checkout-small">El pedido solo se confirma cuando el proveedor informa un pago aprobado y la API verifica la operación.</p>
           <a className="checkout-whatsapp-contact" href={whatsappOrderUrl} target="_blank" rel="noreferrer">Consultar por WhatsApp sobre este pedido</a>
           <button className="checkout-submit" onClick={onFinish}>Volver a la tienda</button>
