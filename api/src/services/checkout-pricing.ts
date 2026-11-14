@@ -39,7 +39,7 @@ export function calculateCheckoutPrice(input: {
     throw new Error('La tasa de recargo configurada no es válida.')
   }
 
-  const surchargeArs = Math.round(baseArs * surchargeRateBps / 10_000)
+  const surchargeArs = Math.round(baseArs * surchargeRateBps / 100_000)
   const totalArs = baseArs + surchargeArs
   assertValidAmount(surchargeArs, 'El recargo')
   assertValidAmount(totalArs, 'El total final')
