@@ -37,6 +37,7 @@ async function createMercadoPagoOrder(input: {
     items: Array<{ productName: string; quantity: number; unitPriceArs: number }>
     shippingCostArs: number | null
     shippingCarrier: string | null
+    paymentSurchargeArs: number
   }
   requestKey: string
 }) {
@@ -55,6 +56,9 @@ async function createMercadoPagoOrder(input: {
       quantity: 1,
       unit_price: toAmount(input.order.shippingCostArs),
     })
+  }
+  if (input.order.paymentSurchargeArs > 0) {
+    items.push({ title: 'Recargo por medio de pago', quantity: 1, unit_price: toAmount(input.order.paymentSurchargeArs) })
   }
 
   const appUrl = env.PUBLIC_APP_URL.replace(/\/+$/, '')
@@ -329,6 +333,7 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
         items: prepared.order.items,
         shippingCostArs: prepared.order.shippingCostArs,
         shippingCarrier: prepared.order.shippingCarrier,
+        paymentSurchargeArs: prepared.order.paymentSurchargeArs,
       },
       requestKey: prepared.attempt.requestKey,
     })
