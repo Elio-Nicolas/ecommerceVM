@@ -33,9 +33,9 @@ test('Mercado Pago a 10 días cubre comisión del 4,39% más IVA estimado', () =
     paymentMethod: 'MERCADO_PAGO',
     subtotalArs: 50000,
     shippingArs: 0,
-    mercadoPagoSurchargeMilliPercent: 56100,
+    mercadoPagoSurchargeMilliPercent: 5610,
   })
-  assert.equal(configured.surchargeRateMilliPercent, 56100)
+  assert.equal(configured.surchargeRateMilliPercent, 5610)
   assert.equal(configured.surchargeArs, 2805)
   assert.equal(configured.totalArs, 52805)
 })
