@@ -9,7 +9,7 @@ type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERE
 type OrderItem = { id: string; productName: string; productSku: string; unitPriceArs: number; quantity: number; lineTotalArs: number }
 type OrderHistory = { id: string; fromStatus: OrderStatus | null; toStatus: OrderStatus; note: string | null; createdAt: string; changedByAdmin?: { email: string } | null }
 type Order = {
-  id: string; code: string; status: OrderStatus; customerName: string; customerEmail: string | null
+  id: string; code: string; status: OrderStatus; paymentMethod: 'CASH' | 'MERCADO_PAGO' | 'GOCUOTAS'; paymentSurchargeMilliPercent: number; paymentSurchargeArs: number; customerName: string; customerEmail: string | null
   customerPhone: string; addressLine: string; city: string; province: string; postalCode: string | null
   customerNotes: string | null; subtotalArs: number; shippingCostArs: number | null; totalArs: number | null
   shippingCarrier: string | null; trackingCode: string | null; shippingService: string | null; shippingEstimatedHours: number | null
@@ -142,8 +142,14 @@ export default function AdminOrders() {
 
   useEffect(() => {
     if (!printKind || printOrders.length === 0) return
-    const frame = window.requestAnimationFrame(() => window.print())
-    return () => window.cancelAnimationFrame(frame)
+    let secondFrame = 0
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => window.print())
+    })
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      if (secondFrame) window.cancelAnimationFrame(secondFrame)
+    }
   }, [printKind, printOrders])
 
   useEffect(() => {
@@ -577,7 +583,7 @@ export default function AdminOrders() {
           <section><h2>{order.customerName}</h2><p>{order.customerPhone}{order.customerEmail ? ` · ${order.customerEmail}` : ''}</p><p>{[order.addressLine, order.city, order.province, order.postalCode].filter(Boolean).join(' · ')}</p></section>
           {order.customerNotes && <section className="print-notes"><strong>Observaciones del comprador</strong><p>{order.customerNotes}</p></section>}
           <table><thead><tr><th>CANT.</th><th>PRODUCTO</th><th>SKU</th>{printKind === 'receipt' && <th>IMPORTE</th>}</tr></thead><tbody>{order.items.map((item) => <tr key={item.id}><td>{item.quantity}</td><td>{item.productName}</td><td>{item.productSku}</td>{printKind === 'receipt' && <td>{formatPrice(item.lineTotalArs)}</td>}</tr>)}</tbody></table>
-          {printKind === 'receipt' ? <div className="print-totals"><p>Subtotal: <strong>{formatPrice(order.subtotalArs)}</strong></p><p>Entrega: <strong>{order.shippingCostArs === null ? 'A coordinar' : formatPrice(order.shippingCostArs)}</strong></p><p className="print-grand-total">TOTAL: <strong>{order.totalArs === null ? 'Pendiente de coordinación' : formatPrice(order.totalArs)}</strong></p></div> : <div className="print-checklist"><strong>CONTROL DE PREPARACIÓN</strong>{order.items.map((item) => <p key={item.id}>□ {item.quantity} × {item.productName} <span>SKU: {item.productSku}</span></p>)}</div>}
+          {printKind === 'receipt' ? <><section className="print-payment"><p>Medio de pago: <strong>{order.paymentMethod === 'CASH' ? 'Efectivo' : order.paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}</strong></p><p>Estado del pedido: <strong>{statusLabels[order.status]}</strong></p>{order.paymentSurchargeArs > 0 && <p>Recargo por medio de pago: <strong>{formatPrice(order.paymentSurchargeArs)}</strong></p>}<p>Estado del cobro: <strong>{order.paymentAttempts?.some((payment) => payment.status === 'APPROVED') ? 'Pago aprobado' : order.paymentMethod === 'CASH' ? 'Pago en efectivo pendiente de confirmar' : order.paymentAttempts?.[0] ? order.paymentAttempts[0].status === 'REJECTED' ? 'Pago rechazado' : order.paymentAttempts[0].status === 'CANCELLED' ? 'Pago cancelado' : 'Pago pendiente de confirmación' : 'Sin pago registrado'}</strong></p></section><div className="print-totals"><p>Subtotal: <strong>{formatPrice(order.subtotalArs)}</strong></p><p>Entrega: <strong>{order.shippingCostArs === null ? 'A coordinar' : formatPrice(order.shippingCostArs)}</strong></p>{order.paymentSurchargeArs > 0 && <p>Recargo: <strong>{formatPrice(order.paymentSurchargeArs)}</strong></p>}<p className="print-grand-total">TOTAL: <strong>{order.totalArs === null ? 'Pendiente de coordinación' : formatPrice(order.totalArs)}</strong></p></div></> : <div className="print-checklist"><strong>CONTROL DE PREPARACIÓN</strong>{order.items.map((item) => <p key={item.id}>□ {item.quantity} × {item.productName} <span>SKU: {item.productSku}</span></p>)}</div>}
           <footer>{order.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : order.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : order.deliveryMethod === 'LEGACY_CARRIER' ? 'Proveedor anterior (histórico)' : 'OCA'} · Estado: {statusLabels[order.status]}{order.trackingCode ? ` · Seguimiento: ${order.trackingCode}` : ''}</footer>
         </article>)}
       </section>}
