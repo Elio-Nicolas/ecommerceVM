@@ -28,7 +28,19 @@ test('GOcuotas aplica 9,9% más IVA sobre productos y envío', () => {
   assert.equal(result.totalArs, 111979)
 })
 
-test('Mercado Pago usa una tasa configurable y no inventa una comisión', () => {
+test('Mercado Pago a 10 días cubre comisión del 4,39% más IVA estimado', () => {
+  const configured = calculateCheckoutPrice({
+    paymentMethod: 'MERCADO_PAGO',
+    subtotalArs: 50000,
+    shippingArs: 0,
+    mercadoPagoSurchargeMilliPercent: 5610,
+  })
+  assert.equal(configured.surchargeRateMilliPercent, 5610)
+  assert.equal(configured.surchargeArs, 2805)
+  assert.equal(configured.totalArs, 52805)
+})
+
+test('Mercado Pago usa una tasa configurable', () => {
   const withoutConfiguredRate = calculateCheckoutPrice({
     paymentMethod: 'MERCADO_PAGO',
     subtotalArs: 100000,
