@@ -27,7 +27,7 @@ const envSchema = z.object({
   ARCA_OPENSSL_PATH: z.string().min(1).default('openssl'),
   MP_ACCESS_TOKEN: optionalTrimmedString(20),
   MP_WEBHOOK_SECRET: optionalTrimmedString(20),
-  MP_CHECKOUT_SURCHARGE_MILLIPERCENT: z.coerce.number().int().min(0).max(100000).default(0), // Milésimas de punto porcentual; 5000 = 5%.
+  MP_CHECKOUT_SURCHARGE_MILLIPERCENT: z.coerce.number().int().min(0).max(100000).default(56100), // Mercado Pago a 10 días: 5,61% para cubrir 4,39% + IVA estimado.
   GOCUOTAS_API_BASE_URL: optionalHttpsUrl,
   GOCUOTAS_EMAIL: optionalTrimmedString(5),
   GOCUOTAS_PASSWORD: optionalTrimmedString(8),
