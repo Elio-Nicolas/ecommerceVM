@@ -19,13 +19,13 @@
 .order-print-toolbar{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid #e2e8f0;background:#f8fafc;font-size:12px;color:#475569}
 .order-print-area{display:none}
 @media print{
-  @page order-print{size:A4;margin:12mm}
+  @page{size:A4;margin:12mm}
   html,body,#root{width:100%!important;margin:0!important;padding:0!important;min-height:0!important;height:auto!important}
   body{min-width:0!important;background:#fff!important}
-  .printing-orders{page:order-print;display:block!important;width:100%!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important}
+  .printing-orders{display:block!important;width:100%!important;min-height:0!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
   .printing-orders>:not(.order-print-area){display:none!important}
   .printing-orders>.order-print-area{display:block!important;position:static!important;inset:auto!important;width:100%!important;margin:0!important;padding:0!important;color:#111827;background:#fff;font:11px Arial,sans-serif}
-  .print-sheet{display:block;box-sizing:border-box;width:100%;min-height:0;height:auto;margin:0;padding:0;break-inside:avoid;page-break-inside:avoid}
+  .print-sheet{display:block;box-sizing:border-box;width:100%;min-height:0;height:auto;margin:0;padding:0;break-inside:auto;page-break-inside:auto}
   .print-sheet+.print-sheet{break-before:page;page-break-before:always}
   .print-sheet header{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0f172a;padding-bottom:12px}
   .print-sheet header strong{font-size:22px;letter-spacing:-1px}
@@ -39,6 +39,8 @@
   .print-sheet th,.print-sheet td{padding:9px 7px;border-bottom:1px solid #d1d5db;text-align:left}
   .print-sheet th{font-size:9px;letter-spacing:.7px;background:#f1f5f9}
   .print-sheet td:first-child,.print-sheet th:first-child{width:55px}
+  .print-payment{margin:14px 0;padding:10px 12px;border:1px solid #d1d5db;background:#f8fafc}
+  .print-payment p{display:flex;justify-content:space-between;gap:16px;margin:5px 0}
   .print-totals{margin:24px 0 0 auto;width:270px}
   .print-totals p{display:flex;justify-content:space-between;padding:5px 0}
   .print-grand-total{border-top:2px solid #111827;font-size:15px;font-weight:700}
