@@ -2,7 +2,7 @@ name: ecommerceVM CI
 
 on:
   pull_request:
-    branches: [main, fix/admin-shipping-method-guard, feature/arca-invoicing-foundation, feature/arca-wsaa-client-v2, feature/arca-wsfe-readonly-v1]
+    branches: [main, fix/admin-shipping-method-guard, feature/arca-invoicing-foundation, feature/arca-wsaa-client-v2, feature/arca-wsfe-readonly-v1, feat/gocuotas-redirect-v1]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   push:
