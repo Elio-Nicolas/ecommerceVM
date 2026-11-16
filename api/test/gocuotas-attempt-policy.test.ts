@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getGoCuotasAttemptDisposition } from '../src/services/gocuotas-attempt-policy'
+import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '../src/services/gocuotas-attempt-policy'
 
 test('reutiliza un checkout GOcuotas solo si el intento PENDING tiene URL persistida', () => {
   assert.equal(getGoCuotasAttemptDisposition({ status: 'PENDING', checkoutUrl: 'https://checkout.gocuotas.com/example' }), 'REUSE_CHECKOUT')
