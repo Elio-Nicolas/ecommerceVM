@@ -289,7 +289,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     return
   }
   if (input.status === 'SHIPPED' && existing.deliveryMethod === 'OCA') {
-    const admittedShipment = existing.shipments.some((shipment) => shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))
+    const admittedShipment = existing.shipments.some((shipment) => shipment.provider === 'OCA' && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))
     if (!admittedShipment) {
       res.status(409).json({ error: { code: 'OCA_SHIPMENT_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando OCA confirme la admisión y exista un número de seguimiento.' } })
       return
