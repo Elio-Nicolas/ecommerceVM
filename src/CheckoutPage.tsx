@@ -16,7 +16,8 @@ type DeliveryMethod = 'OCA' | 'ANDREANI' | 'LOCAL_DELIVERY' | 'PICKUP'
 type DeliveryMethods = {
   pickup: { enabled: boolean; address: string; instructions: string; priceArs: number }
   localDelivery: { enabled: boolean; postalCodes: string[]; priceArs: number | null; coordinate: boolean }
-  oca: { enabled: boolean }\n  andreani: { enabled: boolean }
+  oca: { enabled: boolean }
+  andreani: { enabled: boolean }
 }
 type ShippingQuote = {
   id: string
@@ -192,7 +193,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setSelectedOptionKey('')
     setQuoteError('')
     setQuoteLoading(false)
-    if (!(deliveryMethods?.oca.enabled || deliveryMethods?.andreani.enabled) || (deliveryMethod !== 'OCA' && deliveryMethod !== 'ANDREANI') || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
+    if ((deliveryMethod === 'OCA' ? !deliveryMethods?.oca.enabled : deliveryMethod === 'ANDREANI' ? !deliveryMethods?.andreani.enabled : true) || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
       return () => controller.abort()
     }
 
@@ -204,6 +205,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({
+            provider: deliveryMethod,
             provinceCode,
             postalCode,
             items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
