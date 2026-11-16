@@ -7,14 +7,8 @@ type PaymentStatus = 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELL
 
 type PaymentStatusResponse = {
   data: {
-    code: string
     orderStatus: string
-    payment: {
-      status: PaymentStatus
-      statusDetail: string | null
-      amountArs: number
-      approvedAt: string | null
-    } | null
+    paymentStatus: PaymentStatus | null
   }
 }
 
@@ -26,8 +20,15 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
   const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState('')
 
+  const getAccessToken = () => {
+    try { return sessionStorage.getItem('ecommercevm:order-access:' + orderId) || '' } catch { return '' }
+  }
+
   const refresh = useCallback(async (signal?: AbortSignal) => {
+    const accessToken = getAccessToken()
+    if (!accessToken) throw new Error('No encontramos el acceso seguro de este pedido en esta sesión. Contactanos para verificarlo.')
     const response = await fetch(API_URL + '/api/v1/payments/orders/' + encodeURIComponent(orderId) + '/status', {
+      headers: { 'X-Order-Access-Token': accessToken },
       cache: 'no-store',
       signal,
     })
@@ -53,7 +54,7 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
     void run()
     let pollCount = 0
     const interval = window.setInterval(() => {
-      if (payment?.payment?.status === 'APPROVED' || payment?.payment?.status === 'REJECTED' || payment?.payment?.status === 'CANCELLED' || payment?.payment?.status === 'REFUNDED' || payment?.payment?.status === 'PARTIALLY_REFUNDED' || pollCount >= 20) return
+      if (payment?.paymentStatus === 'APPROVED' || payment?.paymentStatus === 'REJECTED' || payment?.paymentStatus === 'CANCELLED' || payment?.paymentStatus === 'REFUNDED' || payment?.paymentStatus === 'PARTIALLY_REFUNDED' || pollCount >= 20) return
       pollCount += 1
       void refresh(controller.signal).catch(() => undefined)
     }, 15000)
@@ -62,7 +63,7 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
       controller.abort()
       window.clearInterval(interval)
     }
-  }, [refresh, payment?.payment?.status])
+  }, [refresh, payment?.paymentStatus])
 
   async function retryPayment() {
     if (retrying) return
@@ -71,9 +72,11 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
     try {
       const requestKey = crypto.randomUUID()
       try { sessionStorage.setItem('ecommercevm:payment-request:' + orderId, requestKey) } catch { /* El almacenamiento es opcional. */ }
+      const accessToken = getAccessToken()
+      if (!accessToken) throw new Error('No encontramos el acceso seguro de este pedido en esta sesión. Contactanos para verificarlo.')
       const response = await fetch(API_URL + '/api/v1/payments/orders/' + encodeURIComponent(orderId), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Order-Access-Token': accessToken },
         body: JSON.stringify({ requestKey }),
       })
       const payload = await response.json() as { data?: { checkoutUrl?: string }; error?: { message?: string } }
@@ -88,11 +91,11 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
   }
 
   useEffect(() => {
-    if (payment?.payment?.status !== 'REJECTED' && payment?.payment?.status !== 'CANCELLED' && payment?.payment?.status !== 'REFUNDED' && payment?.payment?.status !== 'PARTIALLY_REFUNDED') return
+    if (payment?.paymentStatus !== 'REJECTED' && payment?.paymentStatus !== 'CANCELLED' && payment?.paymentStatus !== 'REFUNDED' && payment?.paymentStatus !== 'PARTIALLY_REFUNDED') return
     try { sessionStorage.removeItem('ecommercevm:payment-request:' + orderId) } catch { /* El almacenamiento es opcional. */ }
-  }, [orderId, payment?.payment?.status])
+  }, [orderId, payment?.paymentStatus])
 
-  const status = payment?.payment?.status
+  const status = payment?.paymentStatus
   const approved = status === 'APPROVED'
   const rejected = status === 'REJECTED' || status === 'CANCELLED'
   const refunded = status === 'REFUNDED' || status === 'PARTIALLY_REFUNDED'
@@ -114,7 +117,6 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
                 ? 'No recibimos una aprobación del pago. Podés volver a intentarlo.'
               : outcome === 'failure' ? 'Mercado Pago no confirmó el pago. Consultamos el estado para evitar duplicar un cobro.' : 'El resultado puede tardar unos instantes. No vuelvas a pagar mientras verificamos la operación.'}
         </p>
-        {payment?.code && <div className="payment-return-code"><span>PEDIDO</span><strong>{payment.code}</strong></div>}
         {loading && <p className="payment-return-muted">Consultando el estado...</p>}
         {status === 'PENDING' && <p className="payment-return-muted">El pago sigue pendiente de acreditación.</p>}
         {error && <p className="payment-return-error" role="alert">{error}</p>}
