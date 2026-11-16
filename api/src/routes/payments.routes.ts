@@ -8,6 +8,7 @@ import { requireAdmin } from '../middleware/require-admin'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
 import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
 import { verifyMercadoPagoWebhookSignature } from '../services/payment-webhook-signature'
+import { hasValidOrderAccessToken } from '../services/order-access-token'
 
 export const paymentsRouter = Router()
 
@@ -366,6 +367,7 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
 })
 
 paymentsRouter.get('/orders/:orderId/status', statusLimiter, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
   const orderId = z.string().uuid().safeParse(req.params.orderId)
   if (!orderId.success) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -374,25 +376,23 @@ paymentsRouter.get('/orders/:orderId/status', statusLimiter, async (req, res) =>
   const order = await prisma.order.findUnique({
     where: { id: orderId.data },
     select: {
-      code: true,
+      customerAccessTokenHash: true,
       status: true,
       paymentAttempts: {
         orderBy: { createdAt: 'desc' },
         take: 1,
-        select: { status: true, statusDetail: true, amountArs: true, approvedAt: true },
+        select: { status: true },
       },
     },
   })
-  if (!order) {
+  if (!order || !hasValidOrderAccessToken(req, order.customerAccessTokenHash)) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  res.setHeader('Cache-Control', 'no-store')
   res.json({
     data: {
-      code: order.code,
       orderStatus: order.status,
-      payment: order.paymentAttempts[0] || null,
+      paymentStatus: order.paymentAttempts[0]?.status ?? null,
     },
   })
 })
