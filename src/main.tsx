@@ -11,12 +11,13 @@ const isAdminRoute = window.location.pathname.startsWith('/admin')
 const paymentParams = new URLSearchParams(window.location.search)
 const paymentOutcome = paymentParams.get('payment')
 const paymentOrderId = paymentParams.get('order')
+const paymentProvider = paymentParams.get('provider') === 'gocuotas' ? 'gocuotas' : 'mercadopago'
 const isPaymentReturnRoute = !isAdminRoute
   && ['success', 'failure', 'pending'].includes(paymentOutcome || '')
   && /^[0-9a-f-]{36}$/i.test(paymentOrderId || '')
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {isPaymentReturnRoute ? <PaymentReturnPage orderId={paymentOrderId!} outcome={paymentOutcome as 'success' | 'failure' | 'pending'} /> : isAdminOrdersRoute ? <AdminOrders /> : isAdminRoute ? <AdminPanel /> : <App />}
+    {isPaymentReturnRoute ? <PaymentReturnPage orderId={paymentOrderId!} outcome={paymentOutcome as 'success' | 'failure' | 'pending'} provider={paymentProvider} /> : isAdminOrdersRoute ? <AdminOrders /> : isAdminRoute ? <AdminPanel /> : <App />}
   </React.StrictMode>,
 )
