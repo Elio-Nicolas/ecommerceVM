@@ -54,6 +54,7 @@ export async function getStoredAndreaniCredentials() {
 export async function getShippingSettingsPublic() {
   const settings = await getShippingSettings()
   const ocaConfigured = Boolean(settings.ocaUsernameEncrypted && settings.ocaPasswordEncrypted && settings.ocaCuitEncrypted && settings.ocaOperativeEncrypted)
+  const andreaniConfigured = Boolean(settings.andreaniUsernameEncrypted && settings.andreaniPasswordEncrypted && settings.andreaniClientCodeEncrypted && settings.andreaniContractEncrypted)
   return {
     pickup: { enabled: settings.pickupEnabled, address: settings.pickupAddress, instructions: settings.pickupInstructions, priceArs: 0 },
     localDelivery: {
@@ -62,7 +63,8 @@ export async function getShippingSettingsPublic() {
       priceArs: settings.localDeliveryCoordinate ? null : settings.localDeliveryFeeArs,
       coordinate: settings.localDeliveryCoordinate,
     },
-    oca: { enabled: ocaConfigured, environment: settings.ocaEnvironment },\n    andreani: { enabled: andreaniConfigured, environment: settings.andreaniEnvironment },
+    oca: { enabled: ocaConfigured, environment: settings.ocaEnvironment },
+    andreani: { enabled: andreaniConfigured, environment: settings.andreaniEnvironment },
   }
 }
 
@@ -81,15 +83,22 @@ export async function saveShippingSettings(input: {
   ocaCuit?: string
   ocaOperative?: string
   clearOcaCredentials?: boolean
+  andreaniEnvironment: 'QA' | 'PRODUCTION'
+  andreaniUsername?: string
+  andreaniPassword?: string
+  andreaniClientCode?: string
+  andreaniContract?: string
+  clearAndreaniCredentials?: boolean
 }) {
   const current = await getShippingSettings()
-  const values = [input.ocaUsername?.trim(), input.ocaPassword?.trim(), input.ocaCuit?.replace(/\\D/g, ''), input.ocaOperative?.trim()]
-  const hasAny = values.some(Boolean)
-  const hasComplete = values.every(Boolean)
-  const hasStored = Boolean(current.ocaUsernameEncrypted && current.ocaPasswordEncrypted && current.ocaCuitEncrypted && current.ocaOperativeEncrypted)
-  if (hasAny && !hasComplete) throw new Error('Para guardar OCA completá usuario, contraseña, CUIT y operativa.')
-  if (input.clearOcaCredentials && hasAny) throw new Error('No podés reemplazar y eliminar las credenciales OCA en la misma operación.')
-  if (input.ocaEnvironment === 'PRODUCTION' && !hasStored && !hasComplete) throw new Error('Configurá primero la cuenta OCA antes de seleccionar producción.')
+  const ocaValues = [input.ocaUsername?.trim(), input.ocaPassword?.trim(), input.ocaCuit?.replace(/\\D/g, ''), input.ocaOperative?.trim()]
+  const ocaHasAny = ocaValues.some(Boolean)
+  const ocaHasComplete = ocaValues.every(Boolean)
+  const ocaHasStored = Boolean(current.ocaUsernameEncrypted && current.ocaPasswordEncrypted && current.ocaCuitEncrypted && current.ocaOperativeEncrypted)
+  if (ocaHasAny && !ocaHasComplete) throw new Error('Para guardar OCA completá usuario, contraseña, CUIT y operativa.')
+  if (input.clearOcaCredentials && ocaHasAny) throw new Error('No podés reemplazar y eliminar las credenciales OCA en la misma operación.')
+  if (input.ocaEnvironment === 'PRODUCTION' && !ocaHasStored && !ocaHasComplete) throw new Error('Configurá primero la cuenta OCA antes de seleccionar producción.')
+
   const andreaniValues = [input.andreaniUsername?.trim(), input.andreaniPassword?.trim(), input.andreaniClientCode?.trim(), input.andreaniContract?.trim()]
   const andreaniHasAny = andreaniValues.some(Boolean)
   const andreaniHasComplete = andreaniValues.every(Boolean)
@@ -103,10 +112,15 @@ export async function saveShippingSettings(input: {
     create: {
       id: SETTINGS_ID,
       ocaEnvironment: input.ocaEnvironment,
-      ocaUsernameEncrypted: hasComplete ? encryptSecret(input.ocaUsername!.trim()) : null,
-      ocaPasswordEncrypted: hasComplete ? encryptSecret(input.ocaPassword!.trim()) : null,
-      ocaCuitEncrypted: hasComplete ? encryptSecret(values[2]!) : null,
-      ocaOperativeEncrypted: hasComplete ? encryptSecret(input.ocaOperative!.trim()) : null,
+      ocaUsernameEncrypted: ocaHasComplete ? encryptSecret(input.ocaUsername!.trim()) : null,
+      ocaPasswordEncrypted: ocaHasComplete ? encryptSecret(input.ocaPassword!.trim()) : null,
+      ocaCuitEncrypted: ocaHasComplete ? encryptSecret(ocaValues[2]!) : null,
+      ocaOperativeEncrypted: ocaHasComplete ? encryptSecret(input.ocaOperative!.trim()) : null,
+      andreaniEnvironment: input.andreaniEnvironment,
+      andreaniUsernameEncrypted: andreaniHasComplete ? encryptSecret(input.andreaniUsername!.trim()) : null,
+      andreaniPasswordEncrypted: andreaniHasComplete ? encryptSecret(input.andreaniPassword!.trim()) : null,
+      andreaniClientCodeEncrypted: andreaniHasComplete ? encryptSecret(input.andreaniClientCode!.trim()) : null,
+      andreaniContractEncrypted: andreaniHasComplete ? encryptSecret(input.andreaniContract!.trim()) : null,
       pickupEnabled: input.pickupEnabled,
       pickupAddress: input.pickupAddress,
       pickupInstructions: input.pickupInstructions,
@@ -119,11 +133,19 @@ export async function saveShippingSettings(input: {
     update: {
       ocaEnvironment: input.ocaEnvironment,
       ...(input.clearOcaCredentials ? { ocaUsernameEncrypted: null, ocaPasswordEncrypted: null, ocaCuitEncrypted: null, ocaOperativeEncrypted: null } : {}),
-      ...(hasComplete ? {
+      ...(ocaHasComplete ? {
         ocaUsernameEncrypted: encryptSecret(input.ocaUsername!.trim()),
         ocaPasswordEncrypted: encryptSecret(input.ocaPassword!.trim()),
-        ocaCuitEncrypted: encryptSecret(values[2]!),
+        ocaCuitEncrypted: encryptSecret(ocaValues[2]!),
         ocaOperativeEncrypted: encryptSecret(input.ocaOperative!.trim()),
+      } : {}),
+      andreaniEnvironment: input.andreaniEnvironment,
+      ...(input.clearAndreaniCredentials ? { andreaniUsernameEncrypted: null, andreaniPasswordEncrypted: null, andreaniClientCodeEncrypted: null, andreaniContractEncrypted: null } : {}),
+      ...(andreaniHasComplete ? {
+        andreaniUsernameEncrypted: encryptSecret(input.andreaniUsername!.trim()),
+        andreaniPasswordEncrypted: encryptSecret(input.andreaniPassword!.trim()),
+        andreaniClientCodeEncrypted: encryptSecret(input.andreaniClientCode!.trim()),
+        andreaniContractEncrypted: encryptSecret(input.andreaniContract!.trim()),
       } : {}),
       pickupEnabled: input.pickupEnabled,
       pickupAddress: input.pickupAddress,
