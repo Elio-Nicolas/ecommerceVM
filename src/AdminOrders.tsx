@@ -45,7 +45,7 @@ function historyEventLabel(entry: OrderHistory): string {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
-  if (order.status === 'PREPARING' && ['OCA', 'ANDREANI'].includes(order.deliveryMethod) && !order.shipments?.some((shipment) => shipment.provider === order.deliveryMethod && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
+  if (order.status === 'PREPARING' && (order.deliveryMethod === 'OCA' || order.deliveryMethod === 'ANDREANI') && !order.shipments?.some((shipment) => shipment.provider === order.deliveryMethod && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
   const mpStatuses = (order.paymentAttempts || []).filter((payment) => payment.provider === 'MERCADO_PAGO').map((payment) => payment.status)
   if (order.status === 'PENDING' && mpStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
   if (mpStatuses.includes('PARTIALLY_REFUNDED')) return []
@@ -540,7 +540,7 @@ export default function AdminOrders() {
               {activeOrder.shippingCostOptions.sellerOptions?.length ? <div className="order-logistics-table"><div className="order-logistics-row order-logistics-head"><span>Transportista</span><span>Costo tienda</span><span>Diferencia estimada</span></div>{activeOrder.shippingCostOptions.sellerOptions.map((option) => <div className="order-logistics-row" key={option.carrierId}><span><strong>{option.carrierName}</strong><small>{option.fulfillmentMode === 'D' ? 'Retiro en depósito' : 'Despacho en sucursal'}{option.estimatedHours ? ` · ${Math.ceil(option.estimatedHours / 24)} días` : ''}</small></span><strong>{formatPrice(option.costArs)}</strong><strong className={((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs) >= 0 ? 'order-logistics-positive' : 'order-logistics-negative'}>{formatPrice((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs)}</strong></div>)}</div> : <p className="order-logistics-unavailable">OCA no devolvió costos por transportista para esta cotización. El precio al cliente sí quedó registrado.</p>}
               <p className="order-logistics-footnote">La diferencia es un margen logístico estimado, no una ganancia neta. El costo definitivo puede variar al generar la etiqueta.</p>
             </section>}
-            {['OCA', 'ANDREANI'].includes(activeOrder.deliveryMethod) && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
+            {(activeOrder.deliveryMethod === 'OCA' || activeOrder.deliveryMethod === 'ANDREANI') && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
               <div><span className="admin-kicker">LOGÍSTICA NACIONAL</span><h3>Cotizar envío y seguimiento</h3><p>Este importe es el que se suma al total del comprador. El costo de OCA se gestionará por separado del importe cobrado al comprador.</p></div>
               <div className="order-shipping-fields">
                 <label>Precio de envío cobrado al cliente (ARS)<input name="shippingCostArs" type="number" min="0" max="2000000000" step="1" required defaultValue={activeOrder.shippingCostArs ?? ''} placeholder="Ej. 8500" /></label>
