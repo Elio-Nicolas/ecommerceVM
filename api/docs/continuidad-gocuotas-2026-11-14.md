@@ -184,3 +184,12 @@ Validación CI:
 - Si el `POST checkouts` ya comenzó y no hay respuesta concluyente, el intento queda `UNKNOWN` y no se vuelve a crear automáticamente.
 - Se agregaron pruebas unitarias para ambos escenarios.
 - Esta corrección no habilita cobros ni modifica credenciales. Requiere CI verde y revisión antes de integrar.
+
+
+## Credenciales API Redirect V1 — verificación documental 16/11/2026
+
+- Se localizó la guía oficial de GOcuotas para obtener credenciales API: https://gocuotas-cdn.s3.amazonaws.com/credenciales_para_apis.pdf.
+- La guía indica que el email y la contraseña definidos al crear la sucursal de la tienda son las credenciales utilizadas para autenticarse contra una API.
+- El código actual de ecommerceVM ya implementa `POST authentication` con `GOCUOTAS_EMAIL` y `GOCUOTAS_PASSWORD`; no requiere una API key separada según esa guía.
+- Sigue pendiente confirmar con Integraciones que Sandbox use la misma credencial de sucursal y que la base URL sea `https://sandbox.gocuotas.com/api_redirect/v1/` con `POST /authentication`.
+- No se copia ninguna contraseña ni token en esta documentación. No probar creación de checkout hasta que la autenticación Sandbox sea válida.
