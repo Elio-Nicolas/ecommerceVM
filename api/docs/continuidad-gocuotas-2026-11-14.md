@@ -194,3 +194,12 @@ No se ejecutaron pagos, no se modificaron credenciales y no se desplegó esta ra
 
 
 La rama `feat/gocuotas-safe-retry-guard` usa el disparador de CI existente para ramas `feat/**`; no se modificó configuración de workflows ni se tocó `main`.
+
+
+## Revisión adicional de reintentos — 16/11/2026
+
+- Se conserva en esta rama la validación de acceso del comprador incorporada en `main` mediante `X-Order-Access-Token`.
+- Si falla la autenticación de GOcuotas antes de enviar `POST checkouts`, se libera el intento `CREATING` para permitir un reintento seguro con la misma clave.
+- Si el `POST checkouts` ya comenzó y la respuesta no es concluyente, el intento queda `UNKNOWN` y no se recrea automáticamente.
+- Se agregaron pruebas unitarias para distinguir ambos escenarios.
+- La corrección no habilita cobros ni modifica credenciales; requiere CI verde y revisión antes del merge.
