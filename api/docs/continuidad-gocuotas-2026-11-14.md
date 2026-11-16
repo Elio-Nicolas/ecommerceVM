@@ -175,3 +175,19 @@ Validación CI:
 - TypeScript build API: success.
 - Frontend build: success.
 - Preview Vercel del último ajuste de checkout: success.
+
+
+## Corrección de seguridad de reintentos — 16/11/2026
+
+En la rama `fix/gocuotas-unknown-checkout-retry` se corrigió un riesgo de checkout duplicado:
+
+- Un intento `CREATING` ya existente bloquea una segunda solicitud mientras la primera está en curso.
+- Un intento `UNKNOWN` no vuelve a ejecutar `POST checkouts`. La respuesta indica que el resultado es incierto y pide no volver a pagar hasta verificarlo.
+- Un intento `PENDING` solo reutiliza la URL si esta quedó persistida; si falta, bloquea el reintento.
+- La búsqueda de intentos activos se realiza por pedido y proveedor, por lo que una nueva `requestKey` del navegador no puede saltarse un intento anterior.
+- Se bloquea la reutilización si el importe del intento no coincide con el total vigente del pedido.
+- Se agregaron pruebas unitarias para los estados seguros y bloqueados.
+
+**Límite conocido:** si GOcuotas creó el checkout pero se perdió la respuesta antes de persistir su ID, todavía no hay forma automática de consultarlo desde nuestro sistema. No se intenta adivinar ni recrear la operación. La recuperación queda pendiente de que GOcuotas confirme un mecanismo oficial de búsqueda/idempotencia o de una conciliación asistida.
+
+No se ejecutaron pagos, no se modificaron credenciales y no se desplegó esta rama.
