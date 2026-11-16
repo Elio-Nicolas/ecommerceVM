@@ -38,6 +38,19 @@ export async function getStoredOcaCredentials() {
   }
 }
 
+export async function getStoredAndreaniCredentials() {
+  const settings = await getShippingSettings()
+  const values = [settings.andreaniUsernameEncrypted, settings.andreaniPasswordEncrypted, settings.andreaniClientCodeEncrypted, settings.andreaniContractEncrypted]
+  if (values.some((value) => !value)) return null
+  return {
+    username: decryptSecret(settings.andreaniUsernameEncrypted!),
+    password: decryptSecret(settings.andreaniPasswordEncrypted!),
+    clientCode: decryptSecret(settings.andreaniClientCodeEncrypted!),
+    contract: decryptSecret(settings.andreaniContractEncrypted!),
+    environment: settings.andreaniEnvironment as 'QA' | 'PRODUCTION',
+  }
+}
+
 export async function getShippingSettingsPublic() {
   const settings = await getShippingSettings()
   const ocaConfigured = Boolean(settings.ocaUsernameEncrypted && settings.ocaPasswordEncrypted && settings.ocaCuitEncrypted && settings.ocaOperativeEncrypted)
@@ -49,7 +62,7 @@ export async function getShippingSettingsPublic() {
       priceArs: settings.localDeliveryCoordinate ? null : settings.localDeliveryFeeArs,
       coordinate: settings.localDeliveryCoordinate,
     },
-    oca: { enabled: ocaConfigured, environment: settings.ocaEnvironment },
+    oca: { enabled: ocaConfigured, environment: settings.ocaEnvironment },\n    andreani: { enabled: andreaniConfigured, environment: settings.andreaniEnvironment },
   }
 }
 
@@ -77,6 +90,13 @@ export async function saveShippingSettings(input: {
   if (hasAny && !hasComplete) throw new Error('Para guardar OCA completá usuario, contraseña, CUIT y operativa.')
   if (input.clearOcaCredentials && hasAny) throw new Error('No podés reemplazar y eliminar las credenciales OCA en la misma operación.')
   if (input.ocaEnvironment === 'PRODUCTION' && !hasStored && !hasComplete) throw new Error('Configurá primero la cuenta OCA antes de seleccionar producción.')
+  const andreaniValues = [input.andreaniUsername?.trim(), input.andreaniPassword?.trim(), input.andreaniClientCode?.trim(), input.andreaniContract?.trim()]
+  const andreaniHasAny = andreaniValues.some(Boolean)
+  const andreaniHasComplete = andreaniValues.every(Boolean)
+  const andreaniHasStored = Boolean(current.andreaniUsernameEncrypted && current.andreaniPasswordEncrypted && current.andreaniClientCodeEncrypted && current.andreaniContractEncrypted)
+  if (andreaniHasAny && !andreaniHasComplete) throw new Error('Para guardar Andreani completá usuario, contraseña, código de cliente y contrato.')
+  if (input.clearAndreaniCredentials && andreaniHasAny) throw new Error('No podés reemplazar y eliminar las credenciales Andreani en la misma operación.')
+  if (input.andreaniEnvironment === 'PRODUCTION' && !andreaniHasStored && !andreaniHasComplete) throw new Error('Configurá primero la cuenta Andreani antes de seleccionar producción.')
 
   return prisma.shippingSettings.upsert({
     where: { id: SETTINGS_ID },
