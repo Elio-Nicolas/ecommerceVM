@@ -1,9 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { Request } from 'express'
-import { env } from '../config/env'
 
-export function deriveOrderAccessToken(checkoutRequestKey: string) {
-  return createHmac('sha256', env.JWT_SECRET)
+export function deriveOrderAccessToken(checkoutRequestKey: string, secret: string) {
+  return createHmac('sha256', secret)
     .update('ecommercevm:order-access:v1:' + checkoutRequestKey)
     .digest('hex')
 }
