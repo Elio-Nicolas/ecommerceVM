@@ -109,3 +109,29 @@ El pipeline de Render también ejecuta migraciones y generación Prisma según l
 - Producción no se selecciona automáticamente.
 - Si la tarifa no devuelve un importe reconocible, se falla la cotización; no se inventan precios.
 - La admisión y el cambio a `SHIPPED` quedan bloqueados hasta tener confirmación del proveedor y tracking persistido.
+
+
+## Registro de revisión técnica — 16/11/2026
+
+### Revisión automatizada del PR #91
+
+La revisión automatizada detectó observaciones sobre:
+
+- Validación de CP de cuatro dígitos y CUIT de 11 dígitos: deben usar expresiones regulares de dígitos, sin escapar dos veces la barra invertida.
+- Consulta de pedidos en administración: debe incluir envíos de ambos proveedores (OCA y ANDREANI) para que la protección de despacho pueda verificar el transportista correcto.
+- Interfaz administrativa: los pedidos Andreani deben identificarse como Andreani y no quedar rotulados como OCA en formularios, comprobantes o listados.
+
+En la revisión del estado actual de la rama se comprobó que las validaciones de CP/CUIT ya usan expresiones regulares correctas y que la consulta de envíos incluye OCA y ANDREANI. La pantalla de administración también contempla el formulario logístico para ambos proveedores; queda pendiente terminar de verificar todas las etiquetas visibles y el pie de impresión.
+
+### CI
+
+El workflow asociado al commit `aab54e99439b3ba536835ce6fcef71a636072987` ejecutó correctamente migraciones Prisma y los 47 tests, y compiló el frontend. Falló únicamente la compilación TypeScript del API porque la primera línea de `api/src/services/andreani.ts` contenía una secuencia literal `\\n` entre imports (TS1127/TS1435). La rama consultada posteriormente ya presenta los imports separados por un salto de línea real; es obligatorio volver a ejecutar CI sobre el HEAD vigente antes de considerar el PR validado.
+
+### Próximo paso y límites
+
+1. Reejecutar CI sobre el último commit de la rama y resolver cualquier error restante.
+2. Completar la revisión visual de los nombres del transportista en administración e impresión.
+3. Mantener bloqueadas la admisión, etiquetas y trazas hasta recibir el OpenAPI vigente y los datos de cuenta/modalidad de Andreani.
+4. No habilitar Producción ni desplegar sin aprobación explícita.
+
+Este registro no confirma una integración operativa con Andreani: hasta ahora no hay credenciales QA ni respuestas reales de la cuenta para validar autenticación y tarifas.
