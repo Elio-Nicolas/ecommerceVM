@@ -304,7 +304,10 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       if (!response.ok || !payload.data) {
         throw new Error(payload.error?.message || 'No pudimos registrar el pedido. Revisá los datos e intentá nuevamente.')
       }
-      try { sessionStorage.removeItem(checkoutStorageKey) } catch { /* El pedido ya quedó registrado; el almacenamiento es opcional. */ }
+      try {
+        sessionStorage.removeItem(checkoutStorageKey)
+        sessionStorage.setItem(`ecommercevm:order-access:${payload.data.id}`, payload.data.customerAccessToken)
+      } catch { /* El pedido ya quedó registrado; el almacenamiento es opcional. */ }
       setCreatedOrder(payload.data)
       onOrderCreated()
       if (paymentMethod !== 'CASH' && payload.data.totalArs !== null) await startPayment(payload.data.id)
