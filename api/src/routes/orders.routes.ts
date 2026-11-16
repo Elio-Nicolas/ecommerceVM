@@ -160,6 +160,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           typeof option === 'object' && option !== null && !Array.isArray(option) && option.key === input.shippingOptionKey,
         ) as Prisma.JsonObject | undefined
         if (!selectedOption) throw new OrderConflictError('La opción de envío seleccionada ya no está disponible. Volvé a cotizar.')
+        if (typeof selectedOption.key !== 'string' || !selectedOption.key.startsWith(`${input.deliveryMethod.toLowerCase()}-`)) throw new OrderConflictError('La cotización no corresponde al transporte seleccionado. Volvé a cotizar.')
         shippingCostArs = Number(selectedOption.priceArs)
         shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : 'OCA'
         shippingService = typeof selectedOption.serviceLabel === 'string' ? selectedOption.serviceLabel : 'Envío estándar'
