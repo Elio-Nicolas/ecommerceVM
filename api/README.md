@@ -43,6 +43,8 @@ Los tokens vencen a las 8 horas. Las contraseñas se almacenan con bcrypt. No ex
 
 ## Estado de logística y entregas
 
+El detalle técnico de OCA e-Pak, endpoints oficiales, requisitos de cuenta, estado implementado y plan de trabajo se mantiene en [docs/oca-epak-integration.md](docs/oca-epak-integration.md). Actualizar ese documento en cada PR de logística.
+
 OCA e-Pak es el único proveedor nacional. El código anterior del transportista fue retirado; los envíos históricos se conservan en el modelo neutral ShippingShipment como LEGACY_CARRIER.
 
 El backend dispone de cotizador OCA y configuración cifrada. La cotización requiere credenciales y una respuesta real para validar el mapeo. La admisión, etiquetas y tracking se completarán cuando OCA confirme los datos comerciales de la cuenta.
