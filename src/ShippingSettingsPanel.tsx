@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 type ShippingSettings = {
-  ocaEnvironment: 'QA' | 'PRODUCTION'; ocaConfigured: boolean\n  andreaniEnvironment: 'QA' | 'PRODUCTION'; andreaniConfigured: boolean
+  ocaEnvironment: 'QA' | 'PRODUCTION'; ocaConfigured: boolean
+  andreaniEnvironment: 'QA' | 'PRODUCTION'; andreaniConfigured: boolean
   pickupEnabled: boolean; pickupAddress: string; pickupInstructions: string
   localDeliveryEnabled: boolean; localDeliveryPostalCodes: string[]
   localDeliveryFeeArs: number; localDeliveryInternalCostArs: number | null; localDeliveryCoordinate: boolean
@@ -16,7 +17,10 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
   const [settings, setSettings] = useState<ShippingSettings>(defaults)
   const [ocaUsername, setOcaUsername] = useState(''), [ocaPassword, setOcaPassword] = useState('')
   const [ocaCuit, setOcaCuit] = useState(''), [ocaOperative, setOcaOperative] = useState('')
-  const [clearOcaCredentials, setClearOcaCredentials] = useState(false), [postalCodesText, setPostalCodesText] = useState('5730')\n  const [andreaniUsername, setAndreaniUsername] = useState(''), [andreaniPassword, setAndreaniPassword] = useState('')\n  const [andreaniClientCode, setAndreaniClientCode] = useState(''), [andreaniContract, setAndreaniContract] = useState('')\n  const [clearAndreaniCredentials, setClearAndreaniCredentials] = useState(false), [testingAndreani, setTestingAndreani] = useState(false)
+  const [clearOcaCredentials, setClearOcaCredentials] = useState(false), [postalCodesText, setPostalCodesText] = useState('5730')
+  const [andreaniUsername, setAndreaniUsername] = useState(''), [andreaniPassword, setAndreaniPassword] = useState('')
+  const [andreaniClientCode, setAndreaniClientCode] = useState(''), [andreaniContract, setAndreaniContract] = useState('')
+  const [clearAndreaniCredentials, setClearAndreaniCredentials] = useState(false), [testingAndreani, setTestingAndreani] = useState(false)
   const [loading, setLoading] = useState(true), [saving, setSaving] = useState(false)
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -49,7 +53,8 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     try {
       const result = await request<{ data: ShippingSettings }>('/admin/shipping-settings', { method: 'PUT', body: JSON.stringify(payload) })
       setSettings(result.data); setPostalCodesText(result.data.localDeliveryPostalCodes.join(', '))
-      setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setClearOcaCredentials(false)\n      setAndreaniUsername(''); setAndreaniPassword(''); setAndreaniClientCode(''); setAndreaniContract(''); setClearAndreaniCredentials(false)
+      setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setClearOcaCredentials(false)
+      setAndreaniUsername(''); setAndreaniPassword(''); setAndreaniClientCode(''); setAndreaniContract(''); setClearAndreaniCredentials(false)
       setNotice('Configuración guardada. OCA queda pendiente de validar con los datos comerciales de tu cuenta.')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.') }
     finally { setSaving(false) }
