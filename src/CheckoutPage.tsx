@@ -245,10 +245,12 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       } catch {
         requestKey = crypto.randomUUID()
       }
+      const accessToken = sessionStorage.getItem(`ecommercevm:order-access:${orderId}`) || createdOrder?.customerAccessToken || ''
+      if (!accessToken) throw new Error('No encontramos el acceso seguro de este pedido. Volvé a consultar el comprobante.')
       const paymentPath = provider === 'GOCUOTAS' ? '/api/v1/payments/gocuotas/orders/' : '/api/v1/payments/orders/'
       const response = await fetch(`${API_URL}${paymentPath}${encodeURIComponent(orderId)}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Order-Access-Token': accessToken },
         body: JSON.stringify({ requestKey }),
       })
       const payload = await response.json() as {
