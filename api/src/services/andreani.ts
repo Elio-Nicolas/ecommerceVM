@@ -84,7 +84,7 @@ export async function quoteAndreani(input: {
   const amount = Number.isFinite(totalWithTax) && totalWithTax >= 0 ? totalWithTax : totalWithoutTax
   if (!Number.isFinite(amount) || amount < 0) throw new AndreaniError('Andreani respondió, pero no se encontró una tarifa válida en la respuesta.')
   return {
-    key: `andreani-${credentials.contract}`,
+    key: 'andreani-standard',
     carrierName: 'Andreani',
     carrierId: null,
     serviceCode: credentials.contract,
