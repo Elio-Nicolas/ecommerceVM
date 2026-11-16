@@ -2,9 +2,9 @@ import { Router } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { getShippingSettingsPublic, getStoredOcaCredentials } from '../services/shipping-settings'
+import { getShippingSettingsPublic, getStoredOcaCredentials, getStoredAndreaniCredentials } from '../services/shipping-settings'
 import { quoteOca, OcaError } from '../services/oca'
-import { shippingCartFingerprint } from '../services/shipping-fingerprint'
+import { shippingCartFingerprint } from '../services/shipping-fingerprint'\nimport { quoteAndreani, AndreaniError } from '../services/andreani'
 
 export const shippingRouter = Router()
 shippingRouter.get('/methods', async (_req, res) => res.json({ data: await getShippingSettingsPublic() }))
@@ -32,7 +32,7 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
       select: { id: true, priceArs: true, stock: true, weightGrams: true, packageLengthCm: true, packageWidthCm: true, packageHeightCm: true },
     }),
   ])
-  if (!credentials) return res.status(503).json({ error: { code: 'OCA_NOT_CONFIGURED', message: 'OCA todavía no está configurado. Retiro y entrega local siguen disponibles.' } })
+  if (input.provider === 'OCA' && !ocaCredentials) return res.status(503).json({ error: { code: 'OCA_NOT_CONFIGURED', message: 'OCA todavía no está configurado. Retiro y entrega local siguen disponibles.' } })\n  if (input.provider === 'ANDREANI' && !andreaniCredentials) return res.status(503).json({ error: { code: 'ANDREANI_NOT_CONFIGURED', message: 'Andreani todavía no está configurado. Retiro y entrega local siguen disponibles.' } })
   if (!origin) return res.status(503).json({ error: { code: 'SHIPPING_ORIGIN_NOT_CONFIGURED', message: 'Configurá un depósito de despacho predeterminado con su código postal.' } })
   if (products.length !== input.items.length) return res.status(422).json({ error: { code: 'SHIPPING_PRODUCTS_UNAVAILABLE', message: 'Uno o más productos ya no están disponibles.' } })
 
@@ -40,7 +40,7 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
   for (const item of input.items) {
     const product = products.find((candidate) => candidate.id === item.productId)!
     if (!product.weightGrams || !product.packageLengthCm || !product.packageWidthCm || !product.packageHeightCm) {
-      return res.status(422).json({ error: { code: 'SHIPPING_PACKAGE_DATA_MISSING', message: 'Completá peso y dimensiones de los productos para cotizar con OCA.' } })
+      return res.status(422).json({ error: { code: 'SHIPPING_PACKAGE_DATA_MISSING', message: 'Completá peso y dimensiones de los productos para cotizar el envío nacional.' } })
     }
     if (product.stock < item.quantity) return res.status(409).json({ error: { code: 'SHIPPING_STOCK_CHANGED', message: 'No hay stock suficiente para uno o más productos.' } })
     weightGrams += product.weightGrams * item.quantity
@@ -48,14 +48,14 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
     subtotalArs += product.priceArs * item.quantity
   }
   try {
-    const option = await quoteOca({ postalCode: input.postalCode, originPostalCode: origin.postalCode, weightGrams, volumeCm3, packages: 1, declaredValueArs: subtotalArs })
+    const option = input.provider === 'OCA'\n      ? await quoteOca({ postalCode: input.postalCode, originPostalCode: origin.postalCode, weightGrams, volumeCm3, packages: 1, declaredValueArs: subtotalArs })\n      : await quoteAndreani({ postalCode: input.postalCode, weightGrams, volumeCm3 })
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
     const quote = await prisma.shippingQuote.create({
       data: { provinceCode: input.provinceCode, postalCode: input.postalCode, cartFingerprint: shippingCartFingerprint(input.items, products), subtotalArs, options: [option], expiresAt },
     })
     return res.json({ data: { id: quote.id, subtotalArs, options: [option], expiresAt } })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo cotizar el envío con OCA.'
+    const message = error instanceof Error ? error.message : 'No se pudo cotizar el envío.'
     return res.status(error instanceof OcaError ? error.statusCode : 502).json({
       error: { code: error instanceof OcaError && error.statusCode === 503 ? 'OCA_NOT_CONFIGURED' : 'OCA_QUOTE_ERROR', message },
     })
