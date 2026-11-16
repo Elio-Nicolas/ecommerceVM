@@ -30,7 +30,7 @@ const createOrderSchema = z.object({
   province: z.string().trim().min(2).max(100),
   postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
   provinceCode: z.string().length(1).regex(/^[A-Z]$/).optional(),
-  deliveryMethod: z.enum(['OCA', 'LOCAL_DELIVERY', 'PICKUP']).default('OCA'),
+  deliveryMethod: z.enum(['OCA', 'ANDREANI', 'LOCAL_DELIVERY', 'PICKUP']).default('OCA'),
   paymentMethod: z.enum(['CASH', 'MERCADO_PAGO', 'GOCUOTAS']).default('CASH'),
   shippingQuoteId: z.string().uuid().optional(),
   shippingOptionKey: z.string().trim().min(1).max(40).optional(),
@@ -207,7 +207,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
         throw new OrderConflictError('El importe del pedido no es válido.')
       }
-      if (input.deliveryMethod === 'OCA' && input.shippingQuoteId) {
+      if ((input.deliveryMethod === 'OCA' || input.deliveryMethod === 'ANDREANI') && input.shippingQuoteId) {
         const quote = await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } })
         if (!quote || quote.subtotalArs !== subtotalArs) throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
       }
