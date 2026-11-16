@@ -12,9 +12,9 @@ type PaymentStatusResponse = {
   }
 }
 
-type Props = { orderId: string; outcome: 'success' | 'failure' | 'pending' }
+type Props = { orderId: string; outcome: 'success' | 'failure' | 'pending'; provider: 'mercadopago' | 'gocuotas' }
 
-export default function PaymentReturnPage({ orderId, outcome }: Props) {
+export default function PaymentReturnPage({ orderId, outcome, provider }: Props) {
   const [payment, setPayment] = useState<PaymentStatusResponse['data'] | null>(null)
   const [loading, setLoading] = useState(true)
   const [retrying, setRetrying] = useState(false)
@@ -74,7 +74,8 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
       try { sessionStorage.setItem('ecommercevm:payment-request:' + orderId, requestKey) } catch { /* El almacenamiento es opcional. */ }
       const accessToken = getAccessToken()
       if (!accessToken) throw new Error('No encontramos el acceso seguro de este pedido en esta sesión. Contactanos para verificarlo.')
-      const response = await fetch(API_URL + '/api/v1/payments/orders/' + encodeURIComponent(orderId), {
+      const paymentPath = provider === 'gocuotas' ? '/api/v1/payments/gocuotas/orders/' : '/api/v1/payments/orders/'
+      const response = await fetch(API_URL + paymentPath + encodeURIComponent(orderId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Order-Access-Token': accessToken },
         body: JSON.stringify({ requestKey }),
@@ -103,28 +104,28 @@ export default function PaymentReturnPage({ orderId, outcome }: Props) {
   return (
     <main className="payment-return-page">
       <section className="payment-return-card">
-        <span className="payment-return-kicker">TU TIENDAVM · MERCADO PAGO</span>
+        <span className="payment-return-kicker">TU TIENDAVM · {provider === 'gocuotas' ? 'GOCUOTAS' : 'MERCADO PAGO'}</span>
         <div className={approved ? 'payment-return-mark approved' : rejected ? 'payment-return-mark rejected' : 'payment-return-mark'}>
           {approved ? '✓' : rejected ? '!' : '…'}
         </div>
         <h1>{approved ? 'Pago confirmado' : refunded ? (status === 'REFUNDED' ? 'Pago reembolsado' : 'Reembolso parcial') : rejected ? 'El pago no se completó' : 'Estamos verificando tu pago'}</h1>
         <p>
           {approved
-            ? 'Mercado Pago confirmó el pago. Tu pedido ya quedó confirmado.'
+            ? 'El proveedor confirmó el pago. Tu pedido ya quedó confirmado.'
             : refunded
-              ? 'Mercado Pago informó un reembolso. Si necesitás ayuda con el pedido, contactanos.'
+              ? 'El proveedor informó un reembolso. Si necesitás ayuda con el pedido, contactanos.'
               : rejected
                 ? 'No recibimos una aprobación del pago. Podés volver a intentarlo.'
-              : outcome === 'failure' ? 'Mercado Pago no confirmó el pago. Consultamos el estado para evitar duplicar un cobro.' : 'El resultado puede tardar unos instantes. No vuelvas a pagar mientras verificamos la operación.'}
+              : outcome === 'failure' ? 'El proveedor no confirmó el pago. Consultamos el estado para evitar duplicar un cobro.' : 'El resultado puede tardar unos instantes. No vuelvas a pagar mientras verificamos la operación.'}
         </p>
         {loading && <p className="payment-return-muted">Consultando el estado...</p>}
         {status === 'PENDING' && <p className="payment-return-muted">El pago sigue pendiente de acreditación.</p>}
         {error && <p className="payment-return-error" role="alert">{error}</p>}
         {!approved && !refunded && <button className="payment-return-primary" onClick={() => void retryPayment()} disabled={retrying || loading}>
-          {retrying ? 'Conectando con Mercado Pago...' : rejected ? 'Intentar pagar nuevamente' : 'Volver al pago'}
+          {retrying ? 'Conectando con el proveedor...' : rejected ? 'Intentar pagar nuevamente' : 'Volver al pago'}
         </button>}
         <button className="payment-return-secondary" onClick={() => window.location.replace('/')}>Volver a la tienda</button>
-        <small>El estado del pedido se actualiza únicamente con la confirmación verificada de Mercado Pago.</small>
+        <small>El estado del pedido se actualiza únicamente con la confirmación verificada del proveedor.</small>
       </section>
     </main>
   )
