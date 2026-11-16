@@ -17,7 +17,7 @@ Los endpoints de consulta responden con 404 genérico tanto para un pedido inexi
 
 ## Cliente
 
-Al registrar o recuperar idempotentemente un pedido, la API devuelve `customerAccessToken` una sola vez en el cuerpo de creación. El checkout lo conserva en `sessionStorage` bajo una clave por pedido. El comprobante y la pantalla de retorno lo envían por header; nunca se agrega a URLs.
+Al registrar o recuperar idempotentemente un pedido, la API devuelve `customerAccessToken` únicamente en el cuerpo de creación o recuperación idempotente del mismo checkout. El checkout lo conserva en `sessionStorage` bajo una clave por pedido. El comprobante y la pantalla de retorno lo envían por header; nunca se agrega a URLs.
 
 Los retornos de Mercado Pago y GOcuotas mantienen el UUID del pedido en la URL, pero el UUID por sí solo ya no autoriza consultas ni creación de checkouts. El proveedor se conserva en el retorno para que los reintentos usen el endpoint correcto.
 
