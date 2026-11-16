@@ -4,9 +4,11 @@ import { rateLimit } from 'express-rate-limit'
 import { z } from 'zod'
 import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
+import { hasValidOrderAccessToken } from '../services/order-access-token'
+import { hasValidOrderAccessToken } from '../services/order-access-token'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
 import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
-import { getGoCuotasAttemptDisposition } from '../services/gocuotas-attempt-policy'
+import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '../services/gocuotas-attempt-policy'
 
 export const goCuotasRouter = Router()
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false })
@@ -58,6 +60,16 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     res.status(400).json({ error: { code: 'PAYMENT_REQUEST_INVALID', message: 'La solicitud de pago no es válida.' } })
     return
   }
+  const accessOrder = await prisma.order.findUnique({ where: { id: orderId.data }, select: { customerAccessTokenHash: true } })
+  if (!accessOrder || !hasValidOrderAccessToken(req, accessOrder.customerAccessTokenHash)) {
+    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  const accessOrder = await prisma.order.findUnique({ where: { id: orderId.data }, select: { customerAccessTokenHash: true } })
+  if (!accessOrder || !hasValidOrderAccessToken(req, accessOrder.customerAccessTokenHash)) {
+    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
   if (!configured()) {
     res.status(503).json({ error: { code: 'GOCUOTAS_NOT_CONFIGURED', message: 'GOcuotas todavía no está configurado para Sandbox.' } })
     return
@@ -76,8 +88,6 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     if (attempt && ['APPROVED', 'REJECTED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(attempt.status)) return { error: 'ATTEMPT_CLOSED' as const }
 
     if (!attempt) {
-      // A different browser retry key must not bypass an in-flight or
-      // ambiguous attempt for this order. Reuse only its persisted URL.
       const active = await tx.paymentAttempt.findFirst({
         where: { orderId: order.id, provider: 'GOCUOTAS', status: { in: ['CREATING', 'PENDING', 'UNKNOWN'] } },
         orderBy: { createdAt: 'desc' },
@@ -125,10 +135,12 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     return
   }
 
+  let checkoutRequestStarted = false
   try {
     const token = await authenticate()
     const appUrl = env.PUBLIC_APP_URL!.replace(/\/+$/, '')
     const apiUrl = env.PUBLIC_API_URL!.replace(/\/+$/, '')
+    checkoutRequestStarted = true
     const response = await fetch(new URL('checkouts', env.GOCUOTAS_API_BASE_URL), {
       method: 'POST',
       headers: { accept: 'application/json', 'content-type': 'application/json', authorization: 'Bearer ' + token },
@@ -162,6 +174,11 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     res.status(201).json({ data: { checkoutUrl: attempt.checkoutUrl, status: attempt.status } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo crear el checkout.'
+    if (getGoCuotasFailureDisposition(checkoutRequestStarted) === 'RELEASE_ATTEMPT') {
+      await prisma.paymentAttempt.deleteMany({ where: { id: prepared.attempt.id, status: 'CREATING' } })
+      res.status(502).json({ error: { code: 'GOCUOTAS_AUTHENTICATION_FAILED', message: 'No pudimos autenticar con GOcuotas. Podés volver a intentarlo.' } })
+      return
+    }
     await prisma.paymentAttempt.update({ where: { id: prepared.attempt.id }, data: { status: 'UNKNOWN', lastError: message.slice(0, 500) } })
     res.status(502).json({ error: { code: 'GOCUOTAS_CHECKOUT_UNKNOWN', message: 'No pudimos confirmar la creación del checkout. No vuelvas a intentar el pago mientras verificamos la operación.' } })
   }
