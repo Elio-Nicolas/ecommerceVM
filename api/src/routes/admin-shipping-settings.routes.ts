@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAdmin } from '../middleware/require-admin'
-import { getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
+import { getShippingSettings, getStoredAndreaniCredentials, saveShippingSettings } from '../services/shipping-settings'
 import { testAndreaniConnection, AndreaniError } from '../services/andreani'
 
 export const adminShippingSettingsRouter = Router()
@@ -28,10 +28,21 @@ adminShippingSettingsRouter.get('/', async (_req, res) => res.json({ data: publi
 
 adminShippingSettingsRouter.post('/andreani/test', async (_req, res) => {
   try {
-    res.json({ data: await testAndreaniConnection(), message: 'Conexión con Andreani verificada.' })
+    const credentials = await getStoredAndreaniCredentials()
+    if (!credentials) {
+      res.status(503).json({ error: { code: 'ANDREANI_NOT_CONFIGURED', message: 'Completá usuario, contraseña, código de cliente y contrato de Andreani antes de probar la conexión.' } })
+      return
+    }
+    if (credentials.environment !== 'QA') {
+      res.status(409).json({ error: { code: 'ANDREANI_QA_REQUIRED', message: 'La prueba de conexión está limitada a QA. No se ejecutó ninguna llamada a producción.' } })
+      return
+    }
+    // Pass the exact QA credential snapshot validated above; a concurrent settings
+    // change cannot redirect this diagnostic request to the production endpoint.
+    res.json({ data: await testAndreaniConnection(credentials), message: 'Conexión con Andreani verificada en QA.' })
   } catch (error) {
     res.status(error instanceof AndreaniError ? error.statusCode : 502).json({
-      error: { code: 'ANDREANI_CONNECTION_ERROR', message: error instanceof Error ? error.message : 'No se pudo validar Andreani.' },
+      error: { code: 'ANDREANI_CONNECTION_ERROR', message: error instanceof Error ? error.message : 'No se pudo validar Andreani en QA.' },
     })
   }
 })
@@ -40,7 +51,7 @@ const schema = z.object({
   ocaEnvironment: z.enum(['QA', 'PRODUCTION']),
   ocaUsername: z.string().trim().min(1).max(200).optional(),
   ocaPassword: z.string().trim().min(1).max(300).optional(),
-  ocaCuit: z.string().trim().regex(/^\d{11}$/, 'El CUIT OCA debe tener 11 dígitos.').optional(),
+  ocaCuit: z.string().trim().regex(/^\\d{11}$/, 'El CUIT OCA debe tener 11 dígitos.').optional(),
   ocaOperative: z.string().trim().min(1).max(100).optional(),
   clearOcaCredentials: z.boolean().optional(),
   andreaniEnvironment: z.enum(['QA', 'PRODUCTION']),
@@ -53,7 +64,7 @@ const schema = z.object({
   pickupAddress: z.string().trim().min(3).max(250),
   pickupInstructions: z.string().trim().max(1000),
   localDeliveryEnabled: z.boolean(),
-  localDeliveryPostalCodes: z.array(z.string().trim().regex(/^\d{4}$/)).max(100),
+  localDeliveryPostalCodes: z.array(z.string().trim().regex(/^\\d{4}$/)).max(100),
   localDeliveryFeeArs: z.number().int().min(0).max(2_000_000_000),
   localDeliveryInternalCostArs: z.number().int().min(0).max(2_000_000_000).nullable(),
   localDeliveryCoordinate: z.boolean(),
