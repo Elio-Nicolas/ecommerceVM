@@ -30,7 +30,7 @@ const orderInclude = {
   paymentAttempts: { orderBy: { createdAt: 'desc' as const }, select: { id: true, provider: true, providerOrderId: true, status: true, statusDetail: true, amountArs: true, approvedAt: true, createdAt: true } },
   fiscalDocuments: { orderBy: { createdAt: 'desc' as const }, select: { id: true, type: true, status: true, pointOfSale: true, voucherType: true, voucherNumber: true, cae: true, caeExpiresAt: true, lastErrorMessage: true, createdAt: true } },
   history: { orderBy: { createdAt: 'desc' as const }, include: { changedByAdmin: { select: { email: true } } } },
-  shipments: { where: { provider: 'OCA' }, select: { provider: true, status: true, trackingNumber: true } },
+  shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } },
   cancellationRequest: true,
 }
 
@@ -176,8 +176,8 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se puede cotizar el envío de un pedido cancelado.' } })
     return
   }
-  if (existing.deliveryMethod !== 'OCA') {
-    res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'La edición manual del costo y seguimiento está disponible únicamente para envíos OCA.' } })
+  if (!['OCA', 'ANDREANI'].includes(existing.deliveryMethod)) {
+    res.status(409).json({ error: { code: 'SHIPPING_METHOD_NOT_SUPPORTED', message: 'La edición manual del costo y seguimiento está disponible únicamente para envíos nacionales OCA o Andreani.' } })
     return
   }
   const shippingCostArs = input.shippingCostArs
@@ -292,6 +292,13 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     const admittedShipment = existing.shipments.some((shipment) => shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))
     if (!admittedShipment) {
       res.status(409).json({ error: { code: 'OCA_SHIPMENT_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando OCA confirme la admisión y exista un número de seguimiento.' } })
+      return
+    }
+  }
+  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ANDREANI') {
+    const admittedShipment = existing.shipments.some((shipment) => shipment.provider === 'ANDREANI' && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))
+    if (!admittedShipment) {
+      res.status(409).json({ error: { code: 'ANDREANI_SHIPMENT_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando Andreani confirme la admisión y exista un número de seguimiento.' } })
       return
     }
   }
