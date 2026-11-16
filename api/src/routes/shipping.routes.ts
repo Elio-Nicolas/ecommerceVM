@@ -37,7 +37,7 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
   ])
   if (input.provider === 'OCA' && !ocaCredentials) return res.status(503).json({ error: { code: 'OCA_NOT_CONFIGURED', message: 'OCA todavía no está configurado. Retiro y entrega local siguen disponibles.' } })
   if (input.provider === 'ANDREANI' && !andreaniCredentials) return res.status(503).json({ error: { code: 'ANDREANI_NOT_CONFIGURED', message: 'Andreani todavía no está configurado. Retiro y entrega local siguen disponibles.' } })
-  if (!origin) return res.status(503).json({ error: { code: 'SHIPPING_ORIGIN_NOT_CONFIGURED', message: 'Configurá un depósito de despacho predeterminado con su código postal.' } })
+  if (input.provider === 'OCA' && !origin) return res.status(503).json({ error: { code: 'SHIPPING_ORIGIN_NOT_CONFIGURED', message: 'Configurá un depósito de despacho predeterminado con su código postal.' } })
   if (products.length !== input.items.length) return res.status(422).json({ error: { code: 'SHIPPING_PRODUCTS_UNAVAILABLE', message: 'Uno o más productos ya no están disponibles.' } })
 
   let weightGrams = 0, volumeCm3 = 0, subtotalArs = 0
@@ -53,7 +53,7 @@ shippingRouter.post('/quotes', quoteLimiter, async (req, res) => {
   }
   try {
     const option = input.provider === 'OCA'
-      ? await quoteOca({ postalCode: input.postalCode, originPostalCode: origin.postalCode, weightGrams, volumeCm3, packages: 1, declaredValueArs: subtotalArs })
+      ? await quoteOca({ postalCode: input.postalCode, originPostalCode: origin!.postalCode, weightGrams, volumeCm3, packages: 1, declaredValueArs: subtotalArs })
       : await quoteAndreani({ postalCode: input.postalCode, weightGrams, volumeCm3 })
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
     const quote = await prisma.shippingQuote.create({
