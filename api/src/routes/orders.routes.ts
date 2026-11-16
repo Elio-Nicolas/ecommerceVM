@@ -83,7 +83,7 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
   const checkoutFingerprint = input.checkoutRequestKey ? createCheckoutFingerprint(input) : null
-  const customerAccessToken = input.checkoutRequestKey ? deriveOrderAccessToken(input.checkoutRequestKey) : randomBytes(32).toString('hex')
+  const customerAccessToken = input.checkoutRequestKey ? deriveOrderAccessToken(input.checkoutRequestKey, env.JWT_SECRET) : randomBytes(32).toString('hex')
   const customerAccessTokenHash = hashOrderAccessToken(customerAccessToken)
 
   if (input.checkoutRequestKey) {
