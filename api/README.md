@@ -45,17 +45,31 @@ Los tokens vencen a las 8 horas. Las contraseñas se almacenan con bcrypt. No ex
 
 OCA e-Pak y Andreani son proveedores nacionales independientes. Los envíos históricos se conservan en el modelo neutral ShippingShipment.
 
-El backend dispone de cotizador OCA y configuración cifrada. La cotización requiere credenciales y una respuesta real para validar el mapeo. La admisión, etiquetas y tracking se completarán cuando OCA confirme los datos comerciales de la cuenta.
+El backend dispone de cotizadores OCA y Andreani y configuración cifrada independiente. La cotización de ambos proveedores debe validarse con respuestas reales de las cuentas. La admisión, etiquetas y tracking de OCA y Andreani todavía requieren completar sus respectivos flujos de cuenta.
 
 ### Qué está disponible
 
+- Cotización OCA y Andreani mediante el endpoint común `/api/v1/shipping/quotes`, indicando el proveedor. Andreani se ofrece en checkout cuando está configurado.\n
 - `PICKUP`: retiro configurado por el vendedor, sin cargo.
 - `LOCAL_DELIVERY`: entrega local según los códigos postales y tarifas configurados.
 - Administración de orígenes de despacho.
-- Configuración OCA protegida: usuario, contraseña, CUIT y operativa se almacenan cifrados; el frontend solo recibe el estado de configuración y el entorno.\n- Configuración Andreani protegida: usuario, contraseña, código de cliente y contrato se almacenan cifrados; el frontend solo recibe el estado de configuración y el entorno.\n- Cotización Andreani implementada en QA/Producción configurables; requiere credenciales y contrato habilitados.
+- Configuración OCA protegida: usuario, contraseña, CUIT y operativa se almacenan cifrados; el frontend solo recibe el estado de configuración y el entorno.
+- Configuración Andreani protegida: usuario, contraseña, código de cliente y contrato se almacenan cifrados; el frontend solo recibe el estado de configuración y el entorno.
+- Cotización Andreani implementada en QA/Producción configurables; requiere credenciales y contrato habilitados.
 - La clave dedicada `SHIPPING_ENCRYPTION_KEY` (mínimo 32 caracteres) permite separar el cifrado logístico de `JWT_SECRET`. Configurala antes de guardar credenciales reales. Los valores históricos cifrados con `JWT_SECRET` siguen siendo legibles durante la transición; no rotes ese secreto hasta completar la recodificación.
 
-### Qué falta para habilitar OCA\n\nVer también [Integración Andreani](docs/andreani-integration.md) para el estado, configuración y pendientes del segundo proveedor nacional.\n\n### Qué falta para completar Andreani\n\n1. Obtener credenciales QA, código de cliente y contrato habilitado.\n2. Validar autenticación y tarifa real con la cuenta.\n3. Implementar alta idempotente, etiquetas PDF y seguimiento según el OpenAPI habilitado.\n4. Probar el ciclo completo en QA antes de ofrecerlo a compradores.\n\n
+### Qué falta para habilitar OCA
+
+Ver también [Integración Andreani](docs/andreani-integration.md) para el estado, configuración y pendientes del segundo proveedor nacional.
+
+### Qué falta para completar Andreani
+
+1. Obtener credenciales QA, código de cliente y contrato habilitado.
+2. Validar autenticación y tarifa real con la cuenta.
+3. Implementar alta idempotente, etiquetas PDF y seguimiento según el OpenAPI habilitado.
+4. Probar el ciclo completo en QA antes de ofrecerlo a compradores.
+
+
 
 1. Recibir de OCA la cuenta comercial, CUIT habilitado, usuario/contraseña de e-Pak y número de operativa.
 2. Confirmar si la admisión se hará en sucursal de Villa Mercedes o mediante retiro, y obtener los datos de origen/cuenta/centro de costo requeridos.
@@ -68,8 +82,8 @@ No cargues credenciales reales en Git, tickets ni chats. No se debe habilitar pr
 ### Endpoints públicos
 
 - GET `/api/v1/shipping/methods`: informa modalidades disponibles.
-- POST `/api/v1/shipping/quotes`: cotiza con OCA cuando la cuenta y el origen están configurados; devuelve 503 si faltan credenciales.
-- POST `/api/v1/orders`: acepta únicamente modalidades habilitadas; los métodos de envío nacional están pausados.
+- POST `/api/v1/shipping/quotes`: recibe `provider: OCA|ANDREANI` y cotiza con el proveedor seleccionado; devuelve 503 si faltan credenciales.
+- POST `/api/v1/orders`: valida y registra cotizaciones vigentes de OCA o Andreani, además de retiro y entrega local.
 
 ### Configuración administrativa
 
