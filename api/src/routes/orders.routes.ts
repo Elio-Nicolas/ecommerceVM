@@ -275,6 +275,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         include: { items: true },
       })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    res.setHeader('Cache-Control', 'no-store')
     res.status(201).json({
       data: {
         customerAccessToken,
