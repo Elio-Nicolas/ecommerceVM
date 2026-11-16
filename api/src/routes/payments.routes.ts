@@ -248,6 +248,11 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
     res.status(400).json({ error: { code: 'PAYMENT_REQUEST_INVALID', message: 'La solicitud de pago no es válida.' } })
     return
   }
+  const accessOrder = await prisma.order.findUnique({ where: { id: orderId.data }, select: { customerAccessTokenHash: true } })
+  if (!accessOrder || !hasValidOrderAccessToken(req, accessOrder.customerAccessTokenHash)) {
+    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
   if (!paymentConfiguration().enabled) {
     res.status(503).json({ error: { code: 'PAYMENTS_NOT_CONFIGURED', message: 'Los pagos online todavía no están configurados.' } })
     return
