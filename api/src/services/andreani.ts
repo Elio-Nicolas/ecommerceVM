@@ -42,11 +42,11 @@ async function login(credentials: AndreaniCredentials) {
   const token = typeof payload?.token === 'string' ? payload.token : typeof payload?.access_token === 'string' ? payload.access_token : null
   if (!token) throw new AndreaniError('Andreani autenticó la solicitud, pero no devolvió un token reconocido.')
   cachedToken = { key, token, expiresAt: Date.now() + 23 * 60 * 60 * 1000 }
-  return token
+  return cachedToken.token
 }
 
-export async function testAndreaniConnection() {
-  const credentials = await getStoredAndreaniCredentials()
+export async function testAndreaniConnection(credentialsOverride?: AndreaniCredentials) {
+  const credentials = credentialsOverride ?? await getStoredAndreaniCredentials()
   if (!credentials) throw new AndreaniError('Andreani todavía no está configurado. Cargá usuario, contraseña, código de cliente y contrato en Administración > Envíos.', 503)
   await login(credentials)
   return { connected: true, environment: credentials.environment }
