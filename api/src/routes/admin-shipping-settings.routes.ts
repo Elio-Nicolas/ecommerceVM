@@ -52,7 +52,7 @@ adminShippingSettingsRouter.post('/oca/test', async (_req, res) => {
       volumeCm3: 1000,
       packages: 1,
       declaredValueArs: 1000,
-    })
+    }, credentials)
     res.json({
       data: { environment: credentials.environment, serviceCode: quote.serviceCode, priceArs: quote.priceArs, estimatedHours: quote.estimatedHours },
       message: 'OCA respondió correctamente a una consulta de tarifa de prueba en QA. No se creó ningún envío.',
