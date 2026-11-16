@@ -22,7 +22,7 @@ Este documento separa lo que existe en el código de lo que todavía requiere da
 - La prueba realiza una consulta de tarifa de solo lectura contra OCA QA usando el CP del origen predeterminado como origen y destino, un paquete de prueba de 1 kg / 1.000 cm³ y valor declarado ARS 1.000.
 - No crea admisiones, no confirma retiros y no modifica pedidos ni stock.
 - Si falta configuración u origen, informa el requisito pendiente. Si la respuesta XML no permite interpretar una tarifa, muestra el error para poder ajustar el parser con una respuesta real.
-- El endpoint rechaza explícitamente el entorno Producción; esta prueba nunca llama a la API productiva.
+- El endpoint rechaza explícitamente el entorno Producción y pasa al cotizador la misma instantánea de credenciales QA que validó. Un cambio concurrente de configuración no puede redirigir esta prueba a la API productiva.
 - Una respuesta exitosa confirma conectividad y lectura de tarifa en QA, pero no valida admisión, etiqueta ni tracking.
 
 ### Orígenes de despacho
