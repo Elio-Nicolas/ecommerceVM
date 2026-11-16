@@ -45,16 +45,19 @@ Los tokens vencen a las 8 horas. Las contraseñas se almacenan con bcrypt. No ex
 
 El detalle técnico de OCA e-Pak, endpoints oficiales, requisitos de cuenta, estado implementado y plan de trabajo se mantiene en [docs/oca-epak-integration.md](docs/oca-epak-integration.md). Actualizar ese documento en cada PR de logística.
 
-OCA e-Pak es el único proveedor nacional. El código anterior del transportista fue retirado; los envíos históricos se conservan en el modelo neutral ShippingShipment como LEGACY_CARRIER.
+OCA e-Pak y Andreani son proveedores nacionales independientes. Los envíos históricos se conservan en el modelo neutral ShippingShipment.
 
-El backend dispone de cotizador OCA y configuración cifrada. La cotización requiere credenciales y una respuesta real para validar el mapeo. La admisión, etiquetas y tracking se completarán cuando OCA confirme los datos comerciales de la cuenta.
+El backend dispone de cotizadores OCA y Andreani con configuración cifrada independiente. Andreani ya cuenta con autenticación administrativa y cotización; ambos proveedores requieren completar admisión, etiquetas y seguimiento con las cuentas comerciales habilitadas.
 
 ### Qué está disponible
 
+- Cotización OCA y Andreani mediante `/api/v1/shipping/quotes`, indicando el proveedor. Andreani aparece en checkout solo cuando está configurado.
 - `PICKUP`: retiro configurado por el vendedor, sin cargo.
 - `LOCAL_DELIVERY`: entrega local según los códigos postales y tarifas configurados.
 - Administración de orígenes de despacho.
 - Configuración OCA protegida: usuario, contraseña, CUIT y operativa se almacenan cifrados; el frontend solo recibe el estado de configuración y el entorno.
+- Configuración Andreani protegida: usuario, contraseña, código de cliente y contrato se almacenan cifrados; el frontend solo recibe el estado de configuración y el entorno.
+- Prueba administrativa de autenticación y cotización Andreani implementadas; requieren credenciales QA y contrato habilitado.
 - La clave dedicada `SHIPPING_ENCRYPTION_KEY` (mínimo 32 caracteres) permite separar el cifrado logístico de `JWT_SECRET`. Configurala antes de guardar credenciales reales. Los valores históricos cifrados con `JWT_SECRET` siguen siendo legibles durante la transición; no rotes ese secreto hasta completar la recodificación.
 
 ### Qué falta para habilitar OCA
@@ -67,11 +70,18 @@ El backend dispone de cotizador OCA y configuración cifrada. La cotización req
 
 No cargues credenciales reales en Git, tickets ni chats. No se debe habilitar producción hasta completar estas verificaciones.
 
+### Qué falta para completar Andreani
+
+1. Recibir OpenAPI vigente y credenciales QA/código de cliente/contrato habilitado.
+2. Confirmar modalidad y datos reales del remitente, documento requerido del destinatario y formato de etiqueta.
+3. Implementar admisión idempotente, descarga PDF y sincronización de tracking según el contrato habilitado.
+4. Validar el ciclo completo en QA antes de habilitar producción.
+
 ### Endpoints públicos
 
 - GET `/api/v1/shipping/methods`: informa modalidades disponibles.
-- POST `/api/v1/shipping/quotes`: cotiza con OCA cuando la cuenta y el origen están configurados; devuelve 503 si faltan credenciales.
-- POST `/api/v1/orders`: acepta únicamente modalidades habilitadas; los métodos de envío nacional están pausados.
+- POST `/api/v1/shipping/quotes`: recibe `provider: OCA|ANDREANI` y cotiza con el proveedor seleccionado; devuelve error controlado si faltan credenciales.
+- POST `/api/v1/orders`: valida y registra cotizaciones vigentes de OCA o Andreani, además de retiro y entrega local.
 
 ### Configuración administrativa
 

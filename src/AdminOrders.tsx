@@ -13,7 +13,7 @@ type Order = {
   customerPhone: string; addressLine: string; city: string; province: string; postalCode: string | null
   customerNotes: string | null; subtotalArs: number; shippingCostArs: number | null; totalArs: number | null
   shippingCarrier: string | null; trackingCode: string | null; shippingService: string | null; shippingEstimatedHours: number | null
-  deliveryMethod: 'OCA' | 'LOCAL_DELIVERY' | 'PICKUP' | 'LEGACY_CARRIER'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
+  deliveryMethod: 'OCA' | 'ANDREANI' | 'LOCAL_DELIVERY' | 'PICKUP' | 'LEGACY_CARRIER'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
   shipments?: { provider: string; status: string; trackingNumber: string | null }[]
   shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
   createdAt: string; items: OrderItem[]; history: OrderHistory[]
@@ -45,7 +45,7 @@ function historyEventLabel(entry: OrderHistory): string {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
-  if (order.status === 'PREPARING' && order.deliveryMethod === 'OCA' && !order.shipments?.some((shipment) => shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
+  if (order.status === 'PREPARING' && (order.deliveryMethod === 'OCA' || order.deliveryMethod === 'ANDREANI') && !order.shipments?.some((shipment) => shipment.provider === order.deliveryMethod && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
   const mpStatuses = (order.paymentAttempts || []).filter((payment) => payment.provider === 'MERCADO_PAGO').map((payment) => payment.status)
   if (order.status === 'PENDING' && mpStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
   if (mpStatuses.includes('PARTIALLY_REFUNDED')) return []
@@ -480,7 +480,7 @@ export default function AdminOrders() {
             <div className="admin-form-heading"><div><span className="admin-kicker">PEDIDO {activeOrder.code}</span><h2>Detalle del pedido</h2></div><div className="admin-category-actions"><button type="button" className="admin-quiet-button" onClick={() => printCurrentOrder(activeOrder, 'receipt')}>Imprimir ticket</button><button type="button" className="admin-quiet-button" onClick={() => printCurrentOrder(activeOrder, 'prep')}>Etiqueta de preparación</button><button className="admin-quiet-button" onClick={() => setSelected(null)}>Cerrar</button></div></div>
             <div className="order-detail-grid">
               <div><span>CLIENTE</span><strong>{activeOrder.customerName}</strong><small>{activeOrder.customerPhone}</small><small>{activeOrder.customerEmail || 'Sin correo informado'}</small></div>
-              <div><span>MODALIDAD DE ENTREGA</span><strong>{activeOrder.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : activeOrder.deliveryMethod === 'LEGACY_CARRIER' ? 'Proveedor anterior (histórico)' : 'OCA'}</strong><small>{activeOrder.deliveryInstructions || [activeOrder.addressLine, activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(' · ')}</small></div>
+              <div><span>MODALIDAD DE ENTREGA</span><strong>{activeOrder.deliveryMethod === 'PICKUP' ? 'Retiro por domicilio del vendedor' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' ? 'Entrega local' : activeOrder.deliveryMethod === 'LEGACY_CARRIER' ? 'Proveedor anterior (histórico)' : activeOrder.deliveryMethod === 'ANDREANI' ? 'Andreani' : 'OCA'}</strong><small>{activeOrder.deliveryInstructions || [activeOrder.addressLine, activeOrder.city, activeOrder.province, activeOrder.postalCode].filter(Boolean).join(' · ')}</small></div>
               <div><span>NOTAS</span><strong>{activeOrder.customerNotes || 'Sin indicaciones adicionales'}</strong></div>
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
@@ -540,7 +540,7 @@ export default function AdminOrders() {
               {activeOrder.shippingCostOptions.sellerOptions?.length ? <div className="order-logistics-table"><div className="order-logistics-row order-logistics-head"><span>Transportista</span><span>Costo tienda</span><span>Diferencia estimada</span></div>{activeOrder.shippingCostOptions.sellerOptions.map((option) => <div className="order-logistics-row" key={option.carrierId}><span><strong>{option.carrierName}</strong><small>{option.fulfillmentMode === 'D' ? 'Retiro en depósito' : 'Despacho en sucursal'}{option.estimatedHours ? ` · ${Math.ceil(option.estimatedHours / 24)} días` : ''}</small></span><strong>{formatPrice(option.costArs)}</strong><strong className={((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs) >= 0 ? 'order-logistics-positive' : 'order-logistics-negative'}>{formatPrice((activeOrder.shippingCostOptions?.priceArs ?? 0) - option.costArs)}</strong></div>)}</div> : <p className="order-logistics-unavailable">OCA no devolvió costos por transportista para esta cotización. El precio al cliente sí quedó registrado.</p>}
               <p className="order-logistics-footnote">La diferencia es un margen logístico estimado, no una ganancia neta. El costo definitivo puede variar al generar la etiqueta.</p>
             </section>}
-            {activeOrder.deliveryMethod === 'OCA' && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
+            {(activeOrder.deliveryMethod === 'OCA' || activeOrder.deliveryMethod === 'ANDREANI') && activeOrder.status !== 'CANCELLED' && <form className="order-shipping-form" key={`${activeOrder.id}-${activeOrder.shippingCostArs}-${activeOrder.shippingCarrier}-${activeOrder.trackingCode}`} onSubmit={(event) => void saveShipping(event, activeOrder)}>
               <div><span className="admin-kicker">LOGÍSTICA NACIONAL</span><h3>Cotizar envío y seguimiento</h3><p>Este importe es el que se suma al total del comprador. El costo de OCA se gestionará por separado del importe cobrado al comprador.</p></div>
               <div className="order-shipping-fields">
                 <label>Precio de envío cobrado al cliente (ARS)<input name="shippingCostArs" type="number" min="0" max="2000000000" step="1" required defaultValue={activeOrder.shippingCostArs ?? ''} placeholder="Ej. 8500" /></label>
@@ -565,9 +565,9 @@ export default function AdminOrders() {
               </div>
               <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando costo...' : 'Guardar costo acordado'}</button>
             </form>}
-            {activeOrder.deliveryMethod === 'OCA' && activeOrder.status !== 'CANCELLED' && <section className="order-logistics-breakdown">
-              <div><span className="admin-kicker">OCA E-PAK</span><h3>Despacho nacional</h3></div>
-              <p>La cotización se realiza con OCA. La admisión, descarga de etiqueta y seguimiento se completarán cuando estén confirmados el número de cuenta, centro de costo y modalidad de despacho de la cuenta.</p>
+            {['OCA', 'ANDREANI'].includes(activeOrder.deliveryMethod) && activeOrder.status !== 'CANCELLED' && <section className="order-logistics-breakdown">
+              <div><span className="admin-kicker">{activeOrder.deliveryMethod === 'ANDREANI' ? 'ANDREANI' : 'OCA E-PAK'}</span><h3>Despacho nacional</h3></div>
+              <p>{activeOrder.deliveryMethod === 'ANDREANI' ? 'La cotización se realiza con Andreani. La admisión, descarga de etiqueta y seguimiento se habilitarán cuando se valide el contrato y el flujo de la cuenta.' : 'La cotización se realiza con OCA. La admisión, descarga de etiqueta y seguimiento se completarán cuando estén confirmados el número de cuenta, centro de costo y modalidad de despacho de la cuenta.'}</p>
             </section>}
             <div className="order-history"><h3>Historial de actividad</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{historyEventLabel(entry)}{entry.fromStatus === entry.toStatus && <small>El pedido continúa {statusLabels[entry.toStatus].toLowerCase()}</small>}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingService === 'A coordinar' && activeOrder.status === 'PENDING' && next === 'CONFIRMED' ? 'Confirmar costo y continuar' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}

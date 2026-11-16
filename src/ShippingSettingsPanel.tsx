@@ -2,12 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react'
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 type ShippingSettings = {
   ocaEnvironment: 'QA' | 'PRODUCTION'; ocaConfigured: boolean
+  andreaniEnvironment: 'QA' | 'PRODUCTION'; andreaniConfigured: boolean
   pickupEnabled: boolean; pickupAddress: string; pickupInstructions: string
   localDeliveryEnabled: boolean; localDeliveryPostalCodes: string[]
   localDeliveryFeeArs: number; localDeliveryInternalCostArs: number | null; localDeliveryCoordinate: boolean
 }
 const defaults: ShippingSettings = {
-  ocaEnvironment: 'QA', ocaConfigured: false, pickupEnabled: true, pickupAddress: 'Domicilio del vendedor',
+  ocaEnvironment: 'QA', ocaConfigured: false, andreaniEnvironment: 'QA', andreaniConfigured: false, pickupEnabled: true, pickupAddress: 'Domicilio del vendedor',
   pickupInstructions: 'La dirección exacta y el horario se coordinarán luego de confirmar el pedido.',
   localDeliveryEnabled: false, localDeliveryPostalCodes: ['5730'], localDeliveryFeeArs: 0,
   localDeliveryInternalCostArs: null, localDeliveryCoordinate: false,
@@ -17,6 +18,9 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
   const [ocaUsername, setOcaUsername] = useState(''), [ocaPassword, setOcaPassword] = useState('')
   const [ocaCuit, setOcaCuit] = useState(''), [ocaOperative, setOcaOperative] = useState('')
   const [clearOcaCredentials, setClearOcaCredentials] = useState(false), [postalCodesText, setPostalCodesText] = useState('5730')
+  const [andreaniUsername, setAndreaniUsername] = useState(''), [andreaniPassword, setAndreaniPassword] = useState('')
+  const [andreaniClientCode, setAndreaniClientCode] = useState(''), [andreaniContract, setAndreaniContract] = useState('')
+  const [clearAndreaniCredentials, setClearAndreaniCredentials] = useState(false), [testingAndreani, setTestingAndreani] = useState(false)
   const [loading, setLoading] = useState(true), [saving, setSaving] = useState(false)
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -41,8 +45,13 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     const credentials = [ocaUsername.trim(), ocaPassword.trim(), ocaCuit.trim(), ocaOperative.trim()]
     if (credentials.some(Boolean) && !credentials.every(Boolean)) { setError('Para guardar OCA completá usuario, contraseña, CUIT y operativa.'); setSaving(false); return }
     if (clearOcaCredentials && credentials.some(Boolean)) { setError('No podés reemplazar y eliminar las credenciales OCA en la misma operación.'); setSaving(false); return }
+    const andreaniCredentials = [andreaniUsername.trim(), andreaniPassword.trim(), andreaniClientCode.trim(), andreaniContract.trim()]
+    if (andreaniCredentials.some(Boolean) && !andreaniCredentials.every(Boolean)) { setError('Para guardar Andreani completá usuario, contraseña, código de cliente y contrato.'); setSaving(false); return }
+    if (clearAndreaniCredentials && andreaniCredentials.some(Boolean)) { setError('No podés reemplazar y eliminar las credenciales Andreani en la misma operación.'); setSaving(false); return }
     const payload = {
       ...settings, localDeliveryPostalCodes: [...new Set(postalCodesText.split(',').map((v) => v.trim()).filter(Boolean))],
+      ...(andreaniCredentials.every(Boolean) ? { andreaniUsername: andreaniCredentials[0], andreaniPassword: andreaniCredentials[1], andreaniClientCode: andreaniCredentials[2], andreaniContract: andreaniCredentials[3] } : {}),
+      ...(clearAndreaniCredentials ? { clearAndreaniCredentials: true } : {}),
       ...(credentials.every(Boolean) ? { ocaUsername: credentials[0], ocaPassword: credentials[1], ocaCuit: credentials[2].replace(/\D/g, ''), ocaOperative: credentials[3] } : {}),
       ...(clearOcaCredentials ? { clearOcaCredentials: true } : {}),
     }
@@ -50,13 +59,23 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
       const result = await request<{ data: ShippingSettings }>('/admin/shipping-settings', { method: 'PUT', body: JSON.stringify(payload) })
       setSettings(result.data); setPostalCodesText(result.data.localDeliveryPostalCodes.join(', '))
       setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setClearOcaCredentials(false)
-      setNotice('Configuración guardada. OCA queda pendiente de validar con los datos comerciales de tu cuenta.')
+      setAndreaniUsername(''); setAndreaniPassword(''); setAndreaniClientCode(''); setAndreaniContract(''); setClearAndreaniCredentials(false)
+      setNotice('Configuración guardada. OCA y Andreani permanecen independientes; Andreani requiere validación con credenciales QA.')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.') }
     finally { setSaving(false) }
   }
+  async function testAndreani() {
+    if (testingAndreani) return
+    setTestingAndreani(true); setError(''); setNotice('')
+    try {
+      const result = await request<{ data: { environment: string }; message: string }>('/admin/shipping-settings/andreani/test', { method: 'POST' })
+      setNotice(`Conexión con Andreani verificada en ${result.data.environment}.`)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo validar Andreani.') }
+    finally { setTestingAndreani(false) }
+  }
   if (loading) return <section className="admin-category-card"><div className="admin-table-empty">Cargando configuración de envíos...</div></section>
   return <section className="admin-category-card shipping-settings-card">
-    <div className="admin-category-heading"><h2>Configuración de envíos y entregas</h2><p>OCA es el proveedor nacional. Las credenciales se cifran en el backend.</p></div>
+    <div className="admin-category-heading"><h2>Configuración de envíos y entregas</h2><p>OCA y Andreani son proveedores nacionales independientes. Las credenciales se cifran en el backend.</p></div>
     {error && <div className="admin-alert error">{error}</div>}{notice && <div className="admin-alert success">{notice}</div>}
     <form className="shipping-settings-form" onSubmit={(event) => void save(event)}>
       <section className="shipping-setting-section">
@@ -70,6 +89,21 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
         </div>
         <p className="shipping-settings-help">Para admisión y etiquetas también faltan número de cuenta, centro de costo y modalidad de despacho desde Villa Mercedes.</p>
         {settings.ocaConfigured && <div className="admin-category-actions"><button type="button" className="archive-action" onClick={() => { setClearOcaCredentials((v) => !v); setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative('') }}>{clearOcaCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales OCA'}</button></div>}
+      </section>
+      <section className="shipping-setting-section">
+        <div className="shipping-setting-title"><div><span className="admin-kicker">TRANSPORTE NACIONAL</span><h3>Andreani</h3><p>Integración REST. Configurá las credenciales de QA cuando Andreani las habilite.</p></div><span className="shipping-credential-status">{settings.andreaniConfigured && !clearAndreaniCredentials ? 'Datos guardados' : 'Pendiente de configuración'}</span></div>
+        <div className="admin-form-grid">
+          <label>Entorno<select value={settings.andreaniEnvironment} onChange={(e) => update('andreaniEnvironment', e.target.value as 'QA' | 'PRODUCTION')}><option value="QA">Pruebas (QA)</option><option value="PRODUCTION">Producción</option></select></label>
+          <label>Usuario API<input value={andreaniUsername} onChange={(e) => setAndreaniUsername(e.target.value)} placeholder={settings.andreaniConfigured && !clearAndreaniCredentials ? 'Guardado · dejar vacío para conservar' : 'Usuario asignado por Andreani'} /></label>
+          <label>Contraseña API<input type="password" autoComplete="new-password" value={andreaniPassword} onChange={(e) => setAndreaniPassword(e.target.value)} placeholder={settings.andreaniConfigured && !clearAndreaniCredentials ? 'Guardada · dejar vacío para conservar' : 'Contraseña asignada por Andreani'} /></label>
+          <label>Código de cliente<input value={andreaniClientCode} onChange={(e) => setAndreaniClientCode(e.target.value)} placeholder="Código de cliente" /></label>
+          <label>Contrato<input value={andreaniContract} onChange={(e) => setAndreaniContract(e.target.value)} placeholder="Contrato de transporte" /></label>
+        </div>
+        <p className="shipping-settings-help">Las credenciales se cifran en el backend. Producción no se habilita automáticamente.</p>
+        <div className="admin-category-actions">
+          {settings.andreaniConfigured && <button type="button" className="archive-action" onClick={() => { setClearAndreaniCredentials((v) => !v); setAndreaniUsername(''); setAndreaniPassword(''); setAndreaniClientCode(''); setAndreaniContract('') }}>{clearAndreaniCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales Andreani'}</button>}
+          <button type="button" className="archive-action" disabled={testingAndreani || !settings.andreaniConfigured} onClick={() => void testAndreani()}>{testingAndreani ? 'Probando conexión...' : 'Probar conexión Andreani'}</button>
+        </div>
       </section>
       <section className="shipping-setting-section">
         <div className="shipping-setting-title"><div><span className="admin-kicker">ENTREGA LOCAL</span><h3>Cadetería / mensajería</h3><p>La disponibilidad se determina por el código postal.</p></div><label className="admin-checkbox"><input type="checkbox" checked={settings.localDeliveryEnabled} onChange={(e) => update('localDeliveryEnabled', e.target.checked)} /> Habilitar entrega local</label></div>

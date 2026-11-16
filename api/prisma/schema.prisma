@@ -114,6 +114,11 @@ model ShippingSettings {
   ocaPasswordEncrypted String?
   ocaCuitEncrypted String?
   ocaOperativeEncrypted String?
+  andreaniEnvironment String @default("QA")
+  andreaniUsernameEncrypted String?
+  andreaniPasswordEncrypted String?
+  andreaniClientCodeEncrypted String?
+  andreaniContractEncrypted String?
   pickupEnabled Boolean @default(true)
   pickupAddress String @default("Domicilio del vendedor")
   pickupInstructions String @default("La dirección exacta y el horario se coordinarán luego de confirmar el pedido.")

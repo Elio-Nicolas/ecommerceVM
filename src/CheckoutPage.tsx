@@ -12,11 +12,12 @@ type ShippingOption = {
   priceArs: number
   estimatedHours: number | null
 }
-type DeliveryMethod = 'OCA' | 'LOCAL_DELIVERY' | 'PICKUP'
+type DeliveryMethod = 'OCA' | 'ANDREANI' | 'LOCAL_DELIVERY' | 'PICKUP'
 type DeliveryMethods = {
   pickup: { enabled: boolean; address: string; instructions: string; priceArs: number }
   localDelivery: { enabled: boolean; postalCodes: string[]; priceArs: number | null; coordinate: boolean }
   oca: { enabled: boolean }
+  andreani: { enabled: boolean }
 }
 type ShippingQuote = {
   id: string
@@ -194,7 +195,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     setSelectedOptionKey('')
     setQuoteError('')
     setQuoteLoading(false)
-    if (!deliveryMethods?.oca.enabled || deliveryMethod !== 'OCA' || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
+    if ((deliveryMethod === 'OCA' ? !deliveryMethods?.oca.enabled : deliveryMethod === 'ANDREANI' ? !deliveryMethods?.andreani.enabled : true) || !provinceCode || !/^\d{4}$/.test(postalCode) || cart.length === 0) {
       return () => controller.abort()
     }
 
@@ -206,6 +207,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({
+            provider: deliveryMethod,
             provinceCode,
             postalCode,
             items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
@@ -293,7 +295,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           customerNotes,
           deliveryMethod,
           paymentMethod,
-          ...(deliveryMethod === 'OCA' && quote && selectedOption ? { shippingQuoteId: quote.id, shippingOptionKey: selectedOption.key } : {}),
+          ...((deliveryMethod === 'OCA' || deliveryMethod === 'ANDREANI') && quote && selectedOption ? { shippingQuoteId: quote.id, shippingOptionKey: selectedOption.key } : {}),
           items: cart.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
         }),
       })
@@ -370,7 +372,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             <div className="checkout-fields">
               <label>Nombre y apellido<input required minLength={2} maxLength={120} autoComplete="name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} /></label>
               <label>Teléfono / WhatsApp<input required type="tel" minLength={8} maxLength={30} autoComplete="tel" placeholder="Ej. 2657 123456" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} /></label>
-              <label className="checkout-field-full">Correo electrónico {deliveryMethod === 'OCA' || paymentsEnabled || goCuotasEnabled ? <span>(obligatorio para el envío y el pago)</span> : <span>(opcional)</span>}<input type="email" required={deliveryMethod === 'OCA' || paymentsEnabled || goCuotasEnabled} maxLength={deliveryMethod === 'OCA' || paymentsEnabled || goCuotasEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
+              <label className="checkout-field-full">Correo electrónico {(deliveryMethod === 'OCA' || deliveryMethod === 'ANDREANI') || paymentsEnabled || goCuotasEnabled ? <span>(obligatorio para el envío y el pago)</span> : <span>(opcional)</span>}<input type="email" required={(deliveryMethod === 'OCA' || deliveryMethod === 'ANDREANI') || paymentsEnabled || goCuotasEnabled} maxLength={(deliveryMethod === 'OCA' || deliveryMethod === 'ANDREANI') || paymentsEnabled || goCuotasEnabled ? 100 : 160} autoComplete="email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} /></label>
             </div>
           </section>
           <section className="checkout-card">
@@ -384,17 +386,21 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
                 <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'LOCAL_DELIVERY'} onClick={(event) => { if (deliveryMethod === 'LOCAL_DELIVERY') { event.preventDefault(); setDeliveryMethod('') } }} onChange={() => setDeliveryMethod('LOCAL_DELIVERY')} />
                 <span className="checkout-shipping-option-copy"><strong>Entrega local</strong><small>{localDeliveryAvailable ? (deliveryMethods.localDelivery.coordinate ? 'Costo a coordinar luego de confirmar el pedido.' : 'Disponible para tu código postal.') : 'No disponible para este código postal.'}</small></span><strong className="checkout-shipping-price">{deliveryMethods.localDelivery.coordinate ? 'A coordinar' : formatPrice(deliveryMethods.localDelivery.priceArs || 0)}</strong>
               </label>}
+              {deliveryMethods.andreani.enabled && <label className={deliveryMethod === 'ANDREANI' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
+                <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'ANDREANI'} onClick={(event) => { if (deliveryMethod === 'ANDREANI') { event.preventDefault(); setDeliveryMethod('') } }} onChange={() => setDeliveryMethod('ANDREANI')} />
+                <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por Andreani</strong><small>Tarifa calculada con el peso y volumen consolidados del pedido.</small></span>
+              </label>}
               {deliveryMethods.oca.enabled && <label className={deliveryMethod === 'OCA' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
                 <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'OCA'} onClick={(event) => { if (deliveryMethod === 'OCA') { event.preventDefault(); setDeliveryMethod('') } }} onChange={() => setDeliveryMethod('OCA')} />
                 <span className="checkout-shipping-option-copy"><strong>Envío a domicilio por OCA</strong><small>Un único bulto consolidado con el peso y las dimensiones estimadas de todo el pedido.</small></span>
               </label>}
             </div>}
             {deliveryMethod === 'PICKUP' ? <p className="checkout-shipping-hint">El retiro no depende de tu localidad. Coordinaremos la entrega del pedido luego de confirmarlo.</p> : deliveryMethod === 'LOCAL_DELIVERY' ? <p className="checkout-shipping-hint">{localDeliveryAvailable ? 'La entrega local está disponible para tu destino.' : 'Ingresá un código postal cubierto por la entrega local.'}</p> : null}
-            {deliveryMethod === 'OCA' && <>
+            {(deliveryMethod === 'OCA' || deliveryMethod === 'ANDREANI') && <>
             {!provinceCode || !/^\d{4}$/.test(postalCode)
               ? <p className="checkout-shipping-hint">Ingresá provincia y código postal para calcular el envío.</p>
               : quoteLoading
-                ? <p className="checkout-shipping-hint">Consultando tarifas de OCA...</p>
+                ? <p className="checkout-shipping-hint">Consultando tarifas de {deliveryMethod === 'ANDREANI' ? 'Andreani' : 'OCA'}...</p>
                 : quoteError
                   ? <div className="checkout-error" role="alert">{quoteError}</div>
                   : quote?.options.length
@@ -417,12 +423,12 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
           </section>
           {deliveryMethod !== '' && deliveryMethod !== 'PICKUP' && (
             <section className="checkout-card">
-              <h2>{deliveryMethod === 'OCA' ? 'Dirección de envío' : 'Dirección de entrega local'}</h2>
+              <h2>{deliveryMethod === 'OCA' || deliveryMethod === 'ANDREANI' ? 'Dirección de envío' : 'Dirección de entrega local'}</h2>
               <div className="checkout-fields">
                 <label className="checkout-field-full">Calle y altura<input required minLength={4} maxLength={180} autoComplete="street-address" value={addressLine} onChange={(event) => setAddressLine(event.target.value)} /></label>
                 <label>Localidad<input required minLength={2} maxLength={100} autoComplete="address-level2" value={city} onChange={(event) => setCity(event.target.value)} /></label>
                 <label>Provincia
-                  <select required={deliveryMethod === 'OCA' || deliveryMethod === 'LOCAL_DELIVERY'} value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
+                  <select required={deliveryMethod === 'OCA' || deliveryMethod === 'ANDREANI' || deliveryMethod === 'LOCAL_DELIVERY'} value={provinceCode} onChange={(event) => setProvinceCode(event.target.value)}>
                     <option value="">Seleccionar provincia</option>
                     {PROVINCES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
                   </select>
