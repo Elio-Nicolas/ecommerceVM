@@ -5,7 +5,6 @@ import { z } from 'zod'
 import { env } from '../config/env'
 import { prisma } from '../lib/prisma'
 import { hasValidOrderAccessToken } from '../services/order-access-token'
-import { hasValidOrderAccessToken } from '../services/order-access-token'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
 import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
 import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '../services/gocuotas-attempt-policy'
@@ -58,11 +57,6 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
   const input = schema.safeParse(req.body)
   if (!orderId.success || !input.success) {
     res.status(400).json({ error: { code: 'PAYMENT_REQUEST_INVALID', message: 'La solicitud de pago no es válida.' } })
-    return
-  }
-  const accessOrder = await prisma.order.findUnique({ where: { id: orderId.data }, select: { customerAccessTokenHash: true } })
-  if (!accessOrder || !hasValidOrderAccessToken(req, accessOrder.customerAccessTokenHash)) {
-    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
   const accessOrder = await prisma.order.findUnique({ where: { id: orderId.data }, select: { customerAccessTokenHash: true } })
