@@ -7,6 +7,7 @@ import { prisma } from '../lib/prisma'
 import { hasValidOrderAccessToken } from '../services/order-access-token'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
 import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
+import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '../services/gocuotas-attempt-policy'
 
 export const goCuotasRouter = Router()
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false })
@@ -78,17 +79,48 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     if (paid) return { error: 'ALREADY_PAID' as const }
     let attempt = await tx.paymentAttempt.findUnique({ where: { requestKey: input.data.requestKey } })
     if (attempt && (attempt.orderId !== order.id || attempt.provider !== 'GOCUOTAS')) return { error: 'REQUEST_KEY_CONFLICT' as const }
-    if (attempt && ['APPROVED', 'REJECTED', 'CANCELLED', 'REFUNDED'].includes(attempt.status)) return { error: 'ATTEMPT_CLOSED' as const }
-    if (!attempt) attempt = await tx.paymentAttempt.create({
-      data: { orderId: order.id, provider: 'GOCUOTAS', requestKey: input.data.requestKey, amountArs: order.totalArs, status: 'CREATING' },
-    })
-    if (attempt.status === 'PENDING' && attempt.checkoutUrl) return { order, attempt, create: false as const }
-    return { order, attempt, create: true as const }
+    if (attempt && ['APPROVED', 'REJECTED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED'].includes(attempt.status)) return { error: 'ATTEMPT_CLOSED' as const }
+
+    if (!attempt) {
+      const active = await tx.paymentAttempt.findFirst({
+        where: { orderId: order.id, provider: 'GOCUOTAS', status: { in: ['CREATING', 'PENDING', 'UNKNOWN'] } },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (active) {
+        if (active.amountArs !== order.totalArs) return { error: 'ATTEMPT_AMOUNT_CHANGED' as const }
+        if (getGoCuotasAttemptDisposition(active) === 'REUSE_CHECKOUT') {
+          return { order, attempt: active, create: false as const }
+        }
+        return { error: active.status === 'UNKNOWN' ? 'CHECKOUT_UNKNOWN' as const : 'CHECKOUT_IN_PROGRESS' as const }
+      }
+      attempt = await tx.paymentAttempt.create({
+        data: { orderId: order.id, provider: 'GOCUOTAS', requestKey: input.data.requestKey, amountArs: order.totalArs, status: 'CREATING' },
+      })
+      return { order, attempt, create: true as const }
+    }
+
+    if (attempt.amountArs !== order.totalArs) return { error: 'ATTEMPT_AMOUNT_CHANGED' as const }
+    if (getGoCuotasAttemptDisposition(attempt) === 'REUSE_CHECKOUT') {
+      return { order, attempt, create: false as const }
+    }
+    return { error: attempt.status === 'UNKNOWN' ? 'CHECKOUT_UNKNOWN' as const : 'CHECKOUT_IN_PROGRESS' as const }
   })
 
   if ('error' in prepared) {
-    const status = prepared.error === 'NOT_FOUND' ? 404 : 409
-    res.status(status).json({ error: { code: prepared.error, message: 'No se pudo iniciar el pago con GOcuotas.' } })
+    const errors: Record<string, { status: number; message: string }> = {
+      NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
+      PAYMENT_METHOD_MISMATCH: { status: 409, message: 'El pedido no está configurado para pagar con GOcuotas.' },
+      ORDER_NOT_PAYABLE: { status: 409, message: 'El pedido todavía no está disponible para pagar.' },
+      ALREADY_PAID: { status: 409, message: 'Este pedido ya tiene un pago aprobado.' },
+      REQUEST_KEY_CONFLICT: { status: 409, message: 'La clave de pago ya fue utilizada para otra operación.' },
+      ATTEMPT_CLOSED: { status: 409, message: 'El intento anterior quedó cerrado. Revisá el estado del pedido antes de iniciar otro pago.' },
+      CHECKOUT_UNKNOWN: { status: 409, message: 'GOcuotas podría haber creado el checkout, pero no pudimos confirmar la respuesta. No generes otro pago; estamos verificando la operación.' },
+      CHECKOUT_IN_PROGRESS: { status: 409, message: 'Ya hay una solicitud de pago en proceso. Esperá unos instantes y consultá nuevamente el estado.' },
+      ATTEMPT_AMOUNT_CHANGED: { status: 409, message: 'El importe del pedido cambió desde el intento anterior. Contactá a la tienda para verificarlo antes de pagar.' },
+    }
+    const errorCode = String(prepared.error || 'UNKNOWN')
+    const error = errors[errorCode] || { status: 409, message: 'No se pudo iniciar el pago con GOcuotas.' }
+    res.status(error.status).json({ error: { code: errorCode, message: error.message } })
     return
   }
   if (!prepared.create) {
@@ -97,10 +129,12 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     return
   }
 
+  let checkoutRequestStarted = false
   try {
     const token = await authenticate()
     const appUrl = env.PUBLIC_APP_URL!.replace(/\/+$/, '')
     const apiUrl = env.PUBLIC_API_URL!.replace(/\/+$/, '')
+    checkoutRequestStarted = true
     const response = await fetch(new URL('checkouts', env.GOCUOTAS_API_BASE_URL), {
       method: 'POST',
       headers: { accept: 'application/json', 'content-type': 'application/json', authorization: 'Bearer ' + token },
@@ -134,8 +168,13 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     res.status(201).json({ data: { checkoutUrl: attempt.checkoutUrl, status: attempt.status } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo crear el checkout.'
+    if (getGoCuotasFailureDisposition(checkoutRequestStarted) === 'RELEASE_ATTEMPT') {
+      await prisma.paymentAttempt.deleteMany({ where: { id: prepared.attempt.id, status: 'CREATING' } })
+      res.status(502).json({ error: { code: 'GOCUOTAS_AUTHENTICATION_FAILED', message: 'No pudimos autenticar con GOcuotas. Podés volver a intentarlo.' } })
+      return
+    }
     await prisma.paymentAttempt.update({ where: { id: prepared.attempt.id }, data: { status: 'UNKNOWN', lastError: message.slice(0, 500) } })
-    res.status(502).json({ error: { code: 'GOCUOTAS_CHECKOUT_UNKNOWN', message: 'No pudimos confirmar la creación del checkout. Reintentá con la misma clave.' } })
+    res.status(502).json({ error: { code: 'GOCUOTAS_CHECKOUT_UNKNOWN', message: 'No pudimos confirmar la creación del checkout. No vuelvas a intentar el pago mientras verificamos la operación.' } })
   }
 })
 
