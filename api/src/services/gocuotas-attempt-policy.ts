@@ -12,3 +12,10 @@ export function getGoCuotasAttemptDisposition(attempt: {
     ? 'REUSE_CHECKOUT'
     : 'BLOCK_RETRY'
 }
+
+export type GoCuotasFailureDisposition = 'RELEASE_ATTEMPT' | 'MARK_UNKNOWN'
+
+/** Authentication happens before checkout creation; only failures after the checkout POST starts are ambiguous. */
+export function getGoCuotasFailureDisposition(checkoutRequestStarted: boolean): GoCuotasFailureDisposition {
+  return checkoutRequestStarted ? 'MARK_UNKNOWN' : 'RELEASE_ATTEMPT'
+}
