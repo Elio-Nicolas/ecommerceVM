@@ -9,6 +9,7 @@ import { shippingCartFingerprint } from '../services/shipping-fingerprint'
 import { createCheckoutFingerprint } from '../services/order-checkout-fingerprint'
 import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
 import { env } from '../config/env'
+import { deriveOrderAccessToken, hashOrderAccessToken, hasValidOrderAccessToken } from '../services/order-access-token'
 
 export const ordersRouter = Router()
 
@@ -68,19 +69,22 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
   }
   const order = await prisma.order.findUnique({
     where: { id: id.data },
-    select: { shippingCostArs: true, totalArs: true, paymentSurchargeArs: true, paymentSurchargeMilliPercent: true },
+    select: { shippingCostArs: true, totalArs: true, paymentSurchargeArs: true, paymentSurchargeMilliPercent: true, customerAccessTokenHash: true },
   })
-  if (!order) {
+  if (!order || !hasValidOrderAccessToken(req, order.customerAccessTokenHash)) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
+  const { customerAccessTokenHash: _tokenHash, ...receipt } = order
   res.setHeader('Cache-Control', 'no-store')
-  res.json({ data: order })
+  res.json({ data: receipt })
 })
 
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
   const checkoutFingerprint = input.checkoutRequestKey ? createCheckoutFingerprint(input) : null
+  const customerAccessToken = input.checkoutRequestKey ? deriveOrderAccessToken(input.checkoutRequestKey, env.JWT_SECRET) : randomBytes(32).toString('hex')
+  const customerAccessTokenHash = hashOrderAccessToken(customerAccessToken)
 
   if (input.checkoutRequestKey) {
     const previousOrder = await prisma.order.findUnique({
@@ -92,9 +96,13 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         res.status(409).json({ error: { code: 'ORDER_IDEMPOTENCY_CONFLICT', message: 'Esta solicitud ya registró un pedido con datos diferentes. Actualizá el checkout antes de volver a intentar.' } })
         return
       }
+      if (previousOrder.customerAccessTokenHash !== customerAccessTokenHash) {
+        await prisma.order.update({ where: { id: previousOrder.id }, data: { customerAccessTokenHash } })
+      }
       res.setHeader('Cache-Control', 'no-store')
       res.status(200).json({
         data: {
+          customerAccessToken,
           id: previousOrder.id,
           code: previousOrder.code,
           status: previousOrder.status,
@@ -236,6 +244,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           code,
           checkoutRequestKey: input.checkoutRequestKey || null,
           checkoutFingerprint,
+          customerAccessTokenHash,
           customerName: input.customerName,
           customerEmail: input.customerEmail,
           customerPhone: input.customerPhone,
@@ -266,8 +275,10 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         include: { items: true },
       })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    res.setHeader('Cache-Control', 'no-store')
     res.status(201).json({
       data: {
+        customerAccessToken,
         id: order.id,
         code: order.code,
         status: order.status,
@@ -298,9 +309,13 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           res.status(409).json({ error: { code: 'ORDER_IDEMPOTENCY_CONFLICT', message: 'Esta solicitud ya registró un pedido con datos diferentes. Actualizá el checkout antes de volver a intentar.' } })
           return
         }
+        if (previousOrder.customerAccessTokenHash !== customerAccessTokenHash) {
+          await prisma.order.update({ where: { id: previousOrder.id }, data: { customerAccessTokenHash } })
+        }
         res.setHeader('Cache-Control', 'no-store')
         res.status(200).json({
           data: {
+            customerAccessToken,
             id: previousOrder.id,
             code: previousOrder.code,
             status: previousOrder.status,
