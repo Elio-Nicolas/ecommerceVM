@@ -1,7 +1,9 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
-import { getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
+import { getShippingSettings, getStoredOcaCredentials, saveShippingSettings } from '../services/shipping-settings'
+import { quoteOca, OcaError } from '../services/oca'
 import { testAndreaniConnection, AndreaniError } from '../services/andreani'
 
 export const adminShippingSettingsRouter = Router()
@@ -25,6 +27,43 @@ function publicSettings(settings: Awaited<ReturnType<typeof getShippingSettings>
 }
 
 adminShippingSettingsRouter.get('/', async (_req, res) => res.json({ data: publicSettings(await getShippingSettings()) }))
+
+adminShippingSettingsRouter.post('/oca/test', async (_req, res) => {
+  try {
+    const credentials = await getStoredOcaCredentials()
+    if (!credentials) {
+      res.status(503).json({ error: { code: 'OCA_NOT_CONFIGURED', message: 'Completá usuario, contraseña, CUIT y operativa de OCA antes de probar la conexión.' } })
+      return
+    }
+    if (credentials.environment !== 'QA') {
+      res.status(409).json({ error: { code: 'OCA_QA_REQUIRED', message: 'La prueba de conexión está limitada a QA. No se ejecutó ninguna llamada a producción.' } })
+      return
+    }
+    const origin = await prisma.shippingOrigin.findFirst({ where: { isActive: true, isDefault: true } })
+    if (!origin) {
+      res.status(409).json({ error: { code: 'OCA_ORIGIN_REQUIRED', message: 'Configurá un origen de despacho activo y predeterminado antes de probar OCA.' } })
+      return
+    }
+    // Tariff lookup is read-only: it does not create an admission or confirm a pickup.
+    const quote = await quoteOca({
+      postalCode: origin.postalCode,
+      originPostalCode: origin.postalCode,
+      weightGrams: 1000,
+      volumeCm3: 1000,
+      packages: 1,
+      declaredValueArs: 1000,
+    })
+    res.json({
+      data: { environment: credentials.environment, serviceCode: quote.serviceCode, priceArs: quote.priceArs, estimatedHours: quote.estimatedHours },
+      message: 'OCA respondió correctamente a una consulta de tarifa de prueba en QA. No se creó ningún envío.',
+    })
+  } catch (error) {
+    const statusCode = error instanceof OcaError ? error.statusCode : 502
+    res.status(statusCode).json({
+      error: { code: 'OCA_CONNECTION_ERROR', message: error instanceof Error ? error.message : 'No se pudo validar OCA en QA.' },
+    })
+  }
+})
 
 adminShippingSettingsRouter.post('/andreani/test', async (_req, res) => {
   try {
