@@ -143,7 +143,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         deliveryInstructions = deliverySettings.localDeliveryCoordinate ? 'El costo de entrega se coordinará luego de confirmar el pedido.' : null
       } else {
         if (!input.shippingQuoteId || !input.shippingOptionKey || !input.provinceCode) {
-          throw new OrderConflictError('Seleccioná una cotización vigente de OCA.')
+          throw new OrderConflictError('Seleccioná una cotización vigente del transporte elegido.')
         }
         const quote = await tx.shippingQuote.findFirst({
           where: {
@@ -180,7 +180,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (products.length !== input.items.length) {
         throw new OrderConflictError('Uno o más productos ya no están disponibles. Actualizá el carrito.')
       }
-      if (input.deliveryMethod === 'OCA') {
+      if (input.deliveryMethod === 'OCA' || input.deliveryMethod === 'ANDREANI') {
         const quote = input.shippingQuoteId ? await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } }) : null
         if (!quote || quote.cartFingerprint !== shippingCartFingerprint(input.items, products)) {
           throw new OrderConflictError('Los productos o sus paquetes cambiaron desde la cotización. Volvé a calcular el envío.')
