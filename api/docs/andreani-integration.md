@@ -37,7 +37,7 @@ Desde Administración → Configuración de envíos → Andreani:
 - Código de cliente.
 - Contrato.
 
-Los cuatro datos se guardan cifrados usando el servicio de cifrado logístico existente. El API administrativo nunca devuelve secretos; solo devuelve `andreaniConfigured` y el entorno.
+Los cuatro datos se guardan cifrados usando el servicio de cifrado logístico existente. El API administrativo nunca devuelve secretos; solo devuelve `andreaniConfigured` y el entorno. Al cambiar entre QA y Producción, se exige volver a ingresar las credenciales correspondientes al nuevo ambiente; no se reutilizan las credenciales del ambiente anterior.
 
 No subir credenciales a Git, issues, logs ni chats. No cambiar a Producción hasta contar con credenciales productivas y completar pruebas de aceptación.
 
