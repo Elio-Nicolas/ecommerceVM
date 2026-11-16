@@ -123,15 +123,25 @@ La revisión automatizada detectó observaciones sobre:
 
 En la revisión del estado actual de la rama se comprobó que las validaciones de CP/CUIT ya usan expresiones regulares correctas y que la consulta de envíos incluye OCA y ANDREANI. La pantalla de administración también contempla el formulario logístico para ambos proveedores; queda pendiente terminar de verificar todas las etiquetas visibles y el pie de impresión.
 
-### CI
+### CI y estado de la rama — actualización 16/11/2026
 
-El workflow asociado al commit `aab54e99439b3ba536835ce6fcef71a636072987` ejecutó correctamente migraciones Prisma y los 47 tests, y compiló el frontend. Falló únicamente la compilación TypeScript del API porque la primera línea de `api/src/services/andreani.ts` contenía una secuencia literal `\\n` entre imports (TS1127/TS1435). La rama consultada posteriormente ya presenta los imports separados por un salto de línea real; es obligatorio volver a ejecutar CI sobre el HEAD vigente antes de considerar el PR validado.
+El error TypeScript registrado en la ejecución anterior quedó corregido en la rama. El commit de documentación `65bfc014abb5eef8fd09d9d686e839ef102601c4` tiene un workflow `ecommerceVM CI` completado con resultado **success** (run `43921823956`):
+
+- Frontend build: correcto.
+- API: migraciones Prisma, generación del cliente, tests y compilación TypeScript: correctos.
+- Check de Vercel: correcto.
+
+La revisión automatizada había señalado problemas en validación de CP/CUIT, carga de envíos y UI administrativa. La inspección del HEAD confirmó que esas correcciones ya están presentes: regex de cuatro y once dígitos, consulta de envíos OCA/ANDREANI y formulario administrativo que contempla ANDREANI.
+
+### Sincronización con main
+
+Al comparar la rama con `main` el 16/11/2026, la rama aparece **36 commits ahead y 1 behind**. El único commit de main pendiente de integrar es posterior a la base del PR. El PR informa mergeable, pero antes de integrarlo debe actualizarse la rama y volver a ejecutar CI sobre el resultado actualizado. No se hizo merge ni despliegue.
 
 ### Próximo paso y límites
 
-1. Reejecutar CI sobre el último commit de la rama y resolver cualquier error restante.
-2. Completar la revisión visual de los nombres del transportista en administración e impresión.
+1. Actualizar la rama con el único commit pendiente de `main` mediante una operación de sincronización/rebase segura; resolver conflictos sin sobrescribir cambios ajenos.
+2. Reejecutar CI luego de la actualización.
 3. Mantener bloqueadas la admisión, etiquetas y trazas hasta recibir el OpenAPI vigente y los datos de cuenta/modalidad de Andreani.
 4. No habilitar Producción ni desplegar sin aprobación explícita.
 
-Este registro no confirma una integración operativa con Andreani: hasta ahora no hay credenciales QA ni respuestas reales de la cuenta para validar autenticación y tarifas.
+Este registro no confirma una integración operativa con Andreani: todavía faltan credenciales QA y respuestas reales de la cuenta para validar autenticación y tarifas.
