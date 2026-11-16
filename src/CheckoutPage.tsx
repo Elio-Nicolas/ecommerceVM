@@ -27,6 +27,7 @@ type ShippingQuote = {
 type CreatedOrder = {
   id: string
   code: string
+  customerAccessToken: string
   subtotalArs: number
   shippingCostArs: number | null
   totalArs: number | null
@@ -117,6 +118,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     const refreshReceipt = async () => {
       try {
         const response = await fetch(`${API_URL}/api/v1/orders/${encodeURIComponent(createdOrder.id)}/receipt`, {
+          headers: { 'X-Order-Access-Token': createdOrder.customerAccessToken },
           cache: 'no-store',
           signal: controller.signal,
         })
