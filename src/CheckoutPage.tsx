@@ -307,6 +307,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       try {
         sessionStorage.removeItem(checkoutStorageKey)
         sessionStorage.setItem(`ecommercevm:order-access:${payload.data.id}`, payload.data.customerAccessToken)
+        sessionStorage.setItem(`ecommercevm:order-code:${payload.data.id}`, payload.data.code)
       } catch { /* El pedido ya quedó registrado; el almacenamiento es opcional. */ }
       setCreatedOrder(payload.data)
       onOrderCreated()
