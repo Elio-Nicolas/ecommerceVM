@@ -104,6 +104,7 @@ export async function saveShippingSettings(input: {
   const andreaniHasComplete = andreaniValues.every(Boolean)
   const andreaniHasStored = Boolean(current.andreaniUsernameEncrypted && current.andreaniPasswordEncrypted && current.andreaniClientCodeEncrypted && current.andreaniContractEncrypted)
   if (andreaniHasAny && !andreaniHasComplete) throw new Error('Para guardar Andreani completá usuario, contraseña, código de cliente y contrato.')
+  if (input.andreaniEnvironment !== current.andreaniEnvironment && !andreaniHasComplete) throw new Error('Al cambiar el ambiente de Andreani, ingresá las credenciales correspondientes al nuevo ambiente.')
   if (input.clearAndreaniCredentials && andreaniHasAny) throw new Error('No podés reemplazar y eliminar las credenciales Andreani en la misma operación.')
   if (input.andreaniEnvironment === 'PRODUCTION' && !andreaniHasStored && !andreaniHasComplete) throw new Error('Configurá primero la cuenta Andreani antes de seleccionar producción.')
 
