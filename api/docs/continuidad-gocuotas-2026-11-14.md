@@ -175,3 +175,12 @@ Validación CI:
 - TypeScript build API: success.
 - Frontend build: success.
 - Preview Vercel del último ajuste de checkout: success.
+
+
+## Reintentos GOcuotas — revisión 16/11/2026
+
+- Se mantiene la validación de acceso del comprador mediante `X-Order-Access-Token` incorporada en `main`.
+- Si falla la autenticación antes de enviar `POST checkouts`, se libera el intento `CREATING` para permitir reintentar con la misma clave.
+- Si el `POST checkouts` ya comenzó y no hay respuesta concluyente, el intento queda `UNKNOWN` y no se vuelve a crear automáticamente.
+- Se agregaron pruebas unitarias para ambos escenarios.
+- Esta corrección no habilita cobros ni modifica credenciales. Requiere CI verde y revisión antes de integrar.
