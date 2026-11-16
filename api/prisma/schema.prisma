@@ -136,6 +136,7 @@ model Order {
   code String @unique
   checkoutRequestKey String? @unique
   checkoutFingerprint String?
+  customerAccessTokenHash String?
   status OrderStatus @default(PENDING)
   customerName String
   customerEmail String?
