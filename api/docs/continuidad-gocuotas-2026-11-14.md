@@ -191,3 +191,6 @@ En la rama `fix/gocuotas-unknown-checkout-retry` se corrigió un riesgo de check
 **Límite conocido:** si GOcuotas creó el checkout pero se perdió la respuesta antes de persistir su ID, todavía no hay forma automática de consultarlo desde nuestro sistema. No se intenta adivinar ni recrear la operación. La recuperación queda pendiente de que GOcuotas confirme un mecanismo oficial de búsqueda/idempotencia o de una conciliación asistida.
 
 No se ejecutaron pagos, no se modificaron credenciales y no se desplegó esta rama.
+
+
+La rama `feat/gocuotas-safe-retry-guard` usa el disparador de CI existente para ramas `feat/**`; no se modificó configuración de workflows ni se tocó `main`.
