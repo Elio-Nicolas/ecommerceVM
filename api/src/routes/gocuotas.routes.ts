@@ -114,8 +114,9 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
       CHECKOUT_IN_PROGRESS: { status: 409, message: 'Ya hay una solicitud de pago en proceso. Esperá unos instantes y consultá nuevamente el estado.' },
       ATTEMPT_AMOUNT_CHANGED: { status: 409, message: 'El importe del pedido cambió desde el intento anterior. Contactá a la tienda para verificarlo antes de pagar.' },
     }
-    const error = errors[prepared.error] || { status: 409, message: 'No se pudo iniciar el pago con GOcuotas.' }
-    res.status(error.status).json({ error: { code: prepared.error, message: error.message } })
+    const errorCode = String(prepared.error || 'UNKNOWN')
+    const error = errors[errorCode] || { status: 409, message: 'No se pudo iniciar el pago con GOcuotas.' }
+    res.status(error.status).json({ error: { code: errorCode, message: error.message } })
     return
   }
   if (!prepared.create) {
