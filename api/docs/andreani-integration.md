@@ -12,7 +12,8 @@ Esta etapa implementa:
 - Cotización nacional Andreani desde el checkout.
 - Persistencia de cotizaciones con el mismo fingerprint de carrito y vencimiento de 10 minutos que el flujo existente.
 - Validación de cotización al crear el pedido.
-- Protección para impedir marcar un pedido Andreani como despachado sin un envío Andreani procesado y con tracking.
+- Protección para impedir marcar un pedido Andreani como despachado sin un envío Andreani procesado y con tracking no vacío.
+- Revalidación de los requisitos de despacho dentro de la transacción y bajo el bloqueo por pedido, evitando usar una lectura logística obsoleta ante operaciones concurrentes.
 
 Todavía no implementa la creación/admisión de órdenes, descarga de etiquetas ni sincronización de tracking. Esas operaciones se deben cerrar con el OpenAPI vigente y los datos/servicios concretos habilitados para la cuenta de ecommerceVM; no se deben inferir campos obligatorios ni códigos de contrato.
 
