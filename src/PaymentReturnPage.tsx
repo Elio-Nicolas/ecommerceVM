@@ -24,6 +24,10 @@ export default function PaymentReturnPage({ orderId, outcome, provider }: Props)
     try { return sessionStorage.getItem('ecommercevm:order-access:' + orderId) || '' } catch { return '' }
   }
 
+  const orderCode = (() => {
+    try { return sessionStorage.getItem('ecommercevm:order-code:' + orderId) || '' } catch { return '' }
+  })()
+
   const refresh = useCallback(async (signal?: AbortSignal) => {
     const accessToken = getAccessToken()
     if (!accessToken) throw new Error('No encontramos el acceso seguro de este pedido en esta sesión. Contactanos para verificarlo.')
@@ -108,6 +112,7 @@ export default function PaymentReturnPage({ orderId, outcome, provider }: Props)
         <div className={approved ? 'payment-return-mark approved' : rejected ? 'payment-return-mark rejected' : 'payment-return-mark'}>
           {approved ? '✓' : rejected ? '!' : '…'}
         </div>
+        {orderCode && <div className="payment-return-code"><span>PEDIDO</span><strong>{orderCode}</strong></div>}
         <h1>{approved ? 'Pago confirmado' : refunded ? (status === 'REFUNDED' ? 'Pago reembolsado' : 'Reembolso parcial') : rejected ? 'El pago no se completó' : 'Estamos verificando tu pago'}</h1>
         <p>
           {approved
