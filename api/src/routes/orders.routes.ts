@@ -31,7 +31,7 @@ const createOrderSchema = z.object({
   province: z.string().trim().min(2).max(100),
   postalCode: z.string().trim().regex(/^\d{4}$/, 'Ingresá un código postal de cuatro dígitos.'),
   provinceCode: z.string().length(1).regex(/^[A-Z]$/).optional(),
-  deliveryMethod: z.enum(['OCA', 'LOCAL_DELIVERY', 'PICKUP']).default('OCA'),
+  deliveryMethod: z.enum(['OCA', 'ANDREANI', 'LOCAL_DELIVERY', 'PICKUP']).default('OCA'),
   paymentMethod: z.enum(['CASH', 'MERCADO_PAGO', 'GOCUOTAS']).default('CASH'),
   shippingQuoteId: z.string().uuid().optional(),
   shippingOptionKey: z.string().trim().min(1).max(40).optional(),
@@ -151,7 +151,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         deliveryInstructions = deliverySettings.localDeliveryCoordinate ? 'El costo de entrega se coordinará luego de confirmar el pedido.' : null
       } else {
         if (!input.shippingQuoteId || !input.shippingOptionKey || !input.provinceCode) {
-          throw new OrderConflictError('Seleccioná una cotización vigente de OCA.')
+          throw new OrderConflictError('Seleccioná una cotización vigente del transporte elegido.')
         }
         const quote = await tx.shippingQuote.findFirst({
           where: {
@@ -168,8 +168,9 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           typeof option === 'object' && option !== null && !Array.isArray(option) && option.key === input.shippingOptionKey,
         ) as Prisma.JsonObject | undefined
         if (!selectedOption) throw new OrderConflictError('La opción de envío seleccionada ya no está disponible. Volvé a cotizar.')
+        if (typeof selectedOption.key !== 'string' || !selectedOption.key.startsWith(`${input.deliveryMethod.toLowerCase()}-`)) throw new OrderConflictError('La cotización no corresponde al transporte seleccionado. Volvé a cotizar.')
         shippingCostArs = Number(selectedOption.priceArs)
-        shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : 'OCA'
+        shippingCarrier = typeof selectedOption.carrierName === 'string' ? selectedOption.carrierName : input.deliveryMethod === 'ANDREANI' ? 'Andreani' : 'OCA'
         shippingService = typeof selectedOption.serviceLabel === 'string' ? selectedOption.serviceLabel : 'Envío estándar'
         shippingEstimatedHours = typeof selectedOption.estimatedHours === 'number' ? selectedOption.estimatedHours : null
         if (!Number.isSafeInteger(shippingCostArs) || shippingCostArs < 0) throw new OrderConflictError('El importe del envío no es válido. Volvé a cotizar.')
@@ -188,7 +189,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (products.length !== input.items.length) {
         throw new OrderConflictError('Uno o más productos ya no están disponibles. Actualizá el carrito.')
       }
-      if (input.deliveryMethod === 'OCA') {
+      if (input.deliveryMethod === 'OCA' || input.deliveryMethod === 'ANDREANI') {
         const quote = input.shippingQuoteId ? await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } }) : null
         if (!quote || quote.cartFingerprint !== shippingCartFingerprint(input.items, products)) {
           throw new OrderConflictError('Los productos o sus paquetes cambiaron desde la cotización. Volvé a calcular el envío.')
@@ -215,7 +216,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
       if (!Number.isSafeInteger(subtotalArs) || subtotalArs < 1 || subtotalArs > 2_000_000_000) {
         throw new OrderConflictError('El importe del pedido no es válido.')
       }
-      if (input.deliveryMethod === 'OCA' && input.shippingQuoteId) {
+      if ((input.deliveryMethod === 'OCA' || input.deliveryMethod === 'ANDREANI') && input.shippingQuoteId) {
         const quote = await tx.shippingQuote.findUnique({ where: { id: input.shippingQuoteId } })
         if (!quote || quote.subtotalArs !== subtotalArs) throw new OrderConflictError('El precio de los productos cambió desde la cotización. Volvé a calcular el envío.')
       }
