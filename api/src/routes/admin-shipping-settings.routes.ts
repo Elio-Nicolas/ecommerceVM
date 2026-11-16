@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAdmin } from '../middleware/require-admin'
-import { getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
+import { getShippingSettings, saveShippingSettings } from '../services/shipping-settings'\nimport { testAndreaniConnection, AndreaniError } from '../services/andreani'
 
 export const adminShippingSettingsRouter = Router()
 adminShippingSettingsRouter.use(requireAdmin)
@@ -15,7 +15,7 @@ function publicSettings(settings: Awaited<ReturnType<typeof getShippingSettings>
     localDeliveryCoordinate: settings.localDeliveryCoordinate,
   }
 }
-adminShippingSettingsRouter.get('/', async (_req, res) => res.json({ data: publicSettings(await getShippingSettings()) }))
+adminShippingSettingsRouter.get('/', async (_req, res) => res.json({ data: publicSettings(await getShippingSettings()) }))\nadminShippingSettingsRouter.post('/andreani/test', async (_req, res) => {\n  try { res.json({ data: await testAndreaniConnection(), message: 'Conexión con Andreani verificada.' }) }\n  catch (error) { res.status(error instanceof AndreaniError ? error.statusCode : 502).json({ error: { code: 'ANDREANI_CONNECTION_ERROR', message: error instanceof Error ? error.message : 'No se pudo validar Andreani.' } }) }\n})
 const schema = z.object({
   ocaEnvironment: z.enum(['QA', 'PRODUCTION']),\n  andreaniEnvironment: z.enum(['QA', 'PRODUCTION']),\n  andreaniUsername: z.string().trim().min(1).max(200).optional(),\n  andreaniPassword: z.string().trim().min(1).max(300).optional(),\n  andreaniClientCode: z.string().trim().min(1).max(100).optional(),\n  andreaniContract: z.string().trim().min(1).max(100).optional(),\n  clearAndreaniCredentials: z.boolean().optional(),
   ocaUsername: z.string().trim().min(1).max(200).optional(),
