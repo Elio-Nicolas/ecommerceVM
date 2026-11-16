@@ -44,7 +44,9 @@ El esquema Prisma ya contiene:
 
 ### Controles de pedidos
 - El administrador puede guardar datos de envío y costo desde la gestión de pedidos.
-- Para marcar un pedido OCA como enviado, el backend exige un envío OCA con estado `PROCESSED` y número de seguimiento.
+- Para marcar un pedido OCA como enviado, el backend exige un envío OCA con estado `PROCESSED` y número de seguimiento no vacío.
+- La condición se valida primero para responder rápido y se vuelve a comprobar dentro de la transacción, bajo el bloqueo por pedido, leyendo nuevamente el estado del envío. Así se evita que una validación inicial quede obsoleta por una operación concurrente.
+- La misma política centralizada se aplica a Andreani y a la entrega local «A coordinar» (que requiere costo registrado); retiro y tarifas locales fijas no agregan ese requisito.
 - Por lo tanto, no se puede marcar como despachado manualmente un envío OCA que todavía no fue admitido por el proveedor.
 
 ## 2. Contrato OCA oficial consultado
