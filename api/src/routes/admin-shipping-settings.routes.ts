@@ -7,7 +7,7 @@ export const adminShippingSettingsRouter = Router()
 adminShippingSettingsRouter.use(requireAdmin)
 function publicSettings(settings: Awaited<ReturnType<typeof getShippingSettings>>) {
   return {
-    ocaEnvironment: settings.ocaEnvironment,
+    ocaEnvironment: settings.ocaEnvironment,\n    andreaniEnvironment: settings.andreaniEnvironment,\n    andreaniConfigured: Boolean(settings.andreaniUsernameEncrypted && settings.andreaniPasswordEncrypted && settings.andreaniClientCodeEncrypted && settings.andreaniContractEncrypted),
     ocaConfigured: Boolean(settings.ocaUsernameEncrypted && settings.ocaPasswordEncrypted && settings.ocaCuitEncrypted && settings.ocaOperativeEncrypted),
     pickupEnabled: settings.pickupEnabled, pickupAddress: settings.pickupAddress, pickupInstructions: settings.pickupInstructions,
     localDeliveryEnabled: settings.localDeliveryEnabled, localDeliveryPostalCodes: settings.localDeliveryPostalCodes,
@@ -17,7 +17,7 @@ function publicSettings(settings: Awaited<ReturnType<typeof getShippingSettings>
 }
 adminShippingSettingsRouter.get('/', async (_req, res) => res.json({ data: publicSettings(await getShippingSettings()) }))
 const schema = z.object({
-  ocaEnvironment: z.enum(['QA', 'PRODUCTION']),
+  ocaEnvironment: z.enum(['QA', 'PRODUCTION']),\n  andreaniEnvironment: z.enum(['QA', 'PRODUCTION']),\n  andreaniUsername: z.string().trim().min(1).max(200).optional(),\n  andreaniPassword: z.string().trim().min(1).max(300).optional(),\n  andreaniClientCode: z.string().trim().min(1).max(100).optional(),\n  andreaniContract: z.string().trim().min(1).max(100).optional(),\n  clearAndreaniCredentials: z.boolean().optional(),
   ocaUsername: z.string().trim().min(1).max(200).optional(),
   ocaPassword: z.string().trim().min(1).max(300).optional(),
   ocaCuit: z.string().trim().regex(/^\d{11}$/, 'El CUIT OCA debe tener 11 dígitos.').optional(),
