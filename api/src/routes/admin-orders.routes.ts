@@ -250,7 +250,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }).parse(req.body)
   const existing = await prisma.order.findUnique({
     where: { id: req.params.id },
-    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: 'OCA' }, select: { provider: true, status: true, trackingNumber: true } } },
+    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } } },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
