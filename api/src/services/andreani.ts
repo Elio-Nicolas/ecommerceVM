@@ -1,4 +1,4 @@
-import { getStoredAndreaniCredentials } from './shipping-settings'
+import { createHash } from 'node:crypto'\nimport { getStoredAndreaniCredentials } from './shipping-settings'
 
 export class AndreaniError extends Error {
   constructor(message: string, readonly statusCode = 502) {
@@ -23,7 +23,7 @@ async function readJson(response: Response): Promise<any> {
 }
 
 async function login(credentials: AndreaniCredentials) {
-  const key = [credentials.environment, credentials.username].join(':')
+  const key = createHash('sha256').update([credentials.environment, credentials.username, credentials.password].join(':')).digest('hex')
   if (cachedToken?.key === key && cachedToken.expiresAt > Date.now() + 60_000) return cachedToken.token
   let response: Response
   try {
