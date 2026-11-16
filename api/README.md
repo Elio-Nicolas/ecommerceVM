@@ -49,7 +49,8 @@ El backend dispone de cotizadores OCA y Andreani y configuración cifrada indepe
 
 ### Qué está disponible
 
-- Cotización OCA y Andreani mediante el endpoint común `/api/v1/shipping/quotes`, indicando el proveedor. Andreani se ofrece en checkout cuando está configurado.\n
+- Cotización OCA y Andreani mediante el endpoint común `/api/v1/shipping/quotes`, indicando el proveedor. Andreani se ofrece en checkout cuando está configurado.
+
 - `PICKUP`: retiro configurado por el vendedor, sin cargo.
 - `LOCAL_DELIVERY`: entrega local según los códigos postales y tarifas configurados.
 - Administración de orígenes de despacho.
