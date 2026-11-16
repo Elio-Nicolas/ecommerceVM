@@ -229,7 +229,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
     return () => { window.clearTimeout(timeout); controller.abort() }
   }, [provinceCode, postalCode, cartKey, deliveryMethod, deliveryMethods])
 
-  async function startPayment(orderId: string, provider: 'MERCADO_PAGO' | 'GOCUOTAS' = paymentMethod === 'GOCUOTAS' ? 'GOCUOTAS' : 'MERCADO_PAGO') {
+  async function startPayment(orderId: string, provider: 'MERCADO_PAGO' | 'GOCUOTAS' = paymentMethod === 'GOCUOTAS' ? 'GOCUOTAS' : 'MERCADO_PAGO', accessTokenOverride?: string) {
     if (paymentLoading) return
     setPaymentLoading(true)
     setPaymentError('')
@@ -245,7 +245,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       } catch {
         requestKey = crypto.randomUUID()
       }
-      const accessToken = sessionStorage.getItem(`ecommercevm:order-access:${orderId}`) || createdOrder?.customerAccessToken || ''
+      const accessToken = accessTokenOverride || sessionStorage.getItem(`ecommercevm:order-access:${orderId}`) || createdOrder?.customerAccessToken || ''
       if (!accessToken) throw new Error('No encontramos el acceso seguro de este pedido. Volvé a consultar el comprobante.')
       const paymentPath = provider === 'GOCUOTAS' ? '/api/v1/payments/gocuotas/orders/' : '/api/v1/payments/orders/'
       const response = await fetch(`${API_URL}${paymentPath}${encodeURIComponent(orderId)}`, {
@@ -310,7 +310,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       } catch { /* El pedido ya quedó registrado; el almacenamiento es opcional. */ }
       setCreatedOrder(payload.data)
       onOrderCreated()
-      if (paymentMethod !== 'CASH' && payload.data.totalArs !== null) await startPayment(payload.data.id)
+      if (paymentMethod !== 'CASH' && payload.data.totalArs !== null) await startPayment(payload.data.id, undefined, payload.data.customerAccessToken)
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Ocurrió un error al enviar el pedido.')
     } finally {
