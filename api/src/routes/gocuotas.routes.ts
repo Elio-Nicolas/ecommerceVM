@@ -21,7 +21,7 @@ function configured() {
 function goCuotasUrl(path: string) {
   const base = env.GOCUOTAS_API_BASE_URL
   if (!base) throw new Error('GOcuotas Sandbox no está configurado.')
-  return new URL(path.replace(/^\\/+/, ''), base.replace(/\\/+$/, '') + '/')
+  return new URL(path.replace(/^\/+/, ''), base.replace(/\/+$/, '') + '/')
 }
 
 async function authenticate() {
