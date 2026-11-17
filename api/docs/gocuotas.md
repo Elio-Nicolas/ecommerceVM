@@ -2,9 +2,9 @@
 
 ## Estado
 
-La integración está implementada en la API y preparada para configurar primero Sandbox. El checkout crea una orden de GOcuotas, persiste el intento y devuelve la URL de pago. La confirmación no depende del retorno del navegador: el webhook consulta la orden directamente en GOcuotas y contrasta la referencia y el importe antes de actualizar el intento y confirmar el pedido.
+La integración está implementada en la API y preparada para configurar primero Sandbox. La creación del checkout acepta la respuesta documentada `url_init` sin exigir un identificador no documentado. El checkout crea una orden de GOcuotas, persiste el intento y devuelve la URL de pago. La confirmación no depende del retorno del navegador: el webhook consulta la orden directamente en GOcuotas y contrasta la referencia y el importe antes de actualizar el intento y confirmar el pedido.
 
-**Estado al 17-11-2026: Sandbox configurado y autenticación alcanzada; checkout todavía no validado de punta a punta.** Las cinco variables requeridas están cargadas en Render y `GET /config` devuelve `enabled: true`. En una prueba real, la API completó la autenticación y recibió HTTP 201 al enviar `POST /checkouts`, pero la respuesta no contenía una combinación reconocible de `id` y `url_init` (o la URL no superó la validación). Por eso el intento se conserva como `UNKNOWN`: no se puede afirmar todavía que el checkout sea utilizable ni debe repetirse el POST para ese pedido.
+**Estado al 17-11-2026: Sandbox configurado y autenticación alcanzada; checkout todavía no validado de punta a punta.** Las cinco variables requeridas están cargadas en Render y `GET /config` devuelve `enabled: true`. En una prueba real, la API completó la autenticación y recibió HTTP 201 al enviar `POST /checkouts`, pero la aplicación exigía `id` además de `url_init`. La documentación oficial de API Redirect V1 muestra que la respuesta exitosa contiene `url_init`; no documenta `id` en la creación del checkout. Por eso el intento se conserva como `UNKNOWN`: no se puede afirmar todavía que el checkout sea utilizable ni debe repetirse el POST para ese pedido.
 
 ## Datos necesarios de GOcuotas
 
@@ -42,8 +42,8 @@ No pegar secretos en el chat ni incluirlos en capturas, logs o commits. Para pas
 1. El storefront consulta `GET /api/v1/payments/gocuotas/config`.
 2. El comprador selecciona GOcuotas y el backend valida que el pedido pertenezca al comprador, tenga ese medio de pago, importe final y email.
 3. El backend crea un intento `CREATING` bajo bloqueo transaccional y evita duplicar intentos activos.
-4. La API autentica con `POST authentication` y crea el checkout con `POST checkouts`. El importe se envía en centavos (`amount_in_cents`), junto con referencia única del pedido, email, teléfono, URLs de retorno y URL de webhook.
-5. La URL de checkout debe ser HTTPS y pertenecer a un dominio de GOcuotas antes de guardarse.
+4. La API autentica y crea el checkout usando las rutas de API Redirect V1 bajo `/api_redirect/v1/`; la creación se realiza con `POST /checkouts` y envía el importe en centavos (`amount_in_cents`), junto con referencia única del pedido, email, teléfono, URLs de retorno y URL de webhook. El importe se envía en centavos (`amount_in_cents`), junto con referencia única del pedido, email, teléfono, URLs de retorno y URL de webhook.
+5. La respuesta documentada de creación contiene `url_init`. La URL debe ser HTTPS y pertenecer a un dominio de GOcuotas antes de guardarse. El identificador del checkout es opcional en esa respuesta y se asocia al intento cuando esté disponible, por ejemplo a través del webhook.
 6. El webhook acepta el identificador de orden, vuelve a autenticar y consulta `GET orders/:id` en GOcuotas. Solo considera aprobado el pago cuando la respuesta verificada tiene `delivered_at`, la referencia coincide y el importe en centavos coincide exactamente con el intento y el total vigente del pedido.
 7. Si la respuesta del checkout se pierde después de enviar el POST, el intento queda `UNKNOWN` y no se genera otro checkout a ciegas. Si llega el webhook antes de persistir el ID del proveedor, se intenta correlacionar por la referencia única del pedido y asociar el ID devuelto por GOcuotas.
 
