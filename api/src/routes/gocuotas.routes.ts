@@ -9,6 +9,7 @@ import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payme
 import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
 import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '../services/gocuotas-attempt-policy'
 import { buildGoCuotasUrl } from '../services/gocuotas-url'
+import { readGoCuotasCheckoutResponse } from '../services/gocuotas-checkout-response'
 
 export const goCuotasRouter = Router()
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false })
@@ -150,9 +151,10 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
       }),
       signal: AbortSignal.timeout(20000),
     })
-    const payload = await response.json().catch(() => null) as { id?: number | string; url_init?: string } | null
+    const checkoutResponse = await readGoCuotasCheckoutResponse(response)
+    const payload = checkoutResponse.payload
     if (!response.ok || !payload?.id || !isValidPaymentCheckoutUrl(payload.url_init)) {
-      throw new Error('GOcuotas devolvió una respuesta incompleta (HTTP ' + response.status + ').')
+      throw new Error('Respuesta de checkout no reconocida: ' + checkoutResponse.diagnostic)
     }
     const attempt = await prisma.$transaction(async tx => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', prepared.order.id)
