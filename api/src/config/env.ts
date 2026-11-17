@@ -30,7 +30,8 @@ const envSchema = z.object({
   MP_CHECKOUT_SURCHARGE_MILLIPERCENT: z.coerce.number().int().min(0).max(100000).default(5610), // Mercado Pago a 10 días: 5,61% para cubrir 4,39% + IVA estimado.
   GOCUOTAS_API_BASE_URL: optionalHttpsUrl,
   GOCUOTAS_EMAIL: optionalTrimmedString(5),
-  GOCUOTAS_PASSWORD: optionalTrimmedString(8),
+  // GOcuotas indica usar la API Key del ambiente como valor del parámetro password.
+  GOCUOTAS_API_KEY: optionalTrimmedString(8),
   PUBLIC_APP_URL: optionalHttpsUrl,
   PUBLIC_API_URL: optionalHttpsUrl,
   ADMIN_EMAIL: z.string().email().optional(),
@@ -45,6 +46,5 @@ const envSchema = z.object({
   LOCAL_DELIVERY_POSTAL_CODES: z.string().default('5730'),
   LOCAL_DELIVERY_FEE_ARS: z.coerce.number().int().min(0).max(2_000_000_000).default(0),
   LOCAL_DELIVERY_INTERNAL_COST_ARS: z.coerce.number().int().min(0).max(2_000_000_000).optional(),
-  LOCAL_DELIVERY_COORDINATE: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
 })
 export const env = envSchema.parse(process.env)
