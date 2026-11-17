@@ -154,16 +154,25 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     if (!response.ok || !payload?.id || !isValidPaymentCheckoutUrl(payload.url_init)) {
       throw new Error('GOcuotas devolvió una respuesta incompleta (HTTP ' + response.status + ').')
     }
-    const attempt = await prisma.paymentAttempt.update({
-      where: { id: prepared.attempt.id },
-      data: {
-        providerOrderId: String(payload.id),
-        checkoutUrl: payload.url_init,
-        status: 'PENDING',
-        statusDetail: 'Checkout creado en GOcuotas',
-        responsePayload: payload as Prisma.InputJsonValue,
-        lastError: null,
-      },
+    const attempt = await prisma.$transaction(async tx => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', prepared.order.id)
+      const current = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
+      if (!current) throw new Error('El intento de pago dejó de existir.')
+      if (current.providerOrderId && current.providerOrderId !== String(payload.id)) {
+        throw new Error('GOcuotas devolvió un identificador distinto al asociado al intento.')
+      }
+      return tx.paymentAttempt.update({
+        where: { id: current.id },
+        data: {
+          providerOrderId: current.providerOrderId || String(payload.id),
+          checkoutUrl: payload.url_init,
+          // A webhook may have approved the order while the checkout response was in flight.
+          status: current.status === 'APPROVED' ? 'APPROVED' : 'PENDING',
+          statusDetail: current.status === 'APPROVED' ? current.statusDetail : 'Checkout creado en GOcuotas',
+          responsePayload: payload as Prisma.InputJsonValue,
+          lastError: null,
+        },
+      })
     })
     res.setHeader('Cache-Control', 'no-store')
     res.status(201).json({ data: { checkoutUrl: attempt.checkoutUrl, status: attempt.status } })
@@ -174,7 +183,13 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
       res.status(502).json({ error: { code: 'GOCUOTAS_AUTHENTICATION_FAILED', message: 'No pudimos autenticar con GOcuotas. Podés volver a intentarlo.' } })
       return
     }
-    await prisma.paymentAttempt.update({ where: { id: prepared.attempt.id }, data: { status: 'UNKNOWN', lastError: message.slice(0, 500) } })
+    await prisma.$transaction(async tx => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', prepared.order.id)
+      const current = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
+      if (current && current.status !== 'APPROVED') {
+        await tx.paymentAttempt.update({ where: { id: current.id }, data: { status: 'UNKNOWN', lastError: message.slice(0, 500) } })
+      }
+    })
     res.status(502).json({ error: { code: 'GOCUOTAS_CHECKOUT_UNKNOWN', message: 'No pudimos confirmar la creación del checkout. No vuelvas a intentar el pago mientras verificamos la operación.' } })
   }
 })
