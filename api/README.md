@@ -88,6 +88,13 @@ No cargues credenciales reales en Git, tickets ni chats. No se debe habilitar pr
 La configuración se administra desde Administración > Configuración de envíos. Las rutas protegidas `GET/PUT /api/v1/admin/shipping-settings` no exponen secretos. Las rutas `/api/v1/admin/shipping-origins` administran los orígenes de despacho.
 
 
+## Pagos online con GOcuotas
+
+La integración GOcuotas API Redirect V1 está preparada para Sandbox. Requiere email de sucursal, API Key del mismo ambiente y las URLs públicas HTTPS de storefront y API. La API Key se envía como `password` en la autenticación; los secretos se guardan únicamente en el entorno privado de Render. El flujo incluye checkout, persistencia de intentos, protección ante reintentos ambiguos y verificación del webhook consultando la orden directamente en GOcuotas.
+
+La guía de configuración, endpoints, controles y pruebas de aceptación está en [docs/gocuotas.md](docs/gocuotas.md). La integración no se considera validada hasta ejecutar el flujo completo con credenciales Sandbox.
+
+
 
 ## PDF de Factura C autorizada
 
