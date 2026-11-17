@@ -281,7 +281,7 @@ export default function App() {
           <span>Tu TiendaVM · Tecnología para tu día a día</span>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 IORed Software 🇦🇷. Todos los derechos reservados.</span>
+          <span>© 2026 IORed Software &#127462;&#127479. Todos los derechos reservados.</span>
           <span>Villa Mercedes, San Luis · Argentina</span>
         </div>
         <div className="floating-actions">
