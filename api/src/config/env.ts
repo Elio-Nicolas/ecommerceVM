@@ -30,7 +30,8 @@ const envSchema = z.object({
   MP_CHECKOUT_SURCHARGE_MILLIPERCENT: z.coerce.number().int().min(0).max(100000).default(5610), // Mercado Pago a 10 días: 5,61% para cubrir 4,39% + IVA estimado.
   GOCUOTAS_API_BASE_URL: optionalHttpsUrl,
   GOCUOTAS_EMAIL: optionalTrimmedString(5),
-  GOCUOTAS_PASSWORD: optionalTrimmedString(8),
+  // GOcuotas indica usar la API Key del ambiente como valor del parámetro password.
+  GOCUOTAS_API_KEY: optionalTrimmedString(8),
   PUBLIC_APP_URL: optionalHttpsUrl,
   PUBLIC_API_URL: optionalHttpsUrl,
   ADMIN_EMAIL: z.string().email().optional(),

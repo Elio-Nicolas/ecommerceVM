@@ -15,7 +15,7 @@ const webhookLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeade
 const schema = z.object({ requestKey: z.string().uuid() })
 
 function configured() {
-  return Boolean(env.GOCUOTAS_API_BASE_URL && env.GOCUOTAS_EMAIL && env.GOCUOTAS_PASSWORD && env.PUBLIC_APP_URL && env.PUBLIC_API_URL)
+  return Boolean(env.GOCUOTAS_API_BASE_URL && env.GOCUOTAS_EMAIL && env.GOCUOTAS_API_KEY && env.PUBLIC_APP_URL && env.PUBLIC_API_URL)
 }
 
 async function authenticate() {
@@ -23,7 +23,7 @@ async function authenticate() {
   const response = await fetch(new URL('authentication', env.GOCUOTAS_API_BASE_URL!), {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json' },
-    body: JSON.stringify({ email: env.GOCUOTAS_EMAIL, password: env.GOCUOTAS_PASSWORD }),
+    body: JSON.stringify({ email: env.GOCUOTAS_EMAIL, password: env.GOCUOTAS_API_KEY }),
     signal: AbortSignal.timeout(15000),
   })
   const data = await response.json().catch(() => null) as { token?: string; message?: string } | null
