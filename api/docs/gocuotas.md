@@ -4,7 +4,7 @@
 
 La integración está implementada en la API y preparada para configurar primero Sandbox. El checkout crea una orden de GOcuotas, persiste el intento y devuelve la URL de pago. La confirmación no depende del retorno del navegador: el webhook consulta la orden directamente en GOcuotas y contrasta la referencia y el importe antes de actualizar el intento y confirmar el pedido.
 
-**Todavía no está validada contra una cuenta real de Sandbox.** Faltan el email de la sucursal y la API Key del ambiente. La presencia de variables habilita el endpoint de configuración, pero no demuestra que las credenciales sean válidas; eso se comprueba con la primera autenticación real.
+**Estado al 17-11-2026: Sandbox configurado y autenticación alcanzada; checkout todavía no validado de punta a punta.** Las cinco variables requeridas están cargadas en Render y `GET /config` devuelve `enabled: true`. En una prueba real, la API completó la autenticación y recibió HTTP 201 al enviar `POST /checkouts`, pero la respuesta no contenía una combinación reconocible de `id` y `url_init` (o la URL no superó la validación). Por eso el intento se conserva como `UNKNOWN`: no se puede afirmar todavía que el checkout sea utilizable ni debe repetirse el POST para ese pedido.
 
 ## Datos necesarios de GOcuotas
 
@@ -65,23 +65,24 @@ El webhook no confía en los campos de estado recibidos en la notificación: usa
 - La aprobación exige coincidencia de referencia e importe exacto. El retorno del navegador nunca confirma un pago.
 - La aprobación no se revierte por una notificación posterior con estado pendiente.
 
-## Prueba de aceptación pendiente (requiere credenciales Sandbox)
+## Prueba de aceptación y diagnóstico
 
-1. Cargar las cinco variables anteriores en el entorno de prueba de la API y reiniciar el servicio.
-2. Consultar `GET /api/v1/payments/gocuotas/config`; debe devolver `enabled: true`.
-3. Crear un pedido de prueba con GOcuotas y un importe final conocido.
-4. Iniciar el checkout y confirmar que devuelve una URL HTTPS de GOcuotas.
-5. Completar el flujo de pago de prueba con los medios/casos que indique GOcuotas.
-6. Verificar que el webhook llega a la URL pública, que la API consulta la orden al proveedor y que solo un pago aprobado confirma el pedido.
-7. Reenviar la misma notificación y comprobar que no duplica cambios ni historial.
-8. Verificar un pago rechazado/descartado y que el pedido no se confirma.
-9. Probar un importe/referencia que no coincida, y confirmar que no se aprueba.
-10. Revisar logs sin exponer API Key, token de autenticación ni datos sensibles.
+La configuración y la autenticación ya fueron ejercitadas. La primera creación de checkout devolvió HTTP 201, pero la aplicación no reconoció el cuerpo de respuesta. El backend ahora registra únicamente metadatos seguros de esa respuesta en `PaymentAttempt.lastError`: código HTTP, tipo de contenido, tipo de cuerpo, nombres de campos de primer nivel y presencia/tipo de `id` y `url_init`. No registra valores del cuerpo, URLs, emails, tokens ni encabezados.
+
+Próximos pasos:
+
+1. Obtener de GOcuotas la estructura contractual de respuesta de `POST /checkouts` o una respuesta de ejemplo anonimizada.
+2. Compararla con los metadatos guardados para el intento `UNKNOWN` y ajustar el parser/validación si corresponde.
+3. Verificar con GOcuotas el estado del checkout ya enviado antes de iniciar cualquier otro POST.
+4. Solo con un pedido nuevo de prueba y una respuesta reconocida, validar URL de checkout, pago Sandbox, webhook, aprobación/rechazo, idempotencia y conciliación de importes.
+
+No repetir el POST para un intento `UNKNOWN`: el proveedor podría haber creado el checkout aunque la aplicación no haya podido interpretar su respuesta.
 
 ## Limitaciones conocidas
 
-- No se ejecutó una autenticación ni un checkout real: faltan credenciales Sandbox.
 - El endpoint `/config` solo comprueba presencia de variables, no validez de credenciales.
+- La autenticación Sandbox sí fue alcanzada en la prueba del 17-11-2026, ya que la aplicación avanzó hasta `POST /checkouts` y recibió HTTP 201.
+- No se pudo validar la estructura del checkout ni confirmar que exista una URL de pago utilizable; el intento quedó `UNKNOWN` y requiere conciliación con GOcuotas.
 - La API de GOcuotas y el contrato comercial deben confirmar los estados exactos de rechazo/cancelación y el comportamiento de reintentos del webhook durante la prueba de aceptación.
 - No se debe habilitar cobro real ni cambiar a credenciales productivas hasta completar Sandbox y autorizar explícitamente el paso a producción.
 - No hay migración de base de datos requerida por esta integración en este cambio.
