@@ -8,6 +8,7 @@ import { hasValidOrderAccessToken } from '../services/order-access-token'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
 import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
 import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '../services/gocuotas-attempt-policy'
+import { buildGoCuotasUrl } from '../services/gocuotas-url'
 
 export const goCuotasRouter = Router()
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false })
@@ -20,7 +21,7 @@ function configured() {
 
 async function authenticate() {
   if (!configured()) throw new Error('GOcuotas Sandbox no está configurado.')
-  const response = await fetch(new URL('authentication', env.GOCUOTAS_API_BASE_URL!), {
+  const response = await fetch(buildGoCuotasUrl('authentication', env.GOCUOTAS_API_BASE_URL!), {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json' },
     body: JSON.stringify({ email: env.GOCUOTAS_EMAIL, password: env.GOCUOTAS_API_KEY }),
@@ -32,7 +33,7 @@ async function authenticate() {
 }
 
 async function getGoOrder(id: string, token: string) {
-  const response = await fetch(new URL('orders/' + encodeURIComponent(id), env.GOCUOTAS_API_BASE_URL), {
+  const response = await fetch(buildGoCuotasUrl('orders/' + encodeURIComponent(id), env.GOCUOTAS_API_BASE_URL!), {
     headers: { accept: 'application/json', authorization: 'Bearer ' + token },
     signal: AbortSignal.timeout(15000),
   })
@@ -135,7 +136,7 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     const appUrl = env.PUBLIC_APP_URL!.replace(/\/+$/, '')
     const apiUrl = env.PUBLIC_API_URL!.replace(/\/+$/, '')
     checkoutRequestStarted = true
-    const response = await fetch(new URL('checkouts', env.GOCUOTAS_API_BASE_URL), {
+    const response = await fetch(buildGoCuotasUrl('checkouts', env.GOCUOTAS_API_BASE_URL!), {
       method: 'POST',
       headers: { accept: 'application/json', 'content-type': 'application/json', authorization: 'Bearer ' + token },
       body: JSON.stringify({
@@ -153,16 +154,25 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     if (!response.ok || !payload?.id || !isValidPaymentCheckoutUrl(payload.url_init)) {
       throw new Error('GOcuotas devolvió una respuesta incompleta (HTTP ' + response.status + ').')
     }
-    const attempt = await prisma.paymentAttempt.update({
-      where: { id: prepared.attempt.id },
-      data: {
-        providerOrderId: String(payload.id),
-        checkoutUrl: payload.url_init,
-        status: 'PENDING',
-        statusDetail: 'Checkout creado en GOcuotas',
-        responsePayload: payload as Prisma.InputJsonValue,
-        lastError: null,
-      },
+    const attempt = await prisma.$transaction(async tx => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', prepared.order.id)
+      const current = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
+      if (!current) throw new Error('El intento de pago dejó de existir.')
+      if (current.providerOrderId && current.providerOrderId !== String(payload.id)) {
+        throw new Error('GOcuotas devolvió un identificador distinto al asociado al intento.')
+      }
+      return tx.paymentAttempt.update({
+        where: { id: current.id },
+        data: {
+          providerOrderId: current.providerOrderId || String(payload.id),
+          checkoutUrl: payload.url_init,
+          // A webhook may have approved the order while the checkout response was in flight.
+          status: current.status === 'APPROVED' ? 'APPROVED' : 'PENDING',
+          statusDetail: current.status === 'APPROVED' ? current.statusDetail : 'Checkout creado en GOcuotas',
+          responsePayload: payload as Prisma.InputJsonValue,
+          lastError: null,
+        },
+      })
     })
     res.setHeader('Cache-Control', 'no-store')
     res.status(201).json({ data: { checkoutUrl: attempt.checkoutUrl, status: attempt.status } })
@@ -173,7 +183,13 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
       res.status(502).json({ error: { code: 'GOCUOTAS_AUTHENTICATION_FAILED', message: 'No pudimos autenticar con GOcuotas. Podés volver a intentarlo.' } })
       return
     }
-    await prisma.paymentAttempt.update({ where: { id: prepared.attempt.id }, data: { status: 'UNKNOWN', lastError: message.slice(0, 500) } })
+    await prisma.$transaction(async tx => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', prepared.order.id)
+      const current = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
+      if (current && current.status !== 'APPROVED') {
+        await tx.paymentAttempt.update({ where: { id: current.id }, data: { status: 'UNKNOWN', lastError: message.slice(0, 500) } })
+      }
+    })
     res.status(502).json({ error: { code: 'GOCUOTAS_CHECKOUT_UNKNOWN', message: 'No pudimos confirmar la creación del checkout. No vuelvas a intentar el pago mientras verificamos la operación.' } })
   }
 })
@@ -184,10 +200,32 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
   try {
     const token = await authenticate()
     const payload = await getGoOrder(String(id.data), token)
-    const attempt = await prisma.paymentAttempt.findFirst({
-      where: { provider: 'GOCUOTAS', providerOrderId: String(payload.id ?? id.data) },
+    const providerOrderId = String(payload.id ?? id.data)
+    let attempt = await prisma.paymentAttempt.findFirst({
+      where: { provider: 'GOCUOTAS', providerOrderId },
       include: { order: { select: { id: true, code: true, status: true, totalArs: true } } },
     })
+
+    // A webhook can arrive before the checkout request has persisted the provider ID
+    // (for example, when the checkout response times out). Correlate only by the
+    // unique order reference generated by this API and only to an unlinked attempt.
+    if (!attempt && typeof payload.order_reference_id === 'string' && payload.order_reference_id.length > 0) {
+      const order = await prisma.order.findUnique({
+        where: { code: payload.order_reference_id },
+        select: { id: true },
+      })
+      if (order) {
+        attempt = await prisma.paymentAttempt.findFirst({
+          where: {
+            orderId: order.id,
+            provider: 'GOCUOTAS',
+            providerOrderId: null,
+            status: { in: ['CREATING', 'UNKNOWN', 'PENDING'] },
+          },
+          include: { order: { select: { id: true, code: true, status: true, totalArs: true } } },
+        })
+      }
+    }
     if (!attempt) { res.status(503).send('Intento todavía no registrado'); return }
     const matches = payload.order_reference_id === attempt.order.code
       && parsePaymentAmount(payload.amount_in_cents) === attempt.amountArs * 100
@@ -202,6 +240,7 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
       if (!current) return
       const effective = current.status === 'APPROVED' ? 'APPROVED' : next
       await tx.paymentAttempt.update({ where: { id: current.id }, data: {
+        providerOrderId: current.providerOrderId || providerOrderId,
         status: effective,
         statusDetail: String(payload.status || (payload.delivered_at ? 'delivered' : payload.discarded_at ? 'discarded' : 'pending')).slice(0, 200),
         responsePayload: payload as Prisma.InputJsonValue,

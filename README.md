@@ -12,6 +12,7 @@ La aplicación cuenta con storefront, API persistente, administración, gestión
 - Carrito persistido en el navegador.
 - Checkout con cotización nacional OCA cuando la cuenta está configurada, además de retiro y entrega local.
 - Mercado Pago está integrado mediante Orders API, pero requiere credenciales y configuración de Webhook para habilitarse. Registrar un pedido no significa que esté cobrado.
+- GOcuotas está integrado mediante API Redirect V1 y preparado para Sandbox; requiere email de sucursal, API Key y validación de webhook con credenciales reales antes de habilitar cobros.
 
 ### Administración
 - Acceso protegido para administradores; no existe registro público.
@@ -25,6 +26,7 @@ La aplicación cuenta con storefront, API persistente, administración, gestión
 - **Logística:** OCA es el único proveedor nacional. El cotizador y la configuración segura están preparados; la tarifa debe validarse con una respuesta real de la cuenta. Admisión, etiquetas y seguimiento requieren número de cuenta, centro de costo y modalidad confirmados. Los envíos antiguos se conservan como registros históricos neutrales.
 - **ARCA:** exclusivamente homologación. Requiere certificado X.509 de pruebas asociado a WSFE, CUIT y punto de venta habilitados. Los comprobantes de homologación no son facturas fiscales válidas para entregar a compradores.
 - **Pagos:** integración de código con Mercado Pago Checkout Pro mediante Orders API, persistencia de intentos, idempotencia, Webhook firmado y confirmación automática solo cuando la API verifica estado e importe. Requiere credenciales de prueba/producción y configurar el evento Order (Mercado Pago) en el panel del proveedor; no está activa sin esas variables.
+- **GOcuotas:** API Redirect V1 integrada para Sandbox, con autenticación, checkout y verificación de webhook consultando la orden en el proveedor. Falta ejecutar pruebas de extremo a extremo con las credenciales de la sucursal; la presencia de variables no valida las credenciales.
 - **Catálogo:** el seed incluye diez productos demostrativos. Deben reemplazarse o revisarse antes de vender; sus precios, imágenes y disponibilidad no representan una oferta comercial real.
 
 ## Puertos locales
@@ -132,7 +134,7 @@ Administrativos (requieren Bearer token):
 - `/api/v1/admin/shipping-origins`
 - `/api/v1/admin/arca`
 
-Los detalles operativos de ARCA están en [api/docs/arca-wsaa.md](api/docs/arca-wsaa.md) y [api/docs/arca-wsfe-readonly.md](api/docs/arca-wsfe-readonly.md). La documentación de logística y configuración está en [api/README.md](api/README.md).
+Los detalles operativos de ARCA están en [api/docs/arca-wsaa.md](api/docs/arca-wsaa.md) y [api/docs/arca-wsfe-readonly.md](api/docs/arca-wsfe-readonly.md). La guía de GOcuotas está en [api/docs/gocuotas.md](api/docs/gocuotas.md); la documentación de logística y configuración está en [api/README.md](api/README.md).
 
 ## Seguridad y preparación comercial
 
