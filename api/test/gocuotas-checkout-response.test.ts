@@ -43,3 +43,16 @@ test('maneja respuestas no JSON y cuerpos vacíos', async () => {
   const empty = await readGoCuotasCheckoutResponse(new Response(null, { status: 204 }))
   assert.match(empty.diagnostic, /body=empty/)
 })
+
+
+test('acepta la respuesta documentada de GOcuotas con url_init sin id', async () => {
+  const response = new Response(JSON.stringify({ url_init: 'https://sandbox.gocuotas.com/checkout/test-token' }), {
+    status: 201,
+    headers: { 'content-type': 'application/json' },
+  })
+  const result = await readGoCuotasCheckoutResponse(response)
+
+  assert.deepEqual(result.payload, { url_init: 'https://sandbox.gocuotas.com/checkout/test-token' })
+  assert.match(result.diagnostic, /id=missing/)
+  assert.match(result.diagnostic, /url_init=string/)
+})
