@@ -8,6 +8,7 @@ import { hasValidOrderAccessToken } from '../services/order-access-token'
 import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payment-validation'
 import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
 import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '../services/gocuotas-attempt-policy'
+import { buildGoCuotasUrl } from '../services/gocuotas-url'
 
 export const goCuotasRouter = Router()
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false })
@@ -18,15 +19,9 @@ function configured() {
   return Boolean(env.GOCUOTAS_API_BASE_URL && env.GOCUOTAS_EMAIL && env.GOCUOTAS_API_KEY && env.PUBLIC_APP_URL && env.PUBLIC_API_URL)
 }
 
-function goCuotasUrl(path: string) {
-  const base = env.GOCUOTAS_API_BASE_URL
-  if (!base) throw new Error('GOcuotas Sandbox no está configurado.')
-  return new URL(path.replace(/^\/+/, ''), base.replace(/\/+$/, '') + '/')
-}
-
 async function authenticate() {
   if (!configured()) throw new Error('GOcuotas Sandbox no está configurado.')
-  const response = await fetch(goCuotasUrl('authentication'), {
+  const response = await fetch(buildGoCuotasUrl('authentication', env.GOCUOTAS_API_BASE_URL!), {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json' },
     body: JSON.stringify({ email: env.GOCUOTAS_EMAIL, password: env.GOCUOTAS_API_KEY }),
@@ -38,7 +33,7 @@ async function authenticate() {
 }
 
 async function getGoOrder(id: string, token: string) {
-  const response = await fetch(goCuotasUrl('orders/' + encodeURIComponent(id)), {
+  const response = await fetch(buildGoCuotasUrl('orders/' + encodeURIComponent(id), env.GOCUOTAS_API_BASE_URL!), {
     headers: { accept: 'application/json', authorization: 'Bearer ' + token },
     signal: AbortSignal.timeout(15000),
   })
@@ -141,7 +136,7 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     const appUrl = env.PUBLIC_APP_URL!.replace(/\/+$/, '')
     const apiUrl = env.PUBLIC_API_URL!.replace(/\/+$/, '')
     checkoutRequestStarted = true
-    const response = await fetch(goCuotasUrl('checkouts'), {
+    const response = await fetch(buildGoCuotasUrl('checkouts', env.GOCUOTAS_API_BASE_URL!), {
       method: 'POST',
       headers: { accept: 'application/json', 'content-type': 'application/json', authorization: 'Bearer ' + token },
       body: JSON.stringify({
