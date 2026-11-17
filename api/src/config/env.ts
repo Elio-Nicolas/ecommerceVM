@@ -46,5 +46,6 @@ const envSchema = z.object({
   LOCAL_DELIVERY_POSTAL_CODES: z.string().default('5730'),
   LOCAL_DELIVERY_FEE_ARS: z.coerce.number().int().min(0).max(2_000_000_000).default(0),
   LOCAL_DELIVERY_INTERNAL_COST_ARS: z.coerce.number().int().min(0).max(2_000_000_000).optional(),
+  LOCAL_DELIVERY_COORDINATE: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
 })
 export const env = envSchema.parse(process.env)
