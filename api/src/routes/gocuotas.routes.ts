@@ -153,20 +153,20 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     })
     const checkoutResponse = await readGoCuotasCheckoutResponse(response)
     const payload = checkoutResponse.payload
-    if (!response.ok || !payload?.id || !isValidPaymentCheckoutUrl(payload.url_init)) {
+    if (!response.ok || !isValidPaymentCheckoutUrl(payload?.url_init)) {
       throw new Error('Respuesta de checkout no reconocida: ' + checkoutResponse.diagnostic)
     }
     const attempt = await prisma.$transaction(async tx => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', prepared.order.id)
       const current = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
       if (!current) throw new Error('El intento de pago dejó de existir.')
-      if (current.providerOrderId && current.providerOrderId !== String(payload.id)) {
+      if (payload.id !== undefined && current.providerOrderId && current.providerOrderId !== String(payload.id)) {
         throw new Error('GOcuotas devolvió un identificador distinto al asociado al intento.')
       }
       return tx.paymentAttempt.update({
         where: { id: current.id },
         data: {
-          providerOrderId: current.providerOrderId || String(payload.id),
+          providerOrderId: current.providerOrderId || (payload.id !== undefined ? String(payload.id) : null),
           checkoutUrl: payload.url_init,
           // A webhook may have approved the order while the checkout response was in flight.
           status: current.status === 'APPROVED' ? 'APPROVED' : 'PENDING',
