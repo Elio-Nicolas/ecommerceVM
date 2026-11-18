@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { formatPrice, type Product } from './products'
 import { fetchCategories, fetchProducts } from './catalog-api'
 import CheckoutPage from './CheckoutPage'
+import PaymentReturnPage from './PaymentReturnPage'
 import RegretPage from './RegretPage'
 
 type CartLine = { product: Product; quantity: number }
@@ -153,6 +154,13 @@ export default function App() {
         ? { ...line, quantity: Math.max(0, Math.min(line.quantity + delta, line.product.stock)) }
         : line)
       .filter((line) => line.quantity > 0))
+  }
+
+  const paymentParams = new URLSearchParams(window.location.search)
+  const paymentOutcome = paymentParams.get('payment')
+  const paymentOrderId = paymentParams.get('order')
+  if (paymentOrderId && /^[0-9a-f-]{36}$/i.test(paymentOrderId) && ['success', 'failure', 'pending'].includes(paymentOutcome || '')) {
+    return <PaymentReturnPage orderId={paymentOrderId} outcome={paymentOutcome as 'success' | 'failure' | 'pending'} provider="mercadopago" />
   }
 
   if (window.location.pathname.replace(/\/$/, '') === '/arrepentimiento') return <RegretPage />
