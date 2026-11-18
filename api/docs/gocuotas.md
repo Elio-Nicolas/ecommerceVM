@@ -2,9 +2,9 @@
 
 ## Estado
 
-La integración está implementada en la API y preparada para configurar primero Sandbox. La creación del checkout acepta la respuesta documentada `url_init` sin exigir un identificador no documentado. El checkout crea una orden de GOcuotas, persiste el intento y devuelve la URL de pago. La confirmación no depende del retorno del navegador: el webhook consulta la orden directamente en GOcuotas y contrasta la referencia y el importe antes de actualizar el intento y confirmar el pedido.
+La integración está implementada en la API y configurada para Producción. La creación del checkout acepta la respuesta documentada `url_init` sin exigir un identificador no documentado. El checkout crea una orden de GOcuotas, persiste el intento y devuelve la URL de pago. La confirmación no depende del retorno del navegador: el webhook consulta la orden directamente en GOcuotas y contrasta la referencia y el importe antes de actualizar el intento y confirmar el pedido.
 
-**Estado al 17-11-2026: Sandbox configurado y autenticación alcanzada; checkout todavía no validado de punta a punta.** Las cinco variables requeridas están cargadas en Render y `GET /config` devuelve `enabled: true`. En una prueba real, la API completó la autenticación y recibió HTTP 201 al enviar `POST /checkouts`, pero la aplicación exigía `id` además de `url_init`. La documentación oficial de API Redirect V1 muestra que la respuesta exitosa contiene `url_init`; no documenta `id` en la creación del checkout. Por eso el intento se conserva como `UNKNOWN`: no se puede afirmar todavía que el checkout sea utilizable ni debe repetirse el POST para ese pedido.
+**Estado al 18-11-2026: Producción configurada y checkout/pago real completado.** El comprador recibió confirmación por email de GOcuotas para una compra de $1.680 en Tu TiendaVM (3 cuotas sin interés). Sin embargo, el intento correspondiente permanece `PENDING` en ecommerceVM; la conciliación del webhook sigue en revisión. No repetir el cobro.
 
 ## Datos necesarios de GOcuotas
 
@@ -83,6 +83,6 @@ No repetir el POST para un intento `UNKNOWN`: el proveedor podría haber creado 
 - El endpoint `/config` solo comprueba presencia de variables, no validez de credenciales.
 - La autenticación Sandbox sí fue alcanzada en la prueba del 17-11-2026, ya que la aplicación avanzó hasta `POST /checkouts` y recibió HTTP 201.
 - No se pudo validar la estructura del checkout ni confirmar que exista una URL de pago utilizable; el intento quedó `UNKNOWN` y requiere conciliación con GOcuotas.
-- La API de GOcuotas y el contrato comercial deben confirmar los estados exactos de rechazo/cancelación y el comportamiento de reintentos del webhook durante la prueba de aceptación.
+- El webhook interpreta `status=approved` como aprobación y `status=denied` como rechazo, además de los campos temporales `delivered_at` y `discarded_at`. En todos los casos exige coincidencia exacta de referencia e importe. El comportamiento de reintentos del webhook debe seguir verificándose con GOcuotas.
 - No se debe habilitar cobro real ni cambiar a credenciales productivas hasta completar Sandbox y autorizar explícitamente el paso a producción.
 - No hay migración de base de datos requerida por esta integración en este cambio.
