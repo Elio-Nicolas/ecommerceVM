@@ -5,16 +5,17 @@ import { verifyMercadoPagoWebhookSignature } from '../src/services/payment-webho
 
 const secret = 'test-webhook-secret'
 const requestId = 'request-123'
-const dataId = 'order-456'
+const dataId = 'ORD01M7R8G0W0Q825RSHBDTDXZ742'
 const now = 1_800_000_000_000
 
 function signed(timestamp: string, id = dataId, request = requestId) {
-  const manifest = 'id:' + id + ';request-id:' + request + ';ts:' + timestamp + ';'
+  // Mercado Pago's signature manifest requires order IDs in lowercase.
+  const manifest = 'id:' + id.toLowerCase() + ';request-id:' + request + ';ts:' + timestamp + ';'
   const hash = createHmac('sha256', secret).update(manifest).digest('hex')
   return 'ts=' + timestamp + ',v1=' + hash
 }
 
-test('acepta una firma válida con timestamp en milisegundos', () => {
+test('acepta una firma válida para un ID de orden de Mercado Pago en mayúsculas', () => {
   assert.equal(verifyMercadoPagoWebhookSignature(signed(String(now)), requestId, dataId, secret, now), true)
 })
 
