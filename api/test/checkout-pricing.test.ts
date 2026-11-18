@@ -17,15 +17,17 @@ test('efectivo mantiene el precio publicado y no agrega recargo', () => {
   })
 })
 
-test('GOcuotas aplica 9,9% más IVA sobre productos y envío', () => {
+test('GOcuotas gross-up 11,979% de comisión sobre el total para conservar neto el precio base', () => {
   const result = calculateCheckoutPrice({
     paymentMethod: 'GOCUOTAS',
     subtotalArs: 100000,
     shippingArs: 0,
   })
-  assert.equal(result.surchargeRateMilliPercent, 11979)
-  assert.equal(result.surchargeArs, 11979)
-  assert.equal(result.totalArs, 111979)
+  assert.equal(result.surchargeRateMilliPercent, 13609)
+  assert.equal(result.surchargeArs, 13609)
+  assert.equal(result.totalArs, 113609)
+  // La comisión estimada sobre el total queda cubierta por el recargo (redondeo al peso).
+  assert.equal(Math.round(result.totalArs * 11979 / 100000), result.surchargeArs)
 })
 
 test('Mercado Pago a 10 días cubre comisión del 4,39% más IVA estimado', () => {
