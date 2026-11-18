@@ -378,7 +378,7 @@ paymentsRouter.get('/orders/:orderId/status', statusLimiter, async (req, res) =>
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  const order = await prisma.order.findUnique({
+  let order = await prisma.order.findUnique({
     where: { id: orderId.data },
     select: {
       customerAccessTokenHash: true,
@@ -386,7 +386,7 @@ paymentsRouter.get('/orders/:orderId/status', statusLimiter, async (req, res) =>
       paymentAttempts: {
         orderBy: { createdAt: 'desc' },
         take: 1,
-        select: { status: true },
+        select: { id: true, provider: true, providerOrderId: true, status: true, updatedAt: true },
       },
     },
   })
@@ -394,10 +394,40 @@ paymentsRouter.get('/orders/:orderId/status', statusLimiter, async (req, res) =>
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
+
+  // El webhook es el mecanismo principal. Si todavía no llegó, el retorno del comprador
+  // consulta la orden real en Mercado Pago y aplica la misma transición idempotente.
+  const attempt = order.paymentAttempts[0]
+  const shouldRefreshProvider = attempt?.provider === 'MERCADO_PAGO'
+    && Boolean(attempt.providerOrderId)
+    && ['CREATING', 'PENDING', 'UNKNOWN'].includes(attempt.status)
+    && Date.now() - attempt.updatedAt.getTime() >= 5_000
+  if (shouldRefreshProvider && attempt?.providerOrderId) {
+    try {
+      const providerOrder = await refreshMercadoPagoOrder(attempt.providerOrderId)
+      await applyMercadoPagoStatus(attempt.providerOrderId, providerOrder)
+      order = await prisma.order.findUnique({
+        where: { id: orderId.data },
+        select: {
+          customerAccessTokenHash: true,
+          status: true,
+          paymentAttempts: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { status: true },
+          },
+        },
+      })
+    } catch (error) {
+      // No se pierde el retorno: se muestra el último estado persistido y el polling reintentará.
+      console.warn('No se pudo actualizar el estado del pago al retornar el comprador:', error)
+    }
+  }
+
   res.json({
     data: {
-      orderStatus: order.status,
-      paymentStatus: order.paymentAttempts[0]?.status ?? null,
+      orderStatus: order?.status ?? 'PENDING',
+      paymentStatus: order?.paymentAttempts[0]?.status ?? null,
     },
   })
 })
