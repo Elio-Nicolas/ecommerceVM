@@ -19,7 +19,9 @@ export function verifyMercadoPagoWebhookSignature(
   if (!Number.isFinite(rawTimestamp) || rawTimestamp <= 0) return false
   const timestampMs = rawTimestamp > 1_000_000_000_000 ? rawTimestamp : rawTimestamp * 1000
   if (Math.abs(nowMs - timestampMs) > 5 * 60 * 1000) return false
-  const manifest = 'id:' + dataId + ';request-id:' + requestId + ';ts:' + timestamp + ';'
+
+  // Mercado Pago sends order IDs in uppercase, but requires lowercase in the signature manifest.
+  const manifest = 'id:' + dataId.toLowerCase() + ';request-id:' + requestId + ';ts:' + timestamp + ';'
   const expectedHash = createHmac('sha256', secret).update(manifest).digest()
   const suppliedHash = Buffer.from(receivedHash, 'hex')
   return suppliedHash.length === expectedHash.length && timingSafeEqual(suppliedHash, expectedHash)
