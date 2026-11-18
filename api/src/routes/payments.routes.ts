@@ -414,7 +414,7 @@ paymentsRouter.get('/orders/:orderId/status', statusLimiter, async (req, res) =>
           paymentAttempts: {
             orderBy: { createdAt: 'desc' },
             take: 1,
-            select: { status: true },
+            select: { id: true, provider: true, providerOrderId: true, status: true, updatedAt: true },
           },
         },
       })
