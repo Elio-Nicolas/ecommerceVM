@@ -10,7 +10,8 @@ export type CheckoutPrice = {
 }
 
 const MAX_ORDER_AMOUNT_ARS = 2_000_000_000
-const GOCUOTAS_SURCHARGE_MILLI_PERCENT = 11979
+// Gross-up: 11.979% fee over the final charge => 13.609% surcharge over the base.
+const GOCUOTAS_SURCHARGE_MILLI_PERCENT = 13609
 
 function assertValidAmount(value: number, label: string) {
   if (!Number.isSafeInteger(value) || value < 0 || value > MAX_ORDER_AMOUNT_ARS) {
