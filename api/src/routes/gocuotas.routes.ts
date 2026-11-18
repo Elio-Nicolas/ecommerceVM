@@ -199,7 +199,12 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
 
 goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
   const id = z.union([z.string(), z.number()]).safeParse(req.body?.id ?? req.body?.order_id)
-  if (!id.success) { res.status(400).send('Notificación inválida'); return }
+  if (!id.success) {
+    console.warn('[GOcuotas webhook] Notificación sin identificador reconocido.')
+    res.status(400).send('Notificación inválida')
+    return
+  }
+  console.info('[GOcuotas webhook] Notificación recibida.')
   try {
     const token = await authenticate()
     const payload = await getGoOrder(String(id.data), token)
@@ -233,9 +238,13 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
     const matches = payload.order_reference_id === attempt.order.code
       && parsePaymentAmount(payload.amount_in_cents) === attempt.amountArs * 100
       && paymentAmountsMatchCurrentOrder(attempt.amountArs, attempt.amountArs, attempt.order.totalArs)
+    // GOcuotas may report the final result through status without setting
+    // delivered_at/discarded_at. Accept only the documented terminal values,
+    // and keep the exact reference + amount checks above as mandatory guards.
+    const providerStatus = String(payload.status || '').trim().toLowerCase()
     let next: PaymentAttemptStatus = 'UNKNOWN'
-    if (matches && payload.delivered_at) next = 'APPROVED'
-    else if (matches && payload.discarded_at) next = 'REJECTED'
+    if (matches && (payload.delivered_at || providerStatus === 'approved')) next = 'APPROVED'
+    else if (matches && (payload.discarded_at || providerStatus === 'denied')) next = 'REJECTED'
     else if (matches) next = 'PENDING'
     await prisma.$transaction(async tx => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', attempt.orderId)
