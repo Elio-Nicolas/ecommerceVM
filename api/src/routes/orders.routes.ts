@@ -10,7 +10,6 @@ import { createCheckoutFingerprint } from '../services/order-checkout-fingerprin
 import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
 import { env } from '../config/env'
 import { deriveOrderAccessToken, hashOrderAccessToken, hasValidOrderAccessToken } from '../services/order-access-token'
-import { sendOrderReceiptEmail } from '../services/order-email'
 
 export const ordersRouter = Router()
 
@@ -277,26 +276,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         include: { items: true },
       })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
-    if (order.customerEmail) {
-      await sendOrderReceiptEmail({
-        id: order.id,
-        code: order.code,
-        customerName: order.customerName,
-        customerEmail: order.customerEmail,
-        addressLine: order.addressLine,
-        city: order.city,
-        province: order.province,
-        postalCode: order.postalCode,
-        paymentMethod: order.paymentMethod,
-        status: order.status,
-        subtotalArs: order.subtotalArs,
-        shippingCostArs: order.shippingCostArs,
-        totalArs: order.totalArs,
-        paymentSurchargeArs: order.paymentSurchargeArs,
-        shippingCarrier: order.shippingCarrier,
-        items: order.items,
-      });
-    }
+    // La creación del pedido no acredita el pago: el correo se envía al confirmar el cobro.
     res.setHeader('Cache-Control', 'no-store')
     res.status(201).json({
       data: {
