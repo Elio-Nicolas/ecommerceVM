@@ -276,13 +276,14 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
     const current = await tx.order.findUnique({ where: { id: existing.id }, select: { status: true, paymentMethod: true, paymentReceivedAt: true } })
     if (!current || current.status === 'CANCELLED' || current.paymentMethod !== 'CASH') return null
     if (current.paymentReceivedAt) return current.paymentReceivedAt
-    await tx.order.update({ where: { id: existing.id }, data: { paymentReceivedAt: receivedAt } })
+    const nextStatus = current.status === 'PENDING' ? 'CONFIRMED' : current.status
+    await tx.order.update({ where: { id: existing.id }, data: { paymentReceivedAt: receivedAt, status: nextStatus } })
     await tx.orderStatusHistory.create({
       data: {
         orderId: existing.id,
         fromStatus: current.status,
-        toStatus: current.status,
-        note: input.data.note || 'Cobro en efectivo/a coordinar registrado manualmente por administración.',
+        toStatus: nextStatus,
+        note: input.data.note || 'Cobro en efectivo/a coordinar verificado y registrado manualmente por administración.',
         changedByAdminId: req.admin?.id || null,
       },
     })
