@@ -11,6 +11,8 @@ Este documento separa lo que existe en el código de lo que todavía requiere da
 - Pantalla: `src/ShippingSettingsPanel.tsx`.
 - API: `GET/PUT /api/v1/admin/shipping-settings`.
 - Las credenciales de e-Pak (usuario, contraseña, CUIT y operativa) se guardan cifradas en `ShippingSettings`.
+- Se agregaron campos cifrados para número de cuenta (`nrocuenta`), centro de costo y `idcentroimposicionorigen`, necesarios para construir la admisión.
+- La API expone únicamente `ocaAdmissionConfigured`; nunca devuelve los valores descifrados. Los tres datos de admisión se guardan juntos y se validan con los formatos publicados por OCA.
 - La API no devuelve los secretos al frontend; solo expone `ocaConfigured` y `ocaEnvironment`.
 - La clave recomendada para cifrado es `SHIPPING_ENCRYPTION_KEY` (mínimo 32 caracteres). No guardar credenciales ni claves en Git, issues o chats.
 - El selector permite QA y producción. No seleccionar producción hasta completar QA y confirmar expresamente la habilitación comercial.
@@ -40,7 +42,7 @@ El esquema Prisma ya contiene:
 - `ShippingShipmentEvent`: eventos externos, payload, estado de procesamiento, reintentos y errores.
 - `Order` conserva costo, carrier, tracking, servicio, cotización y snapshot de opciones.
 
-**Importante:** que existan estos modelos no significa que ya exista el circuito OCA. En `main` todavía no hay servicio ni endpoints administrativos para crear/admitir el envío, recuperar etiquetas o sincronizar eventos OCA.
+**Importante:** que existan estos modelos no significa que ya exista el circuito OCA. Hay un generador aislado y validado del XML de admisión (`api/src/services/oca-admission-xml.ts`), pero todavía no existe el servicio de negocio ni los endpoints administrativos para admitir el envío, recuperar etiquetas o sincronizar eventos OCA.
 
 ### Controles de pedidos
 - El administrador puede guardar datos de envío y costo desde la gestión de pedidos.
@@ -62,6 +64,8 @@ Los métodos documentados por OCA usan respuestas XML y permiten consultar el WS
 
 El servicio implementado construye la URL del método y realiza GET. Falta validar los valores y el XML devuelto con credenciales/datos de la cuenta comercial real.
 
+El parser de cotización ahora contempla importes con separadores decimales argentinos e internacionales, XML con namespaces y respuestas ASMX con XML interno escapado. El plazo solo se convierte a horas cuando OCA informa explícitamente `HorasEntrega` o `DiasEntrega`; no se deduce la unidad de un campo genérico. Hay pruebas unitarias con fixtures sintéticos. Esto endurece el procesamiento, pero no sustituye la validación con la respuesta real de la cuenta.
+
 ### Crear envío: `IngresoORMultiplesRetiros_v2`
 OCA documenta:
 - QA: `https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/IngresoORMultiplesRetiros_v2`
@@ -69,10 +73,25 @@ OCA documenta:
 - Parámetros: `usr`, `psw`, `XML_Datos`, `ConfirmarRetiro`, `ArchivoCliente` y `ArchivoProceso` (estos dos últimos son de uso interno y no se completan).
 - `ConfirmarRetiro=false` deja la orden en el carrito e-Pak pendiente de confirmación; `true` confirma de inmediato.
 
-Antes de implementar la admisión hay que obtener y validar con OCA el XML completo para la modalidad contratada, los datos de origen/destino, contacto, centro de costo, franja horaria, paquetes y modalidad de retiro/entrega. No generar XML de producción por inferencia.
+Antes de implementar la admisión hay que obtener y validar con OCA el XML completo para la modalidad contratada, los datos de origen/destino, contacto, centro de costo, paquetes y modalidad de entrega. La franja horaria aplica a retiro a domicilio, no a admisión en sucursal. No generar XML de producción por inferencia.
+
+Se agregó `buildOcaAdmissionXml()` como serializador puro del contrato publicado: arma la estructura `ROWS/origenes/origen/envios/envio`, requiere la sucursal de admisión de origen, permite `idci` solo cuando el destinatario retira en sucursal y representa un único paquete consolidado por pedido (`cant=1`). Para una operativa sin seguro envía `valor=0`; solo incluye valor declarado cuando el seguro esté habilitado. Valida límites de campos, fecha, códigos postales, dimensiones y caracteres que OCA advierte que pueden fallar. La franja `idfranjahoraria` es opcional para admisión en sucursal y solo se serializa cuando se informa; OCA la exige para órdenes de retiro a domicilio. Todavía no llama al Web Service ni persiste admisiones: faltan número de cuenta, operativa, centro de costo, sucursal y datos de QA asignados a la cuenta.
+
+### Cliente de admisión implementado
+
+Se agregó `api/src/services/oca-admission.ts`:
+- Usa el endpoint `IngresoORMultiplesRetiros_v2` del ambiente configurado y envía credenciales/XML por HTTP POST form-urlencoded (no en la URL).
+- La confirmación inmediata queda desactivada por defecto. Solo se activa si el llamador la solicita explícitamente; `false` deja el envío en el carrito e-Pak para confirmación manual.
+- Interpreta `OrdenRetiro`, `NumeroEnvio`, `Remito`, `Estado` y el resumen de ingresados/rechazados.
+- Distingue rechazos de respuestas incompletas o timeouts. Una respuesta incierta no debe reintentarse automáticamente: primero hay que consultar e-Pak para evitar duplicar una admisión.
+- Tiene pruebas con respuestas sintéticas de aceptación, rechazo, XML escapado, SOAP Fault y resultado incierto.
+
+Este cliente todavía no se invoca desde una ruta administrativa ni persiste por sí mismo. La siguiente etapa es conectar la admisión con el pedido, completar los datos de cuenta/origen que hoy no existen en la configuración y aplicar bloqueo/idempotencia antes de hacer una llamada real.
 
 ### Etiquetas
-OCA documenta métodos de etiquetas HTML y PDF, además de ZPL para impresoras compatibles. Entre los métodos publicados:
+OCA documenta métodos de etiquetas HTML y PDF, además de ZPL para impresoras compatibles.
+
+Se agregó `api/src/services/oca-label.ts`: consulta `GetPdfDeEtiquetasPorOrdenOrNumeroEnvio` por HTTP GET en el ambiente configurado, decodifica la respuesta XML/Base64, valida firma `%PDF-` y limita el archivo a 15 MB. No inventa un PDF ni acepta respuestas de error como etiqueta. El endpoint protegido `GET /api/v1/admin/shipping-labels/orders/:orderId/oca` recupera la etiqueta para una admisión OCA ya persistida, la guarda en `ShippingShipment.labelPdf` y responde `application/pdf` para abrir/imprimir. Si ya está guardada, reutiliza la copia local y no vuelve a llamar a OCA. Requiere `externalAdmissionId`; todavía no crea la admisión ni asigna ese identificador. Entre los métodos publicados:
 - `GetPdfDeEtiquetasPorOrdenOrNumeroEnvio`
 - `GetPdfDeEtiquetasPorOrdenOrNumeroEnvioParaEtiquetadora`
 - `GetHtmlDeEtiquetasPorOrdenOrNumeroEnvio`
@@ -89,11 +108,12 @@ No solicitar ni almacenar estos datos en Git:
 1. CUIT habilitado y número de cuenta comercial.
 2. Usuario y contraseña e-Pak.
 3. Operativa asignada para el servicio elegido (puerta a puerta, puerta a sucursal u otra modalidad habilitada).
-4. Centro de costo / dirección de devolución.
-5. Modalidad de despacho desde Villa Mercedes: ingreso en sucursal o retiro por OCA.
-6. Si hay retiro: sucursal/origen, franja horaria, días y condiciones.
-7. Formato de etiqueta requerido (PDF A4 o 10×15 cm) y confirmación de impresión.
-8. Credenciales y endpoint de QA habilitados para la cuenta.
+4. Número de cuenta e-Pak habilitado (formato `NNNNNN/NNN`), centro de costo retornado por `GetCentroCostoPorOperativa` e ID de sucursal de admisión retornado por `GetCentrosImposicionConServiciosByCP` para CP 5730, con servicio de admisión habilitado.
+5. Centro de costo / dirección de devolución.
+6. Modalidad de despacho desde Villa Mercedes: ingreso en sucursal o retiro por OCA.
+7. Si hay retiro: sucursal/origen, franja horaria, días y condiciones.
+8. Formato de etiqueta requerido (PDF A4 o 10×15 cm) y confirmación de impresión.
+9. Credenciales y endpoint de QA habilitados para la cuenta.
 
 No usar los usuarios/credenciales de ejemplo publicados por OCA como credenciales comerciales ni como sustituto de la cuenta del vendedor.
 
@@ -131,3 +151,50 @@ No usar los usuarios/credenciales de ejemplo publicados por OCA como credenciale
 - `api/src/routes/admin-orders.routes.ts`: protección del cambio a enviado.
 
 Este documento debe actualizarse en el mismo PR que cada avance de OCA.
+
+## Consultas de metadatos en Administración
+
+- `GET /api/v1/admin/shipping-settings/oca/admission-branches?postalCode=5730` consulta sucursales por CP y devuelve exclusivamente las que tienen el servicio OCA `IdTipoServicio=1` (Admisión de paquetes). El identificador se toma de `IdCentroImposicion`; nombre, domicilio y ubicación se leen de los nodos del centro.
+- `GET /api/v1/admin/shipping-settings/oca/cost-centers` consulta centros de costo con CUIT y operativa guardados. El identificador se toma de `NroCentroCosto`.
+- Los dos endpoints son administrativos, de sólo lectura y están limitados al entorno QA. Si la configuración está en Producción, responden con error controlado y no llaman al endpoint productivo.
+- Las consultas no crean órdenes, no generan etiquetas y no confirman admisiones.
+- El panel permite seleccionar el centro de costo y la sucursal devueltos por OCA; ambos valores se guardan cifrados junto con el resto de la configuración.
+
+La estructura del XML de sucursales se contrastó con una respuesta SOAP documentada que contiene `CentrosDeImposicion/Centro/Servicios/Servicio`. La elegibilidad de origen se filtra por `IdTipoServicio=1`, correspondiente a Admisión de paquetes. El XML de centros de costo se procesa como `NewDataSet/Table`, tomando `NroCentroCosto`.
+
+
+## Admisión administrativa en QA
+
+La API administrativa expone `POST /api/v1/admin/orders/:id/oca-admission` (requiere sesión de administrador). La operación está limitada a pedidos OCA en estado `PREPARING`, con cobro confirmado, y a credenciales OCA configuradas en ambiente `QA`.
+
+El cuerpo requiere los datos estructurados del destinatario y las dimensiones/peso del único bulto consolidado:
+
+```json
+{
+  "recipient": {
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "street": "Calle destino",
+    "number": "123",
+    "postalCode": "5730",
+    "locality": "Villa Mercedes",
+    "province": "San Luis",
+    "phone": "2657...",
+    "email": "cliente@example.com"
+  },
+  "parcel": {
+    "heightCm": 10,
+    "widthCm": 20,
+    "lengthCm": 30,
+    "weightKg": 1.2
+  }
+}
+```
+
+Localidad, provincia y CP del destinatario deben coincidir con el pedido. Calle y altura se solicitan estructuradas para no adivinar cómo separar el domicilio guardado en `addressLine`. Las medidas son ingresadas por administración: no se suman dimensiones de productos ni se presume una geometría de embalaje.
+
+El origen se obtiene exclusivamente de la sucursal OCA de admisión configurada y consultada por CP 5730. La ruta exige calle, altura, localidad, provincia y CP de esa sucursal; nunca usa `pickupAddress`, `ShippingOrigins` ni el domicilio particular del vendedor.
+
+Antes de llamar a OCA se reserva un único `ShippingShipment` por pedido/proveedor bajo bloqueo transaccional. Los intentos existentes no se repiten automáticamente. Un timeout o respuesta no concluyente queda en `ADMISSION_UNKNOWN` y requiere conciliación manual en e-Pak. La llamada usa `ConfirmarRetiro=false`: registra la orden en el carrito e-Pak, sin confirmarla ni despacharla. Un resultado aceptado queda en `ADMITTED`; no habilita por sí solo marcar el pedido como `SHIPPED`, que continúa condicionado al procesamiento y tracking.
+
+Esta ruta es backend-only por ahora; todavía no hay formulario de admisión en el panel administrativo. No ejecutar contra producción hasta validar datos comerciales y credenciales con OCA.

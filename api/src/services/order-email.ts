@@ -51,7 +51,9 @@ export async function sendPaidOrderConfirmationEmail(orderId: string) {
     <td style="padding:12px 8px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap">${money(item.lineTotalArs)}</td></tr>`).join('')
   const shipping = order.shippingCostArs === null ? 'A coordinar' : money(order.shippingCostArs)
   const total = order.totalArs === null ? 'A confirmar' : money(order.totalArs)
-  const address = [order.addressLine, order.city, order.province, order.postalCode].filter(Boolean).join(', ')
+  const deliveryDescription = order.deliveryMethod === 'PICKUP'
+    ? 'Retiro coordinado. Nos comunicaremos después de confirmar la compra para acordar el horario y facilitar la dirección.'
+    : [order.addressLine, order.city, order.province, order.postalCode].filter(Boolean).join(', ')
   const subject = 'Pago confirmado · Pedido ' + order.code + ' · Tu TiendaVM'
   const html = `
   <div style="margin:0;background:#f8fafc;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;color:#0f172a"><div style="max-width:620px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden">
@@ -64,7 +66,7 @@ export async function sendPaidOrderConfirmationEmail(orderId: string) {
   <tr><td style="padding:10px 8px;color:#475569">Recargo por medio de pago</td><td style="padding:10px 8px;text-align:right">${money(order.paymentSurchargeArs)}</td></tr>
   <tr><td style="padding:14px 8px;font-weight:bold;border-top:1px solid #cbd5e1">Total</td><td style="padding:14px 8px;text-align:right;font-weight:bold;border-top:1px solid #cbd5e1">${total}</td></tr></table>
   <h2 style="font-size:17px;margin:26px 0 8px">Estado del pago</h2><p style="margin:0;color:#475569;line-height:1.6">Pago acreditado${isManuallyReceived ? ' y registrado por la tienda' : ' por ' + (order.paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago')}.</p>
-  <h2 style="font-size:17px;margin:26px 0 8px">Entrega</h2><p style="margin:0;color:#475569;line-height:1.6">${escapeHtml(address)}</p>
+  <h2 style="font-size:17px;margin:26px 0 8px">Entrega</h2><p style="margin:0;color:#475569;line-height:1.6">${escapeHtml(deliveryDescription)}</p>
   <div style="margin:28px 0;text-align:center"><a href="${regretUrl}" style="display:inline-block;background:#0a2540;color:#fff;text-decoration:none;font-weight:bold;padding:14px 22px;border-radius:9px">Botón de arrepentimiento</a></div>
   <p style="font-size:12px;line-height:1.6;color:#64748b">Para enviar una solicitud, ingresá el código de pedido de este correo y el mismo email con el que realizaste la compra. La solicitud será revisada por la tienda; este formulario no ejecuta un reembolso automático.</p></div>
   <div style="padding:18px 32px;background:#f8fafc;color:#64748b;font-size:12px">Tu TiendaVM · Villa Mercedes, San Luis</div></div></div>`
@@ -81,7 +83,7 @@ export async function sendPaidOrderConfirmationEmail(orderId: string) {
           ...order.items.map((item) => item.productName + ' x' + item.quantity + ' - ' + money(item.lineTotalArs)),
           'Subtotal: ' + money(order.subtotalArs), 'Envío: ' + shipping,
           'Recargo: ' + money(order.paymentSurchargeArs), 'Total: ' + total,
-          'Estado: Pago acreditado', 'Entrega: ' + address, 'Arrepentimiento: ' + regretUrl,
+          'Estado: Pago acreditado', 'Entrega: ' + deliveryDescription, 'Arrepentimiento: ' + regretUrl,
         ].join('\n'),
       }),
       signal: AbortSignal.timeout(12000),

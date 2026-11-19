@@ -126,7 +126,7 @@ export default function AdminPanel() {
   const visibleProducts = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('es')
     return products.filter((product) =>
-      (statusFilter === 'ALL' || product.status === statusFilter) &&
+      (statusFilter === 'ALL' || (statusFilter === 'OUT_OF_STOCK' ? product.status === 'ACTIVE' && product.stock <= 0 : product.status === statusFilter)) &&
       (!term || `${product.name} ${product.sku} ${product.category.name}`.toLocaleLowerCase('es').includes(term)),
     )
   }, [products, search, statusFilter])
@@ -356,6 +356,7 @@ export default function AdminPanel() {
                 <label>Precio (ARS)<input type="number" min="1" step="1" value={form.priceArs} onChange={(event) => updateField('priceArs', event.target.value)} required /></label>
                 <label>Precio anterior (ARS)<input type="number" min="1" step="1" value={form.compareAtArs} onChange={(event) => updateField('compareAtArs', event.target.value)} /></label>
                 <label>Stock disponible<input type="number" min="0" step="1" value={form.stock} onChange={(event) => updateField('stock', event.target.value)} required /></label>
+                {editing && <div className="admin-full-field"><button type="button" className="admin-quiet-button" onClick={() => updateField('stock', '0')} disabled={form.stock === '0'}>Marcar como sin stock</button><small>Al guardar, el producto seguirá publicado y conservará todos sus datos e imágenes. En la tienda se mostrará como “Sin stock” y no podrá agregarse al carrito. Para reponerlo, ingresá la nueva cantidad disponible.</small></div>}
                 <label>Peso del paquete (gramos)<input type="number" min="1" max="1000000" step="1" value={form.weightGrams} onChange={(event) => updateField('weightGrams', event.target.value)} placeholder="Ej. 850" /></label>
                 <label>Largo del paquete (cm)<input type="number" min="1" max="300" step="1" value={form.packageLengthCm} onChange={(event) => updateField('packageLengthCm', event.target.value)} placeholder="Ej. 25" /></label>
                 <label>Ancho del paquete (cm)<input type="number" min="1" max="300" step="1" value={form.packageWidthCm} onChange={(event) => updateField('packageWidthCm', event.target.value)} placeholder="Ej. 18" /></label>
@@ -377,10 +378,10 @@ export default function AdminPanel() {
             </form>
           ) : null}
           <div className="admin-table-card">
-            <div className="admin-table-toolbar"><label className="admin-search">⌕<input placeholder="Buscar por nombre, SKU o categoría..." value={search} onChange={(event) => setSearch(event.target.value)} /></label><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">Todos los estados</option><option value="ACTIVE">Publicados</option><option value="DRAFT">Borradores</option><option value="ARCHIVED">Archivados</option></select></div>
+            <div className="admin-table-toolbar"><label className="admin-search">⌕<input placeholder="Buscar por nombre, SKU o categoría..." value={search} onChange={(event) => setSearch(event.target.value)} /></label><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">Todos los estados</option><option value="OUT_OF_STOCK">Sin stock</option><option value="ACTIVE">Publicados</option><option value="DRAFT">Borradores</option><option value="ARCHIVED">Archivados</option></select></div>
             {loading ? <div className="admin-table-empty">Cargando productos...</div> : visibleProducts.length === 0 ? <div className="admin-table-empty">No hay productos para mostrar.</div> : (
               <div className="admin-table-scroll"><table className="admin-table"><thead><tr><th>PRODUCTO</th><th>CATEGORÍA</th><th>PRECIO</th><th>STOCK</th><th>ESTADO</th><th>ACCIONES</th></tr></thead><tbody>
-                {visibleProducts.map((product) => <tr key={product.id}><td><div className="admin-product-cell">{product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span className="admin-product-placeholder">IMG</span>}<div><strong>{product.name}</strong><small>{product.sku}</small></div></div></td><td>{product.category.name}</td><td className="admin-price">{formatPrice(product.priceArs)}</td><td>{product.stock}</td><td><span className={`admin-status ${product.status.toLowerCase()}`}>{product.status === 'ACTIVE' ? 'Publicado' : product.status === 'DRAFT' ? 'Borrador' : 'Archivado'}</span></td><td><div className="admin-row-actions"><button onClick={() => openEditProduct(product)}>Editar</button>{product.status !== 'ARCHIVED' && <button className="archive-action" onClick={() => void archiveProduct(product)}>Archivar</button>}</div></td></tr>)}
+                {visibleProducts.map((product) => <tr key={product.id}><td><div className="admin-product-cell">{product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span className="admin-product-placeholder">IMG</span>}<div><strong>{product.name}</strong><small>{product.sku}</small></div></div></td><td>{product.category.name}</td><td className="admin-price">{formatPrice(product.priceArs)}</td><td>{product.stock}</td><td><span className={`admin-status ${product.status.toLowerCase()}`}>{product.status === 'ACTIVE' && product.stock <= 0 ? 'Sin stock' : product.status === 'ACTIVE' ? 'Publicado' : product.status === 'DRAFT' ? 'Borrador' : 'Archivado'}</span></td><td><div className="admin-row-actions"><button onClick={() => openEditProduct(product)}>Editar</button>{product.status !== 'ARCHIVED' && <button className="archive-action" onClick={() => void archiveProduct(product)}>Archivar</button>}</div></td></tr>)}
               </tbody></table></div>
             )}
             <div className="admin-table-footer">Mostrando {visibleProducts.length} de {products.length} productos</div>

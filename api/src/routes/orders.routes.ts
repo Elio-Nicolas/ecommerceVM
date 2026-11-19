@@ -139,7 +139,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         if (!deliverySettings.pickupEnabled) throw new OrderConflictError('El retiro por domicilio no está disponible.')
         shippingCarrier = 'Retiro por domicilio'
         shippingService = 'Retiro coordinado'
-        deliveryInstructions = `${deliverySettings.pickupAddress}. ${deliverySettings.pickupInstructions}`
+        deliveryInstructions = 'La dirección y el horario de retiro se coordinarán después de confirmar la compra.'
       } else if (input.deliveryMethod === 'LOCAL_DELIVERY') {
         if (!deliverySettings.localDeliveryEnabled || !deliverySettings.localDeliveryPostalCodes.includes(input.postalCode)) {
           throw new OrderConflictError('La entrega local no está disponible para ese código postal.')
@@ -249,11 +249,11 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           customerName: input.customerName,
           customerEmail: input.customerEmail,
           customerPhone: input.customerPhone,
-          addressLine: input.deliveryMethod === 'PICKUP' ? deliverySettings.pickupAddress : input.addressLine,
-          city: input.deliveryMethod === 'PICKUP' ? 'Villa Mercedes' : input.city,
-          province: input.deliveryMethod === 'PICKUP' ? 'San Luis' : input.province,
-          provinceCode: input.deliveryMethod === 'PICKUP' ? 'D' : input.provinceCode || null,
-          postalCode: input.deliveryMethod === 'PICKUP' ? '5730' : input.postalCode,
+          addressLine: input.deliveryMethod === 'PICKUP' ? 'Retiro coordinado' : input.addressLine,
+          city: input.deliveryMethod === 'PICKUP' ? 'A coordinar' : input.city,
+          province: input.deliveryMethod === 'PICKUP' ? 'A coordinar' : input.province,
+          provinceCode: input.deliveryMethod === 'PICKUP' ? null : input.provinceCode || null,
+          postalCode: input.deliveryMethod === 'PICKUP' ? '0000' : input.postalCode,
           customerNotes: input.customerNotes,
           subtotalArs,
           shippingCostArs,

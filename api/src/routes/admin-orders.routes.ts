@@ -6,6 +6,11 @@ import { env } from '../config/env'
 import { requireAdmin } from '../middleware/require-admin'
 import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
 import { sendPaidOrderConfirmationEmail } from '../services/order-email'
+import { createOcaAdmission, OcaAdmissionError } from '../services/oca-admission'
+import { buildOcaAdmissionXml, OcaAdmissionXmlError } from '../services/oca-admission-xml'
+import { getOcaAdmissionDate, isCompleteOcaOriginBranch, isOcaOrderPaid, matchesOcaRecipient } from '../services/oca-admission-validation'
+import { getOcaAdmissionBranches } from '../services/oca-metadata'
+import { getStoredOcaCredentials } from '../services/shipping-settings'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -241,6 +246,174 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     return
   }
   res.json({ data: updated, message: 'Datos de envío actualizados.' })
+})
+
+adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  const input = z.object({
+    recipient: z.object({
+      firstName: z.string().trim().min(1).max(30),
+      lastName: z.string().trim().min(1).max(30),
+      street: z.string().trim().min(1).max(30),
+      number: z.string().trim().min(1).max(5),
+      postalCode: z.string().regex(/^[0-9]{4}$/),
+      locality: z.string().trim().min(1).max(30),
+      province: z.string().trim().min(1).max(30),
+      phone: z.string().trim().max(30).optional(),
+      email: z.string().trim().email().max(100).optional(),
+    }),
+    parcel: z.object({
+      heightCm: z.number().positive().max(200),
+      widthCm: z.number().positive().max(200),
+      lengthCm: z.number().positive().max(300),
+      weightKg: z.number().positive().max(50),
+    }),
+  }).safeParse(req.body)
+  if (!orderId.success || !input.success) {
+    res.status(400).json({ error: { code: 'OCA_ADMISSION_INPUT_INVALID', message: 'Revisá los datos del destinatario y las dimensiones del bulto consolidado.' } })
+    return
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId.data },
+    include: { items: true, paymentAttempts: { select: { provider: true, status: true, approvedAt: true } } },
+  })
+  if (!order) {
+    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (order.deliveryMethod !== 'OCA' || order.status !== 'PREPARING') {
+    res.status(409).json({ error: { code: 'OCA_ADMISSION_ORDER_STATE_INVALID', message: 'La admisión OCA requiere un pedido OCA confirmado y en preparación.' } })
+    return
+  }
+  const paid = isOcaOrderPaid(order.paymentReceivedAt, order.paymentAttempts)
+  if (!paid) {
+    res.status(409).json({ error: { code: 'OCA_ADMISSION_PAYMENT_REQUIRED', message: 'No se puede admitir el envío hasta que el cobro esté confirmado.' } })
+    return
+  }
+  if (!matchesOcaRecipient(order, input.data.recipient)) {
+    res.status(409).json({ error: { code: 'OCA_RECIPIENT_ADDRESS_MISMATCH', message: 'Los datos de nombre, teléfono, correo, localidad, provincia y código postal deben coincidir con el pedido.' } })
+    return
+  }
+
+  const credentials = await getStoredOcaCredentials()
+  if (!credentials || credentials.environment !== 'QA' || !credentials.accountNumber || !credentials.costCenter || !credentials.originBranchId) {
+    res.status(503).json({ error: { code: 'OCA_ADMISSION_NOT_CONFIGURED', message: 'Configurá credenciales QA, cuenta, centro de costo y sucursal OCA de admisión antes de continuar.' } })
+    return
+  }
+  const branches = await getOcaAdmissionBranches('5730')
+  const originBranch = branches.find((item) => item.id === credentials.originBranchId) ?? null
+  if (!isCompleteOcaOriginBranch(originBranch, credentials.originBranchId, '5730')) {
+    res.status(409).json({ error: { code: 'OCA_ORIGIN_BRANCH_INCOMPLETE', message: 'OCA no devolvió calle, altura, localidad, provincia y CP completos para la sucursal de admisión configurada. No se usará otro domicilio.' } })
+    return
+  }
+
+  const admissionDate = getOcaAdmissionDate()
+  let xmlData: string
+  try {
+    xmlData = buildOcaAdmissionXml({
+    accountNumber: credentials.accountNumber,
+    operative: credentials.operative,
+    orderReference: order.code,
+      admissionDate,
+    costCenter: credentials.costCenter,
+    originBranchId: originBranch.id,
+    origin: {
+        street: originBranch.street,
+        number: originBranch.number,
+        postalCode: originBranch.postalCode!,
+        locality: originBranch.locality,
+        province: originBranch.province,
+      },
+    recipient: {
+        ...input.data.recipient,
+      },
+    parcel: input.data.parcel,
+    })
+  } catch (error) {
+    if (error instanceof OcaAdmissionXmlError) {
+      res.status(400).json({ error: { code: 'OCA_ADMISSION_XML_INVALID', message: error.message } })
+      return
+    }
+    throw error
+  }
+
+  const shipment = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', order.id)
+    const existing = await tx.shippingShipment.findUnique({
+      where: { orderId_provider: { orderId: order.id, provider: 'OCA' } },
+    })
+    if (existing) return null
+    return tx.shippingShipment.create({
+      data: {
+        orderId: order.id,
+        provider: 'OCA',
+        status: 'ADMISSION_PENDING',
+        parcels: { count: 1, ...input.data.parcel },
+        events: { create: { eventType: 'ADMISSION_REQUESTED', status: 'RECEIVED', payload: { environment: 'QA', originBranchId: originBranch.id } } },
+      },
+    })
+  })
+  if (!shipment) {
+    res.status(409).json({ error: { code: 'OCA_ADMISSION_ALREADY_ATTEMPTED', message: 'Ya existe un registro OCA para este pedido. No se repetirá la admisión automáticamente; verificá el resultado en e-Pak.' } })
+    return
+  }
+
+  try {
+    const result = await createOcaAdmission({ xmlData, confirmImmediately: false, requiredEnvironment: 'QA' })
+    await prisma.$transaction(async (tx) => {
+      await tx.shippingShipment.update({
+        where: { id: shipment.id },
+        data: {
+          status: 'ADMITTED',
+          externalAdmissionId: result.admissionId,
+          trackingNumber: result.trackingNumber,
+          admittedAt: new Date(),
+          lastError: null,
+        },
+      })
+      await tx.shippingShipmentEvent.create({
+        data: {
+          shipmentId: shipment.id,
+          eventType: 'ADMISSION_RESPONSE',
+          status: 'PROCESSED',
+          payload: {
+            acceptedCount: result.acceptedCount,
+            rejectedCount: result.rejectedCount,
+            providerStatus: result.providerStatus,
+            operationCode: result.operationCode,
+          },
+          processedAt: new Date(),
+        },
+      })
+    })
+    res.status(201).json({
+      data: { status: 'ADMITTED', admissionId: result.admissionId, trackingNumber: result.trackingNumber },
+      message: 'OCA registró la admisión en QA. La confirmación final queda pendiente en e-Pak.',
+    })
+  } catch (error) {
+    const uncertain = error instanceof OcaAdmissionError && error.uncertain
+    const message = error instanceof Error ? error.message : 'No se pudo completar la admisión OCA.'
+    await prisma.shippingShipment.update({
+      where: { id: shipment.id },
+      data: { status: uncertain ? 'ADMISSION_UNKNOWN' : 'ADMISSION_FAILED', lastError: message.slice(0, 400) },
+    })
+    await prisma.shippingShipmentEvent.create({
+      data: {
+        shipmentId: shipment.id,
+        eventType: uncertain ? 'ADMISSION_RESULT_UNKNOWN' : 'ADMISSION_REJECTED',
+        status: 'RECEIVED',
+        payload: { message: message.slice(0, 300), uncertain },
+      },
+    }).catch(() => undefined)
+    const statusCode = error instanceof OcaAdmissionError ? error.statusCode : 502
+    res.status(statusCode).json({
+      error: {
+        code: uncertain ? 'OCA_ADMISSION_RESULT_UNKNOWN' : 'OCA_ADMISSION_FAILED',
+        message: uncertain ? 'OCA pudo haber recibido la solicitud. No reintentes: verificá e-Pak antes de cualquier nueva acción.' : message,
+      },
+    })
+  }
 })
 
 adminOrdersRouter.post('/:id/payment-received', async (req, res) => {

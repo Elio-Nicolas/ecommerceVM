@@ -114,6 +114,9 @@ model ShippingSettings {
   ocaPasswordEncrypted String?
   ocaCuitEncrypted String?
   ocaOperativeEncrypted String?
+  ocaAccountNumberEncrypted String?
+  ocaCostCenterEncrypted String?
+  ocaOriginBranchIdEncrypted String?
   andreaniEnvironment String @default("QA")
   andreaniUsernameEncrypted String?
   andreaniPasswordEncrypted String?

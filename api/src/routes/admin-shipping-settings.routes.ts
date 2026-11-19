@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAdmin } from '../middleware/require-admin'
 import { getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
 import { testAndreaniConnection, AndreaniError } from '../services/andreani'
+import { getOcaCostCenters, getOcaAdmissionBranches, OcaMetadataError } from '../services/oca-metadata'
 
 export const adminShippingSettingsRouter = Router()
 adminShippingSettingsRouter.use(requireAdmin)
@@ -11,6 +12,7 @@ function publicSettings(settings: Awaited<ReturnType<typeof getShippingSettings>
   return {
     ocaEnvironment: settings.ocaEnvironment,
     ocaConfigured: Boolean(settings.ocaUsernameEncrypted && settings.ocaPasswordEncrypted && settings.ocaCuitEncrypted && settings.ocaOperativeEncrypted),
+    ocaAdmissionConfigured: Boolean(settings.ocaAccountNumberEncrypted && settings.ocaCostCenterEncrypted && settings.ocaOriginBranchIdEncrypted),
     andreaniEnvironment: settings.andreaniEnvironment,
     andreaniConfigured: Boolean(settings.andreaniUsernameEncrypted && settings.andreaniPasswordEncrypted && settings.andreaniClientCodeEncrypted && settings.andreaniContractEncrypted),
     pickupEnabled: settings.pickupEnabled,
@@ -25,6 +27,27 @@ function publicSettings(settings: Awaited<ReturnType<typeof getShippingSettings>
 }
 
 adminShippingSettingsRouter.get('/', async (_req, res) => res.json({ data: publicSettings(await getShippingSettings()) }))
+
+adminShippingSettingsRouter.get('/oca/admission-branches', async (req, res) => {
+  try {
+    const postalCode = typeof req.query.postalCode === 'string' ? req.query.postalCode : '5730'
+    res.json({ data: await getOcaAdmissionBranches(postalCode) })
+  } catch (error) {
+    res.status(error instanceof OcaMetadataError ? error.statusCode : 502).json({
+      error: { code: 'OCA_METADATA_ERROR', message: error instanceof Error ? error.message : 'No se pudieron consultar las sucursales OCA.' },
+    })
+  }
+})
+
+adminShippingSettingsRouter.get('/oca/cost-centers', async (_req, res) => {
+  try {
+    res.json({ data: await getOcaCostCenters() })
+  } catch (error) {
+    res.status(error instanceof OcaMetadataError ? error.statusCode : 502).json({
+      error: { code: 'OCA_METADATA_ERROR', message: error instanceof Error ? error.message : 'No se pudieron consultar los centros de costo OCA.' },
+    })
+  }
+})
 
 adminShippingSettingsRouter.post('/andreani/test', async (_req, res) => {
   try {
@@ -42,6 +65,9 @@ const schema = z.object({
   ocaPassword: z.string().trim().min(1).max(300).optional(),
   ocaCuit: z.string().trim().regex(/^\d{11}$/, 'El CUIT OCA debe tener 11 dígitos.').optional(),
   ocaOperative: z.string().trim().min(1).max(100).optional(),
+  ocaAccountNumber: z.string().trim().regex(/^\d{1,10}\/\d{1,3}$/).optional(),
+  ocaCostCenter: z.string().trim().regex(/^\d{1,10}$/).optional(),
+  ocaOriginBranchId: z.string().trim().regex(/^\d{1,3}$/).optional(),
   clearOcaCredentials: z.boolean().optional(),
   andreaniEnvironment: z.enum(['QA', 'PRODUCTION']),
   andreaniUsername: z.string().trim().min(1).max(200).optional(),
