@@ -97,7 +97,7 @@ export async function saveShippingSettings(input: {
   clearAndreaniCredentials?: boolean
 }) {
   const current = await getShippingSettings()
-  const ocaValues = [input.ocaUsername?.trim(), input.ocaPassword?.trim(), input.ocaCuit?.replace(/\\D/g, ''), input.ocaOperative?.trim()]
+  const ocaValues = [input.ocaUsername?.trim(), input.ocaPassword?.trim(), input.ocaCuit?.replace(/\D/g, ''), input.ocaOperative?.trim()]
   const ocaHasAny = ocaValues.some(Boolean)
   const ocaHasComplete = ocaValues.every(Boolean)
   const ocaHasStored = Boolean(current.ocaUsernameEncrypted && current.ocaPasswordEncrypted && current.ocaCuitEncrypted && current.ocaOperativeEncrypted)
@@ -105,7 +105,7 @@ export async function saveShippingSettings(input: {
   const admissionHasAny = admissionValues.some(Boolean)
   const admissionHasComplete = admissionValues.every(Boolean)
   if (admissionHasAny && !admissionHasComplete) throw new Error('Para admisión OCA completá número de cuenta, centro de costo e ID de sucursal de origen.')
-  if (admissionHasComplete && (!/^\\d{1,10}\\/\\d{1,3}$/.test(admissionValues[0]!) || !/^\\d{1,10}$/.test(admissionValues[1]!) || !/^\\d{1,3}$/.test(admissionValues[2]!))) throw new Error('Revisá el formato de cuenta, centro de costo e ID de sucursal OCA.')
+  if (admissionHasComplete && (!/^\d{1,10}\/\d{1,3}$/.test(admissionValues[0]!) || !/^\d{1,10}$/.test(admissionValues[1]!) || !/^\d{1,3}$/.test(admissionValues[2]!))) throw new Error('Revisá el formato de cuenta, centro de costo e ID de sucursal OCA.')
   if (ocaHasAny && !ocaHasComplete) throw new Error('Para guardar OCA completá usuario, contraseña, CUIT y operativa.')
   if (input.clearOcaCredentials && ocaHasAny) throw new Error('No podés reemplazar y eliminar las credenciales OCA en la misma operación.')
   if (input.ocaEnvironment === 'PRODUCTION' && !ocaHasStored && !ocaHasComplete) throw new Error('Configurá primero la cuenta OCA antes de seleccionar producción.')
