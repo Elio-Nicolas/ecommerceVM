@@ -167,6 +167,8 @@ model Order {
   deliveryMethod String @default("OCA")
   shippingInternalCostArs Int?
   deliveryInstructions String?
+  paymentReceivedAt DateTime?
+  receiptEmailSentAt DateTime?
   provinceCode String?
   items OrderItem[]
   history OrderStatusHistory[]

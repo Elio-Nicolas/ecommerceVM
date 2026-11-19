@@ -9,6 +9,7 @@ import { isValidPaymentCheckoutUrl, parsePaymentAmount } from '../services/payme
 import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consistency'
 import { verifyMercadoPagoWebhookSignature } from '../services/payment-webhook-signature'
 import { hasValidOrderAccessToken } from '../services/order-access-token'
+import { sendPaidOrderConfirmationEmail } from '../services/order-email'
 
 export const paymentsRouter = Router()
 
@@ -233,6 +234,13 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
       })
     }
   })
+  const approved = await prisma.paymentAttempt.findUnique({
+    where: { providerOrderId },
+    select: { orderId: true, status: true, order: { select: { status: true } } },
+  })
+  if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED') {
+    await sendPaidOrderConfirmationEmail(approved.orderId)
+  }
   return true
 }
 

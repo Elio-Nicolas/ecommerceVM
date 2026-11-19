@@ -16,7 +16,7 @@ type Order = {
   deliveryMethod: 'OCA' | 'ANDREANI' | 'LOCAL_DELIVERY' | 'PICKUP' | 'LEGACY_CARRIER'; shippingInternalCostArs: number | null; deliveryInstructions: string | null
   shipments?: { provider: string; status: string; trackingNumber: string | null }[]
   shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
-  createdAt: string; items: OrderItem[]; history: OrderHistory[]
+  createdAt: string; paymentReceivedAt: string | null; receiptEmailSentAt: string | null; items: OrderItem[]; history: OrderHistory[]
   cancellationRequest?: { id: string; status: 'REQUESTED' | 'PROCESSING' | 'REFUNDED' | 'FAILED'; providerRefundId: string | null; providerStatus: string | null; lastError: string | null; createdAt: string } | null
   paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'REFUNDED' | 'PARTIALLY_REFUNDED'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
   fiscalDocuments?: { id: string; type: 'INVOICE_C' | 'CREDIT_NOTE_C' | 'DEBIT_NOTE_C'; status: 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'; pointOfSale: number | null; voucherType: number; voucherNumber: number | null; cae: string | null; caeExpiresAt: string | null; lastErrorMessage: string | null; createdAt: string }[]
@@ -101,6 +101,7 @@ export default function AdminOrders() {
   const [paymentReconcilingId, setPaymentReconcilingId] = useState<string | null>(null)
   const [paymentReconcileFeedback, setPaymentReconcileFeedback] = useState<Record<string, string>>({})
   const [refundProcessing, setRefundProcessing] = useState(false)
+  const [paymentReceivingId, setPaymentReceivingId] = useState<string | null>(null)
 
   const loadOrders = useCallback(async (authToken: string) => {
     setLoading(true)
@@ -182,6 +183,26 @@ export default function AdminOrders() {
       setError(message)
     } finally {
       setPaymentReconcilingId(null)
+    }
+  }
+
+  async function registerCashPayment(order: Order) {
+    if (!token || paymentReceivingId) return
+    if (!window.confirm(`Confirmás que recibiste efectivamente el pago del pedido ${order.code}? Se confirmará el pedido y se enviará el correo al comprador.`)) return
+    setPaymentReceivingId(order.id)
+    setError('')
+    setNotice('')
+    try {
+      const result = await request<{ message: string }>(`/admin/orders/${order.id}/payment-received`, token, {
+        method: 'POST',
+        body: JSON.stringify({ note: 'Cobro en efectivo/a coordinar verificado por administración.' }),
+      })
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo registrar el cobro.')
+    } finally {
+      setPaymentReceivingId(null)
     }
   }
 
@@ -485,6 +506,12 @@ export default function AdminOrders() {
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
             <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de coordinación' : `Envío: ${formatPrice(activeOrder.shippingCostArs)}`}</small><span>Total del pedido</span><strong>{activeOrder.totalArs === null ? 'Pendiente de coordinación' : formatPrice(activeOrder.totalArs)}</strong></div>
+            {activeOrder.paymentMethod === 'CASH' && <section className="order-payment-card">
+              <div className="order-payment-heading"><div><span className="admin-kicker">COBRO MANUAL</span><h3>Efectivo / a coordinar</h3></div><small>{activeOrder.paymentReceivedAt ? `Cobrado · ${formatDate(activeOrder.paymentReceivedAt)}` : 'Pendiente de cobro'}</small></div>
+              {activeOrder.paymentReceivedAt
+                ? <div className="order-payment-attempt"><p>El cobro fue registrado el {formatDate(activeOrder.paymentReceivedAt)}.</p><button type="button" className="admin-quiet-button" disabled={paymentReceivingId !== null} onClick={() => void registerCashPayment(activeOrder)}>{paymentReceivingId === activeOrder.id ? 'Verificando correo...' : 'Verificar / reintentar correo de confirmación'}</button></div>
+                : <div className="order-payment-attempt"><p>Registrá el cobro únicamente después de recibir el dinero. Esta acción confirma el pedido si todavía estaba pendiente y dispara el correo de pago confirmado.</p><button type="button" className="admin-primary" disabled={paymentReceivingId !== null || activeOrder.status === 'CANCELLED'} onClick={() => void registerCashPayment(activeOrder)}>{paymentReceivingId === activeOrder.id ? 'Registrando cobro...' : 'Registrar pago recibido'}</button></div>}
+            </section>}
             <section className="order-payment-card">
               <div className="order-payment-heading"><div><span className="admin-kicker">COBROS ONLINE</span><h3>Mercado Pago</h3></div><small>Estado verificado por Webhook</small></div>
               {(activeOrder.paymentAttempts || []).map((payment) => <div className="order-payment-attempt" key={payment.id}>

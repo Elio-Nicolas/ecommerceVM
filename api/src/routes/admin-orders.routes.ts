@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma'
 import { env } from '../config/env'
 import { requireAdmin } from '../middleware/require-admin'
 import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
+import { sendPaidOrderConfirmationEmail } from '../services/order-email'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -240,6 +241,65 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     return
   }
   res.json({ data: updated, message: 'Datos de envío actualizados.' })
+})
+
+adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  const input = z.object({ note: z.string().trim().max(500).optional() }).safeParse(req.body)
+  if (!orderId.success || !input.success) {
+    res.status(400).json({ error: { code: 'PAYMENT_RECEIPT_INVALID', message: 'La solicitud de registro de cobro no es válida.' } })
+    return
+  }
+  const existing = await prisma.order.findUnique({
+    where: { id: orderId.data },
+    select: { id: true, paymentMethod: true, status: true, paymentReceivedAt: true, totalArs: true },
+  })
+  if (!existing) {
+    res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (existing.paymentMethod !== 'CASH') {
+    res.status(409).json({ error: { code: 'MANUAL_PAYMENT_NOT_ALLOWED', message: 'El registro manual de cobro solo corresponde a pedidos con pago a coordinar.' } })
+    return
+  }
+  if (existing.status === 'CANCELLED') {
+    res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se puede registrar un cobro para un pedido cancelado.' } })
+    return
+  }
+  if (existing.totalArs === null) {
+    res.status(409).json({ error: { code: 'ORDER_TOTAL_NOT_FINAL', message: 'Primero coordiná y registrá el costo total de entrega. Después podrás registrar el cobro completo.' } })
+    return
+  }
+  if (existing.paymentReceivedAt) {
+    await sendPaidOrderConfirmationEmail(existing.id)
+    res.json({ data: { paymentReceivedAt: existing.paymentReceivedAt }, message: 'El cobro ya estaba registrado. Se verificó el envío del correo de confirmación.' })
+    return
+  }
+  const receivedAt = new Date()
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
+    const current = await tx.order.findUnique({ where: { id: existing.id }, select: { status: true, paymentMethod: true, paymentReceivedAt: true, totalArs: true } })
+    if (!current || current.status === 'CANCELLED' || current.paymentMethod !== 'CASH' || current.totalArs === null) return null
+    if (current.paymentReceivedAt) return current.paymentReceivedAt
+    const nextStatus = current.status === 'PENDING' ? 'CONFIRMED' : current.status
+    await tx.order.update({ where: { id: existing.id }, data: { paymentReceivedAt: receivedAt, status: nextStatus } })
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: existing.id,
+        fromStatus: current.status,
+        toStatus: nextStatus,
+        note: input.data.note || 'Cobro en efectivo/a coordinar verificado y registrado manualmente por administración.',
+        changedByAdminId: req.admin?.id || null,
+      },
+    })
+    return receivedAt
+  })
+  if (!updated) {
+    res.status(409).json({ error: { code: 'ORDER_PAYMENT_CONFLICT', message: 'El pedido cambió o fue cancelado. Recargá e intentá nuevamente.' } })
+    return
+  }
+  await sendPaidOrderConfirmationEmail(existing.id)
+  res.json({ data: { paymentReceivedAt: updated }, message: 'Cobro registrado. Se procesó el envío del correo de confirmación.' })
 })
 
 adminOrdersRouter.patch('/:id/status', async (req, res) => {

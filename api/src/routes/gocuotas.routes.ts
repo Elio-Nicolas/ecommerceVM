@@ -10,6 +10,7 @@ import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consi
 import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '../services/gocuotas-attempt-policy'
 import { buildGoCuotasUrl } from '../services/gocuotas-url'
 import { readGoCuotasCheckoutResponse } from '../services/gocuotas-checkout-response'
+import { sendPaidOrderConfirmationEmail } from '../services/order-email'
 
 export const goCuotasRouter = Router()
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false })
@@ -264,6 +265,13 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
         if (changed.count === 1) await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: 'PENDING', toStatus: 'CONFIRMED', note: 'Pago aprobado por GOcuotas. Orden ' + String(id.data) + '.' } })
       }
     })
+    const approved = await prisma.paymentAttempt.findUnique({
+      where: { id: attempt.id },
+      select: { status: true, order: { select: { id: true, status: true } } },
+    })
+    if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED') {
+      await sendPaidOrderConfirmationEmail(approved.order.id)
+    }
     res.status(200).send('OK')
   } catch (error) {
     console.error('Error procesando webhook GOcuotas:', error)
