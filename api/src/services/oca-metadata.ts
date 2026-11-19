@@ -78,6 +78,8 @@ export type OcaAdmissionBranch = {
   id: string
   code: string | null
   name: string
+  street: string | null
+  number: string | null
   address: string | null
   postalCode: string | null
   locality: string | null
@@ -113,6 +115,8 @@ export function parseOcaAdmissionBranches(xml: string): OcaAdmissionBranch[] {
       id,
       code: readTag(row, 'Sigla'),
       name: readTag(row, 'Sucursal')?.trim() || readTag(row, 'Descripcion')?.trim() || 'Sucursal OCA',
+      street: street?.trim() || null,
+      number: number?.trim() || null,
       address: address || null,
       postalCode: readTag(row, 'CodigoPostal')?.trim() || null,
       locality: readTag(row, 'Localidad')?.trim() || null,
