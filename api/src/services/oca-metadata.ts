@@ -7,10 +7,7 @@ export class OcaMetadataError extends Error {
   }
 }
 
-const endpoints = {
-  QA: 'https://integraciones.ocadev.com.ar/epak_tracking_test/GetCentroCostoPorOperativa',
-  PRODUCTION: 'https://webservice.oca.com.ar/oep_tracking/Oep_Track.asmx/GetCentroCostoPorOperativa',
-} as const
+const costCenterQaEndpoint = 'https://integraciones.ocadev.com.ar/epak_tracking_test/GetCentroCostoPorOperativa'
 
 function decodeXml(value: string): string {
   let decoded = value
@@ -57,7 +54,8 @@ export function parseOcaCostCenters(xml: string): OcaCostCenter[] {
 export async function getOcaCostCenters(): Promise<OcaCostCenter[]> {
   const credentials = await getStoredOcaCredentials()
   if (!credentials) throw new OcaMetadataError('Configurá primero usuario e-Pak, contraseña, CUIT y operativa OCA.', 503)
-  const url = new URL(endpoints[credentials.environment])
+  if (credentials.environment !== 'QA') throw new OcaMetadataError('La consulta de centros de costo está habilitada sólo en QA hasta autorizar explícitamente el uso de producción.', 409)
+  const url = new URL(costCenterQaEndpoint)
   url.search = new URLSearchParams({
     CUIT: credentials.cuit.slice(0, 2) + '-' + credentials.cuit.slice(2, 10) + '-' + credentials.cuit.slice(10),
     Operativa: credentials.operative,
@@ -128,9 +126,8 @@ export async function getOcaAdmissionBranches(postalCode: string): Promise<OcaAd
   if (!/^\d{4}$/.test(postalCode)) throw new OcaMetadataError('El código postal debe tener cuatro dígitos.', 400)
   const settings = await getShippingSettings()
   const environment = settings.ocaEnvironment as 'QA' | 'PRODUCTION'
-  const base = environment === 'QA'
-    ? 'https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP'
-    : 'https://webservice.oca.com.ar/epak_tracking/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP'
+  if (environment !== 'QA') throw new OcaMetadataError('La consulta de sucursales está habilitada sólo en QA hasta autorizar explícitamente el uso de producción.', 409)
+  const base = 'https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP'
   const url = new URL(base)
   url.search = new URLSearchParams({ CodigoPostal: postalCode }).toString()
 
