@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireAdmin } from '../middleware/require-admin'
 import { getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
 import { testAndreaniConnection, AndreaniError } from '../services/andreani'
-import { getOcaCostCenters, OcaMetadataError } from '../services/oca-metadata'
+import { getOcaCostCenters, getOcaAdmissionBranches, OcaMetadataError } from '../services/oca-metadata'
 
 export const adminShippingSettingsRouter = Router()
 adminShippingSettingsRouter.use(requireAdmin)
@@ -27,6 +27,17 @@ function publicSettings(settings: Awaited<ReturnType<typeof getShippingSettings>
 }
 
 adminShippingSettingsRouter.get('/', async (_req, res) => res.json({ data: publicSettings(await getShippingSettings()) }))
+
+adminShippingSettingsRouter.get('/oca/admission-branches', async (req, res) => {
+  try {
+    const postalCode = typeof req.query.postalCode === 'string' ? req.query.postalCode : '5730'
+    res.json({ data: await getOcaAdmissionBranches(postalCode) })
+  } catch (error) {
+    res.status(error instanceof OcaMetadataError ? error.statusCode : 502).json({
+      error: { code: 'OCA_METADATA_ERROR', message: error instanceof Error ? error.message : 'No se pudieron consultar las sucursales OCA.' },
+    })
+  }
+})
 
 adminShippingSettingsRouter.get('/oca/cost-centers', async (_req, res) => {
   try {
