@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import testCase from 'node:test'
-import { OcaAdmissionError, parseOcaAdmissionResponse } from '../src/services/oca-admission'
+import { OcaAdmissionError, parseOcaAdmissionResponse } from '../src/services/oca-admission-response'
 
 const acceptedResponse = `<?xml version="1.0"?>
 <IngresoORMultiplesRetiros_v2Response>
@@ -42,5 +42,12 @@ testCase('rechaza un SOAP Fault', () => {
   assert.throws(
     () => parseOcaAdmissionResponse('<soap:Fault><faultstring>Rejected</faultstring></soap:Fault>'),
     OcaAdmissionError,
+  )
+})
+
+testCase('trata una respuesta vacía como resultado incierto', () => {
+  assert.throws(
+    () => parseOcaAdmissionResponse(''),
+    (error: unknown) => error instanceof OcaAdmissionError && error.uncertain,
   )
 })
