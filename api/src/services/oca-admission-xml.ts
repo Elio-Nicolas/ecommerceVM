@@ -66,6 +66,12 @@ function attr(name: string, value: string | number | undefined): string {
   return ' ' + name + '="' + escaped + '"'
 }
 
+function numericIdentifier(value: string, field: string, maxLength: number): string {
+  const normalized = text(value, field, maxLength, true)
+  if (!/^\\d+$/.test(normalized)) throw new OcaAdmissionXmlError(field + ' debe contener solo dígitos.')
+  return normalized
+}
+
 function addressAttributes(address: OcaAddress) {
   return [
     attr('calle', text(address.street, 'la calle', 30, true)),
@@ -85,7 +91,7 @@ function decimal(value: number, field: string): string {
 
 export function buildOcaAdmissionXml(input: OcaAdmissionXmlInput): string {
   const accountNumber = text(input.accountNumber, 'el número de cuenta OCA', 10, true)
-  const operative = text(input.operative, 'la operativa OCA', 6, true)
+  const operative = numericIdentifier(input.operative, 'la operativa OCA', 6)
   const orderReference = text(input.orderReference, 'el número de remito', 30, true)
   const costCenter = text(input.costCenter, 'el centro de costo', 10, true)
   const originBranchId = text(input.originBranchId, 'la sucursal OCA de admisión', 3, true)
@@ -119,7 +125,7 @@ export function buildOcaAdmissionXml(input: OcaAdmissionXmlInput): string {
     addressAttributes(recipient),
     attr('telefono', text(recipient.phone, 'el teléfono', 30)),
     attr('email', text(recipient.email, 'el email del destinatario', 100)),
-    attr('idci', text(recipient.destinationBranchId, 'la sucursal OCA de destino', 3)),
+    attr('idci', recipient.destinationBranchId ? numericIdentifier(recipient.destinationBranchId, 'la sucursal OCA de destino', 3) : ''),
     attr('celular', text(recipient.mobile, 'el celular', 15)),
     attr('observaciones', text(recipient.observations, 'las observaciones del destinatario', 100)),
   ].join('')
