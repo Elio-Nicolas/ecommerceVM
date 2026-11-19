@@ -1,14 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 type ShippingSettings = {
-  ocaEnvironment: 'QA' | 'PRODUCTION'; ocaConfigured: boolean
+  ocaEnvironment: 'QA' | 'PRODUCTION'; ocaConfigured: boolean; ocaAdmissionConfigured: boolean
   andreaniEnvironment: 'QA' | 'PRODUCTION'; andreaniConfigured: boolean
   pickupEnabled: boolean; pickupAddress: string; pickupInstructions: string
   localDeliveryEnabled: boolean; localDeliveryPostalCodes: string[]
   localDeliveryFeeArs: number; localDeliveryInternalCostArs: number | null; localDeliveryCoordinate: boolean
 }
 const defaults: ShippingSettings = {
-  ocaEnvironment: 'QA', ocaConfigured: false, andreaniEnvironment: 'QA', andreaniConfigured: false, pickupEnabled: true, pickupAddress: 'Domicilio del vendedor',
+  ocaEnvironment: 'QA', ocaConfigured: false, ocaAdmissionConfigured: false, andreaniEnvironment: 'QA', andreaniConfigured: false, pickupEnabled: true, pickupAddress: 'Domicilio del vendedor',
   pickupInstructions: 'La dirección exacta y el horario se coordinarán luego de confirmar el pedido.',
   localDeliveryEnabled: false, localDeliveryPostalCodes: ['5730'], localDeliveryFeeArs: 0,
   localDeliveryInternalCostArs: null, localDeliveryCoordinate: false,
@@ -17,6 +17,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
   const [settings, setSettings] = useState<ShippingSettings>(defaults)
   const [ocaUsername, setOcaUsername] = useState(''), [ocaPassword, setOcaPassword] = useState('')
   const [ocaCuit, setOcaCuit] = useState(''), [ocaOperative, setOcaOperative] = useState('')
+  const [ocaAccountNumber, setOcaAccountNumber] = useState(''), [ocaCostCenter, setOcaCostCenter] = useState(''), [ocaOriginBranchId, setOcaOriginBranchId] = useState('')
   const [clearOcaCredentials, setClearOcaCredentials] = useState(false), [postalCodesText, setPostalCodesText] = useState('5730')
   const [andreaniUsername, setAndreaniUsername] = useState(''), [andreaniPassword, setAndreaniPassword] = useState('')
   const [andreaniClientCode, setAndreaniClientCode] = useState(''), [andreaniContract, setAndreaniContract] = useState('')
@@ -45,6 +46,9 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     const credentials = [ocaUsername.trim(), ocaPassword.trim(), ocaCuit.trim(), ocaOperative.trim()]
     if (credentials.some(Boolean) && !credentials.every(Boolean)) { setError('Para guardar OCA completá usuario, contraseña, CUIT y operativa.'); setSaving(false); return }
     if (clearOcaCredentials && credentials.some(Boolean)) { setError('No podés reemplazar y eliminar las credenciales OCA en la misma operación.'); setSaving(false); return }
+    const admissionSettings = [ocaAccountNumber.trim(), ocaCostCenter.trim(), ocaOriginBranchId.trim()]
+    if (admissionSettings.some(Boolean) && !admissionSettings.every(Boolean)) { setError('Para admisión OCA completá número de cuenta, centro de costo e ID de sucursal de origen.'); setSaving(false); return }
+    if (admissionSettings.every(Boolean) && (!/^\\d{1,10}\\/\\d{1,3}$/.test(admissionSettings[0]) || !/^\\d{1,10}$/.test(admissionSettings[1]) || !/^\\d{1,3}$/.test(admissionSettings[2]))) { setError('Revisá el formato de cuenta, centro de costo e ID de sucursal OCA.'); setSaving(false); return }
     const andreaniCredentials = [andreaniUsername.trim(), andreaniPassword.trim(), andreaniClientCode.trim(), andreaniContract.trim()]
     if (andreaniCredentials.some(Boolean) && !andreaniCredentials.every(Boolean)) { setError('Para guardar Andreani completá usuario, contraseña, código de cliente y contrato.'); setSaving(false); return }
     if (clearAndreaniCredentials && andreaniCredentials.some(Boolean)) { setError('No podés reemplazar y eliminar las credenciales Andreani en la misma operación.'); setSaving(false); return }
@@ -58,7 +62,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     try {
       const result = await request<{ data: ShippingSettings }>('/admin/shipping-settings', { method: 'PUT', body: JSON.stringify(payload) })
       setSettings(result.data); setPostalCodesText(result.data.localDeliveryPostalCodes.join(', '))
-      setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setClearOcaCredentials(false)
+      setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setOcaAccountNumber(''); setOcaCostCenter(''); setOcaOriginBranchId(''); setClearOcaCredentials(false)
       setAndreaniUsername(''); setAndreaniPassword(''); setAndreaniClientCode(''); setAndreaniContract(''); setClearAndreaniCredentials(false)
       setNotice('Configuración guardada. OCA y Andreani permanecen independientes; Andreani requiere validación con credenciales QA.')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.') }
@@ -87,7 +91,12 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
           <label>CUIT registrado en OCA<input inputMode="numeric" maxLength={11} value={ocaCuit} onChange={(e) => setOcaCuit(e.target.value.replace(/\D/g, '').slice(0, 11))} placeholder="11 dígitos" /></label>
           <label>Número de operativa<input value={ocaOperative} onChange={(e) => setOcaOperative(e.target.value)} placeholder="Lo informa OCA" /></label>
         </div>
-        <p className="shipping-settings-help">Para admisión y etiquetas también faltan número de cuenta, centro de costo y modalidad de despacho desde Villa Mercedes.</p>
+        <div className="admin-form-grid">
+          <label>Número de cuenta OCA<input value={ocaAccountNumber} onChange={(e) => setOcaAccountNumber(e.target.value)} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Ej. 123456/001'} /></label>
+          <label>Centro de costo<input inputMode="numeric" value={ocaCostCenter} onChange={(e) => setOcaCostCenter(e.target.value.replace(/\\D/g, '').slice(0, 10))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Asignado por OCA'} /></label>
+          <label>ID sucursal de admisión<input inputMode="numeric" value={ocaOriginBranchId} onChange={(e) => setOcaOriginBranchId(e.target.value.replace(/\\D/g, '').slice(0, 3))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Sucursal OCA Villa Mercedes'} /></label>
+        </div>
+        <p className="shipping-settings-help">Los tres datos se cifran en el backend. El ID de sucursal debe corresponder a un centro OCA habilitado para admisión; no uses un ID supuesto.</p>
         {settings.ocaConfigured && <div className="admin-category-actions"><button type="button" className="archive-action" onClick={() => { setClearOcaCredentials((v) => !v); setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative('') }}>{clearOcaCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales OCA'}</button></div>}
       </section>
       <section className="shipping-setting-section">
