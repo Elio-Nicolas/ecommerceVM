@@ -46,7 +46,15 @@ export function matchesOcaRecipient(order: OcaOrderIdentity, recipient: OcaRecip
     && normalizeOcaRecipientText(recipient.province) === normalizeOcaRecipientText(order.province)
 }
 
-export function isCompleteOcaOriginBranch(branch: OcaBranch, expectedId: string, expectedPostalCode: string): branch is NonNullable<OcaBranch> {
+type CompleteOcaBranch = Omit<NonNullable<OcaBranch>, 'street' | 'number' | 'postalCode' | 'locality' | 'province'> & {
+  street: string
+  number: string
+  postalCode: string
+  locality: string
+  province: string
+}
+
+export function isCompleteOcaOriginBranch(branch: OcaBranch, expectedId: string, expectedPostalCode: string): branch is CompleteOcaBranch {
   return Boolean(branch
     && branch.id === expectedId
     && branch.street?.trim()
