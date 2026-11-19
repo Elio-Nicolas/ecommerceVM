@@ -32,7 +32,14 @@ export async function sendPaidOrderConfirmationEmail(orderId: string) {
 
   const claimedAt = new Date()
   const claim = await prisma.order.updateMany({
-    where: { id: order.id, status: { not: 'CANCELLED' }, receiptEmailSentAt: null },
+    where: {
+      id: order.id,
+      status: { not: 'CANCELLED' },
+      OR: [
+        { receiptEmailSentAt: null },
+        { receiptEmailSentAt: { lt: new Date(claimedAt.getTime() - 5 * 60 * 1000) } },
+      ],
+    },
     data: { receiptEmailSentAt: claimedAt },
   })
   if (claim.count !== 1) return false
