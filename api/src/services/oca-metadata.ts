@@ -8,12 +8,8 @@ export class OcaMetadataError extends Error {
 }
 
 const endpoints = {
-  QA: {
-    costCenters: 'https://integraciones.ocadev.com.ar/epak_tracking_test/GetCentroCostoPorOperativa',
-  },
-  PRODUCTION: {
-    costCenters: 'https://webservice.oca.com.ar/oep_tracking/Oep_Track.asmx/GetCentroCostoPorOperativa',
-  },
+  QA: 'https://integraciones.ocadev.com.ar/epak_tracking_test/GetCentroCostoPorOperativa',
+  PRODUCTION: 'https://webservice.oca.com.ar/oep_tracking/Oep_Track.asmx/GetCentroCostoPorOperativa',
 } as const
 
 function decodeXml(value: string): string {
@@ -25,20 +21,16 @@ function decodeXml(value: string): string {
   return decoded
 }
 
-function readTag(xml: string, names: string[]): string | null {
-  for (const name of names) {
-    const escaped = name.replace(/[.*+?^${}()|[\\]\\]/g, '\\name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')')
-    const match = xml.match(new RegExp('<(?:[\\w.-]+:)?' + escaped + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?' + escaped + '\\s*>', 'i'))
-    if (match?.[1]) return match[1].replace(/<[^>]+>/g, '').trim()
-  }
-  return null
+function readTag(xml: string, name: string): string | null {
+  const match = xml.match(new RegExp('<(?:[\\\\w.-]+:)?' + name + '(?:\\\\s[^>]*)?>([\\\\s\\\\S]*?)<\\\\/(?:[\\\\w.-]+:)?' + name + '\\\\s*>', 'i'))
+  return match?.[1] ? match[1].replace(/<[^>]+>/g, '').trim() : null
 }
 
 function parseRows(xml: string): string[] {
   const decoded = decodeXml(xml)
-  const rows = [...decoded.matchAll(/<(?:[\\w.-]+:)?Table(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?Table\\s*>/gi)]
+  const rows = [...decoded.matchAll(/<(?:[\\\\w.-]+:)?Table(?:\\\\s[^>]*)?>([\\\\s\\\\S]*?)<\\\\/(?:[\\\\w.-]+:)?Table\\\\s*>/gi)]
   if (rows.length) return rows.map((row) => row[1])
-  if (/<(?:[\\w.-]+:)?NewDataSet\\b/i.test(decoded)) return []
+  if (/<(?:[\\\\w.-]+:)?NewDataSet\\\\b/i.test(decoded)) return []
   throw new OcaMetadataError('OCA devolvió un XML de centros de costo con una estructura no reconocida.')
 }
 
@@ -50,22 +42,22 @@ export type OcaCostCenter = {
 }
 
 export function parseOcaCostCenters(xml: string): OcaCostCenter[] {
-  if (!xml.trim() || /<(?:[\\w.-]+:)?Fault\\b/i.test(decodeXml(xml))) {
+  const decoded = decodeXml(xml)
+  if (!decoded.trim() || /<(?:[\\\\w.-]+:)?Fault\\\\b/i.test(decoded)) {
     throw new OcaMetadataError('OCA devolvió una respuesta inválida al consultar centros de costo.')
   }
-  const centers = parseRows(xml).map((row) => ({
-    number: readTag(row, ['NroCentroCosto']) ?? '',
-    requester: readTag(row, ['Solicitante']),
-    locality: readTag(row, ['LocalidadRetiro']),
-    postalCode: readTag(row, ['codigopostal', 'CodigoPostal']),
-  })).filter((center) => /^\\d{1,10}$/.test(center.number))
-  return centers
+  return parseRows(decoded).map((row) => ({
+    number: readTag(row, 'NroCentroCosto') ?? '',
+    requester: readTag(row, 'Solicitante'),
+    locality: readTag(row, 'LocalidadRetiro'),
+    postalCode: readTag(row, 'codigopostal') ?? readTag(row, 'CodigoPostal'),
+  })).filter((center) => /^\\\\d{1,10}$/.test(center.number))
 }
 
 export async function getOcaCostCenters(): Promise<OcaCostCenter[]> {
   const credentials = await getStoredOcaCredentials()
   if (!credentials) throw new OcaMetadataError('Configurá primero usuario e-Pak, contraseña, CUIT y operativa OCA.', 503)
-  const url = new URL(endpoints[credentials.environment].costCenters)
+  const url = new URL(endpoints[credentials.environment])
   url.search = new URLSearchParams({
     CUIT: credentials.cuit.slice(0, 2) + '-' + credentials.cuit.slice(2, 10) + '-' + credentials.cuit.slice(10),
     Operativa: credentials.operative,
