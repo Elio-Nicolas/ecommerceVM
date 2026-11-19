@@ -40,7 +40,7 @@ El esquema Prisma ya contiene:
 - `ShippingShipmentEvent`: eventos externos, payload, estado de procesamiento, reintentos y errores.
 - `Order` conserva costo, carrier, tracking, servicio, cotización y snapshot de opciones.
 
-**Importante:** que existan estos modelos no significa que ya exista el circuito OCA. En `main` todavía no hay servicio ni endpoints administrativos para crear/admitir el envío, recuperar etiquetas o sincronizar eventos OCA.
+**Importante:** que existan estos modelos no significa que ya exista el circuito OCA. Hay un generador aislado y validado del XML de admisión (`api/src/services/oca-admission-xml.ts`), pero todavía no existe el servicio de negocio ni los endpoints administrativos para admitir el envío, recuperar etiquetas o sincronizar eventos OCA.
 
 ### Controles de pedidos
 - El administrador puede guardar datos de envío y costo desde la gestión de pedidos.
@@ -72,6 +72,8 @@ OCA documenta:
 - `ConfirmarRetiro=false` deja la orden en el carrito e-Pak pendiente de confirmación; `true` confirma de inmediato.
 
 Antes de implementar la admisión hay que obtener y validar con OCA el XML completo para la modalidad contratada, los datos de origen/destino, contacto, centro de costo, franja horaria, paquetes y modalidad de retiro/entrega. No generar XML de producción por inferencia.
+
+Se agregó `buildOcaAdmissionXml()` como serializador puro del contrato publicado: arma la estructura `ROWS/origenes/origen/envios/envio`, requiere la sucursal de admisión de origen, permite `idci` solo cuando el destinatario retira en sucursal y representa un único paquete consolidado por pedido (`cant=1`). Para una operativa sin seguro envía `valor=0`; solo incluye valor declarado cuando el seguro esté habilitado. Valida límites de campos, fecha, códigos postales, dimensiones y caracteres que OCA advierte que pueden fallar. Todavía no llama al Web Service ni persiste admisiones: faltan número de cuenta, operativa, centro de costo, sucursal y datos de QA asignados a la cuenta.
 
 ### Etiquetas
 OCA documenta métodos de etiquetas HTML y PDF, además de ZPL para impresoras compatibles. Entre los métodos publicados:
