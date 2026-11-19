@@ -230,6 +230,7 @@ export default function App() {
                 <article className="product-card" key={product.id}>
                   <button className="product-image" onClick={() => openProduct(product)} aria-label={`Ver ${product.name}`}>
                     <img src={product.image} alt={product.name} loading="lazy" />
+                    {product.stock <= 0 && <span className="product-stock-overlay">SIN STOCK</span>}
                     {product.badge && <span className="product-badge">{product.badge}</span>}
                     <span className="quick-view">Vista rápida <ArrowIcon /></span>
                   </button>
