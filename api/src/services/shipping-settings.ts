@@ -34,6 +34,9 @@ export async function getStoredOcaCredentials() {
     password: decryptSecret(settings.ocaPasswordEncrypted!),
     cuit: decryptSecret(settings.ocaCuitEncrypted!),
     operative: decryptSecret(settings.ocaOperativeEncrypted!),
+    accountNumber: settings.ocaAccountNumberEncrypted ? decryptSecret(settings.ocaAccountNumberEncrypted) : null,
+    costCenter: settings.ocaCostCenterEncrypted ? decryptSecret(settings.ocaCostCenterEncrypted) : null,
+    originBranchId: settings.ocaOriginBranchIdEncrypted ? decryptSecret(settings.ocaOriginBranchIdEncrypted) : null,
     environment: settings.ocaEnvironment as 'QA' | 'PRODUCTION',
   }
 }
@@ -82,6 +85,9 @@ export async function saveShippingSettings(input: {
   ocaPassword?: string
   ocaCuit?: string
   ocaOperative?: string
+  ocaAccountNumber?: string
+  ocaCostCenter?: string
+  ocaOriginBranchId?: string
   clearOcaCredentials?: boolean
   andreaniEnvironment: 'QA' | 'PRODUCTION'
   andreaniUsername?: string
@@ -95,6 +101,12 @@ export async function saveShippingSettings(input: {
   const ocaHasAny = ocaValues.some(Boolean)
   const ocaHasComplete = ocaValues.every(Boolean)
   const ocaHasStored = Boolean(current.ocaUsernameEncrypted && current.ocaPasswordEncrypted && current.ocaCuitEncrypted && current.ocaOperativeEncrypted)
+  const admissionValues = [input.ocaAccountNumber?.trim(), input.ocaCostCenter?.trim(), input.ocaOriginBranchId?.trim()]
+  const admissionHasAny = admissionValues.some(Boolean)
+  const admissionHasComplete = admissionValues.every(Boolean)
+  if (admissionHasAny && !admissionHasComplete) throw new Error('Para admisión OCA completá número de cuenta, centro de costo e ID de sucursal de origen.')
+  if (admissionHasComplete && (!/^\\d{1,10}\\/\\d{1,3}$/.test(admissionValues[0]!) || !/^\\d{1,10}$/.test(admissionValues[1]!) || !/^\\d{1,3}$/.test(admissionValues[2]!))) throw new Error('Revisá el formato de cuenta, centro de costo e ID de sucursal OCA.')
+  const admissionHasStored = Boolean(current.ocaAccountNumberEncrypted && current.ocaCostCenterEncrypted && current.ocaOriginBranchIdEncrypted)
   if (ocaHasAny && !ocaHasComplete) throw new Error('Para guardar OCA completá usuario, contraseña, CUIT y operativa.')
   if (input.clearOcaCredentials && ocaHasAny) throw new Error('No podés reemplazar y eliminar las credenciales OCA en la misma operación.')
   if (input.ocaEnvironment === 'PRODUCTION' && !ocaHasStored && !ocaHasComplete) throw new Error('Configurá primero la cuenta OCA antes de seleccionar producción.')
@@ -117,6 +129,9 @@ export async function saveShippingSettings(input: {
       ocaPasswordEncrypted: ocaHasComplete ? encryptSecret(input.ocaPassword!.trim()) : null,
       ocaCuitEncrypted: ocaHasComplete ? encryptSecret(ocaValues[2]!) : null,
       ocaOperativeEncrypted: ocaHasComplete ? encryptSecret(input.ocaOperative!.trim()) : null,
+      ocaAccountNumberEncrypted: admissionHasComplete ? encryptSecret(admissionValues[0]!) : null,
+      ocaCostCenterEncrypted: admissionHasComplete ? encryptSecret(admissionValues[1]!) : null,
+      ocaOriginBranchIdEncrypted: admissionHasComplete ? encryptSecret(admissionValues[2]!) : null,
       andreaniEnvironment: input.andreaniEnvironment,
       andreaniUsernameEncrypted: andreaniHasComplete ? encryptSecret(input.andreaniUsername!.trim()) : null,
       andreaniPasswordEncrypted: andreaniHasComplete ? encryptSecret(input.andreaniPassword!.trim()) : null,
@@ -133,12 +148,17 @@ export async function saveShippingSettings(input: {
     },
     update: {
       ocaEnvironment: input.ocaEnvironment,
-      ...(input.clearOcaCredentials ? { ocaUsernameEncrypted: null, ocaPasswordEncrypted: null, ocaCuitEncrypted: null, ocaOperativeEncrypted: null } : {}),
+      ...(input.clearOcaCredentials ? { ocaUsernameEncrypted: null, ocaPasswordEncrypted: null, ocaCuitEncrypted: null, ocaOperativeEncrypted: null, ocaAccountNumberEncrypted: null, ocaCostCenterEncrypted: null, ocaOriginBranchIdEncrypted: null } : {}),
       ...(ocaHasComplete ? {
         ocaUsernameEncrypted: encryptSecret(input.ocaUsername!.trim()),
         ocaPasswordEncrypted: encryptSecret(input.ocaPassword!.trim()),
         ocaCuitEncrypted: encryptSecret(ocaValues[2]!),
         ocaOperativeEncrypted: encryptSecret(input.ocaOperative!.trim()),
+      } : {}),
+      ...(admissionHasComplete ? {
+        ocaAccountNumberEncrypted: encryptSecret(admissionValues[0]!),
+        ocaCostCenterEncrypted: encryptSecret(admissionValues[1]!),
+        ocaOriginBranchIdEncrypted: encryptSecret(admissionValues[2]!),
       } : {}),
       andreaniEnvironment: input.andreaniEnvironment,
       ...(input.clearAndreaniCredentials ? { andreaniUsernameEncrypted: null, andreaniPasswordEncrypted: null, andreaniClientCodeEncrypted: null, andreaniContractEncrypted: null } : {}),
