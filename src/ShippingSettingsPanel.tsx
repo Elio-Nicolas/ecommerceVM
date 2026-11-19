@@ -19,6 +19,8 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
   const [ocaCuit, setOcaCuit] = useState(''), [ocaOperative, setOcaOperative] = useState('')
   const [ocaAccountNumber, setOcaAccountNumber] = useState(''), [ocaCostCenter, setOcaCostCenter] = useState(''), [ocaOriginBranchId, setOcaOriginBranchId] = useState('')
   const [clearOcaCredentials, setClearOcaCredentials] = useState(false), [postalCodesText, setPostalCodesText] = useState('5730')
+  const [ocaCostCenters, setOcaCostCenters] = useState<{ number: string; requester: string | null; locality: string | null; postalCode: string | null }[]>([])
+  const [loadingOcaCostCenters, setLoadingOcaCostCenters] = useState(false)
   const [andreaniUsername, setAndreaniUsername] = useState(''), [andreaniPassword, setAndreaniPassword] = useState('')
   const [andreaniClientCode, setAndreaniClientCode] = useState(''), [andreaniContract, setAndreaniContract] = useState('')
   const [clearAndreaniCredentials, setClearAndreaniCredentials] = useState(false), [testingAndreani, setTestingAndreani] = useState(false)
@@ -69,6 +71,17 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.') }
     finally { setSaving(false) }
   }
+  async function loadOcaCostCenters() {
+    if (loadingOcaCostCenters) return
+    setLoadingOcaCostCenters(true); setError(''); setNotice('')
+    try {
+      const result = await request<{ data: typeof ocaCostCenters }>('/admin/shipping-settings/oca/cost-centers')
+      setOcaCostCenters(result.data)
+      if (!result.data.some((center) => center.number === ocaCostCenter)) setOcaCostCenter('')
+      setNotice('Centros de costo obtenidos desde OCA para la CUIT y operativa configuradas.')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudieron consultar los centros de costo OCA.') }
+    finally { setLoadingOcaCostCenters(false) }
+  }
   async function testAndreani() {
     if (testingAndreani) return
     setTestingAndreani(true); setError(''); setNotice('')
@@ -97,7 +110,11 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
           <label>Centro de costo<input inputMode="numeric" value={ocaCostCenter} onChange={(e) => setOcaCostCenter(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Asignado por OCA'} /></label>
           <label>ID sucursal de admisión<input inputMode="numeric" value={ocaOriginBranchId} onChange={(e) => setOcaOriginBranchId(e.target.value.replace(/\D/g, '').slice(0, 3))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Sucursal OCA Villa Mercedes'} /></label>
         </div>
-        <p className="shipping-settings-help">Los tres datos se cifran en el backend. El ID de sucursal debe corresponder a un centro OCA habilitado para admisión; no uses un ID supuesto.</p>
+        <p className="shipping-settings-help">Los datos se cifran en el backend. El centro de costo se puede consultar a OCA cuando guardes usuario, CUIT y operativa.</p>
+        <div className="admin-category-actions">
+          <button type="button" className="archive-action" disabled={loadingOcaCostCenters || !settings.ocaConfigured || clearOcaCredentials} onClick={() => void loadOcaCostCenters()}>{loadingOcaCostCenters ? 'Consultando OCA...' : 'Consultar centros de costo OCA'}</button>
+        </div>
+        {ocaCostCenters.length > 0 && <label>Seleccionar centro de costo devuelto por OCA<select value={ocaCostCenter} onChange={(e) => setOcaCostCenter(e.target.value)}><option value="">Seleccioná un centro de costo</option>{ocaCostCenters.map((center) => <option key={center.number} value={center.number}>{center.number}{center.requester ? ' · ' + center.requester : ''}{center.locality ? ' · ' + center.locality : ''}</option>)}</select></label>}
         {settings.ocaConfigured && <div className="admin-category-actions"><button type="button" className="archive-action" onClick={() => { setClearOcaCredentials((v) => !v); setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative('') }}>{clearOcaCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales OCA'}</button></div>}
       </section>
       <section className="shipping-setting-section">
