@@ -52,8 +52,15 @@ export type OcaAdmissionResult = {
 
 export function parseOcaAdmissionResponse(responseXml: string): OcaAdmissionResult {
   const xml = decodeXml(responseXml)
-  if (!xml.trim() || /<(?:[\w.-]+:)?Fault\b/i.test(xml)) {
-    throw new OcaAdmissionError('OCA devolvió una respuesta inválida al registrar el envío.')
+  if (!xml.trim()) {
+    throw new OcaAdmissionError(
+      'OCA no devolvió contenido luego de recibir la solicitud. El resultado puede ser incierto: verificá e-Pak antes de reintentar.',
+      502,
+      true,
+    )
+  }
+  if (/<(?:[\\w.-]+:)?Fault\\b/i.test(xml)) {
+    throw new OcaAdmissionError('OCA rechazó la solicitud mediante un SOAP Fault.')
   }
 
   const detailMatch = xml.match(/<(?:[\w.-]+:)?DetalleIngresos(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?DetalleIngresos\s*>/i)
@@ -146,5 +153,15 @@ export async function createOcaAdmission(input: {
       true,
     )
   }
-  return parseOcaAdmissionResponse(await response.text())
+  let responseXml: string
+  try {
+    responseXml = await response.text()
+  } catch {
+    throw new OcaAdmissionError(
+      'Se interrumpió la lectura de la respuesta de OCA. El resultado puede ser incierto: consultá e-Pak antes de reintentar.',
+      502,
+      true,
+    )
+  }
+  return parseOcaAdmissionResponse(responseXml)
 }
