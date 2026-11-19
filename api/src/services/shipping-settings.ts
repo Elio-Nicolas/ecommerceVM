@@ -59,7 +59,7 @@ export async function getShippingSettingsPublic() {
   const ocaConfigured = Boolean(settings.ocaUsernameEncrypted && settings.ocaPasswordEncrypted && settings.ocaCuitEncrypted && settings.ocaOperativeEncrypted)
   const andreaniConfigured = Boolean(settings.andreaniUsernameEncrypted && settings.andreaniPasswordEncrypted && settings.andreaniClientCodeEncrypted && settings.andreaniContractEncrypted)
   return {
-    pickup: { enabled: settings.pickupEnabled, address: settings.pickupAddress, instructions: settings.pickupInstructions, priceArs: 0 },
+    pickup: { enabled: settings.pickupEnabled, instructions: 'La dirección y el horario se coordinarán después de confirmar la compra.', priceArs: 0 },
     localDelivery: {
       enabled: settings.localDeliveryEnabled,
       postalCodes: settings.localDeliveryPostalCodes,
