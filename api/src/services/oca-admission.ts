@@ -1,7 +1,7 @@
 import { getStoredOcaCredentials } from './shipping-settings'
 
 import { OcaAdmissionError, parseOcaAdmissionResponse, type OcaAdmissionResult } from './oca-admission-response'
-export { OcaAdmissionError }
+export { OcaAdmissionError, parseOcaAdmissionResponse }
 
 const endpoints = {
   QA: 'https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx',
