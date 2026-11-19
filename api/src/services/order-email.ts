@@ -26,13 +26,13 @@ export async function sendPaidOrderConfirmationEmail(orderId: string) {
     where: { id: orderId },
     include: { items: true, paymentAttempts: { where: { status: 'APPROVED' }, select: { id: true }, take: 1 } },
   })
-  if (!order || !order.customerEmail || order.status !== 'CONFIRMED') return false
+  if (!order || !order.customerEmail || order.status === 'CANCELLED') return false
   const isManuallyReceived = Boolean(order.paymentReceivedAt)
-  if (!isManuallyReceived && order.paymentAttempts.length === 0) return false
+  if (!isManuallyReceived && (order.status !== 'CONFIRMED' || order.paymentAttempts.length === 0)) return false
 
   const claimedAt = new Date()
   const claim = await prisma.order.updateMany({
-    where: { id: order.id, status: 'CONFIRMED', receiptEmailSentAt: null },
+    where: { id: order.id, status: { not: 'CANCELLED' }, receiptEmailSentAt: null },
     data: { receiptEmailSentAt: claimedAt },
   })
   if (claim.count !== 1) return false
