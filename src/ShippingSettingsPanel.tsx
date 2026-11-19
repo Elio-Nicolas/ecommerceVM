@@ -62,7 +62,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     try {
       const result = await request<{ data: ShippingSettings }>('/admin/shipping-settings', { method: 'PUT', body: JSON.stringify(payload) })
       setSettings(result.data); setPostalCodesText(result.data.localDeliveryPostalCodes.join(', '))
-      setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setOcaAccountNumber(''); setOcaCostCenter(''); setOcaOriginBranchId(''); setClearOcaCredentials(false)
+      setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setOcaAccountNumber(''); setOcaCostCenter(''); setOcaOriginBranchId(''); setOcaAccountNumber(''); setOcaCostCenter(''); setOcaOriginBranchId(''); setClearOcaCredentials(false)
       setAndreaniUsername(''); setAndreaniPassword(''); setAndreaniClientCode(''); setAndreaniContract(''); setClearAndreaniCredentials(false)
       setNotice('Configuración guardada. OCA y Andreani permanecen independientes; Andreani requiere validación con credenciales QA.')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.') }
