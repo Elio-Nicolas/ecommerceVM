@@ -11,6 +11,7 @@ function publicSettings(settings: Awaited<ReturnType<typeof getShippingSettings>
   return {
     ocaEnvironment: settings.ocaEnvironment,
     ocaConfigured: Boolean(settings.ocaUsernameEncrypted && settings.ocaPasswordEncrypted && settings.ocaCuitEncrypted && settings.ocaOperativeEncrypted),
+    ocaAdmissionConfigured: Boolean(settings.ocaAccountNumberEncrypted && settings.ocaCostCenterEncrypted && settings.ocaOriginBranchIdEncrypted),
     andreaniEnvironment: settings.andreaniEnvironment,
     andreaniConfigured: Boolean(settings.andreaniUsernameEncrypted && settings.andreaniPasswordEncrypted && settings.andreaniClientCodeEncrypted && settings.andreaniContractEncrypted),
     pickupEnabled: settings.pickupEnabled,
@@ -42,6 +43,9 @@ const schema = z.object({
   ocaPassword: z.string().trim().min(1).max(300).optional(),
   ocaCuit: z.string().trim().regex(/^\d{11}$/, 'El CUIT OCA debe tener 11 dígitos.').optional(),
   ocaOperative: z.string().trim().min(1).max(100).optional(),
+  ocaAccountNumber: z.string().trim().regex(/^\\d{1,10}\\/\\d{1,3}$/).optional(),
+  ocaCostCenter: z.string().trim().regex(/^\\d{1,10}$/).optional(),
+  ocaOriginBranchId: z.string().trim().regex(/^\\d{1,3}$/).optional(),
   clearOcaCredentials: z.boolean().optional(),
   andreaniEnvironment: z.enum(['QA', 'PRODUCTION']),
   andreaniUsername: z.string().trim().min(1).max(200).optional(),
