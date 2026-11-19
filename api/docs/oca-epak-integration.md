@@ -62,6 +62,8 @@ Los métodos documentados por OCA usan respuestas XML y permiten consultar el WS
 
 El servicio implementado construye la URL del método y realiza GET. Falta validar los valores y el XML devuelto con credenciales/datos de la cuenta comercial real.
 
+El parser de cotización ahora contempla importes con separadores decimales argentinos e internacionales, XML con namespaces y respuestas ASMX con XML interno escapado. El plazo solo se convierte a horas cuando OCA informa explícitamente `HorasEntrega` o `DiasEntrega`; no se deduce la unidad de un campo genérico. Hay pruebas unitarias con fixtures sintéticos. Esto endurece el procesamiento, pero no sustituye la validación con la respuesta real de la cuenta.
+
 ### Crear envío: `IngresoORMultiplesRetiros_v2`
 OCA documenta:
 - QA: `https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/IngresoORMultiplesRetiros_v2`
