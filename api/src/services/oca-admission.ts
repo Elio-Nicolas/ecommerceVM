@@ -1,6 +1,6 @@
 import { getStoredOcaCredentials } from './shipping-settings'
 
-import { OcaAdmissionError, parseOcaAdmissionResponse } from './oca-admission-response'
+import { OcaAdmissionError, parseOcaAdmissionResponse, type OcaAdmissionResult } from './oca-admission-response'
 export { OcaAdmissionError } from './oca-admission-response'
 
 const endpoints = {
