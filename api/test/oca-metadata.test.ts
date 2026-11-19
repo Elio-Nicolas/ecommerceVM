@@ -28,6 +28,8 @@ testCase('incluye sólo sucursales con servicio de admisión', () => {
     id: '25',
     code: 'VM1',
     name: 'SUCURSAL VILLA MERCEDES',
+    street: 'MITRE',
+    number: '123',
     address: 'MITRE 123',
     postalCode: '5730',
     locality: 'VILLA MERCEDES',
