@@ -252,7 +252,7 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
   }
   const existing = await prisma.order.findUnique({
     where: { id: orderId.data },
-    select: { id: true, paymentMethod: true, status: true, paymentReceivedAt: true },
+    select: { id: true, paymentMethod: true, status: true, paymentReceivedAt: true, totalArs: true },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -264,6 +264,10 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
   }
   if (existing.status === 'CANCELLED') {
     res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se puede registrar un cobro para un pedido cancelado.' } })
+    return
+  }
+  if (existing.totalArs === null) {
+    res.status(409).json({ error: { code: 'ORDER_TOTAL_NOT_FINAL', message: 'Primero coordiná y registrá el costo total de entrega. Después podrás registrar el cobro completo.' } })
     return
   }
   if (existing.paymentReceivedAt) {
