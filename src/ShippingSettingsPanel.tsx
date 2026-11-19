@@ -57,12 +57,13 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
       ...(andreaniCredentials.every(Boolean) ? { andreaniUsername: andreaniCredentials[0], andreaniPassword: andreaniCredentials[1], andreaniClientCode: andreaniCredentials[2], andreaniContract: andreaniCredentials[3] } : {}),
       ...(clearAndreaniCredentials ? { clearAndreaniCredentials: true } : {}),
       ...(credentials.every(Boolean) ? { ocaUsername: credentials[0], ocaPassword: credentials[1], ocaCuit: credentials[2].replace(/\D/g, ''), ocaOperative: credentials[3] } : {}),
+      ...(admissionSettings.every(Boolean) ? { ocaAccountNumber: admissionSettings[0], ocaCostCenter: admissionSettings[1], ocaOriginBranchId: admissionSettings[2] } : {}),
       ...(clearOcaCredentials ? { clearOcaCredentials: true } : {}),
     }
     try {
       const result = await request<{ data: ShippingSettings }>('/admin/shipping-settings', { method: 'PUT', body: JSON.stringify(payload) })
       setSettings(result.data); setPostalCodesText(result.data.localDeliveryPostalCodes.join(', '))
-      setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setOcaAccountNumber(''); setOcaCostCenter(''); setOcaOriginBranchId(''); setOcaAccountNumber(''); setOcaCostCenter(''); setOcaOriginBranchId(''); setClearOcaCredentials(false)
+      setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative(''); setOcaAccountNumber(''); setOcaCostCenter(''); setOcaOriginBranchId(''); setClearOcaCredentials(false)
       setAndreaniUsername(''); setAndreaniPassword(''); setAndreaniClientCode(''); setAndreaniContract(''); setClearAndreaniCredentials(false)
       setNotice('Configuración guardada. OCA y Andreani permanecen independientes; Andreani requiere validación con credenciales QA.')
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.') }
