@@ -75,6 +75,17 @@ Antes de implementar la admisión hay que obtener y validar con OCA el XML compl
 
 Se agregó `buildOcaAdmissionXml()` como serializador puro del contrato publicado: arma la estructura `ROWS/origenes/origen/envios/envio`, requiere la sucursal de admisión de origen, permite `idci` solo cuando el destinatario retira en sucursal y representa un único paquete consolidado por pedido (`cant=1`). Para una operativa sin seguro envía `valor=0`; solo incluye valor declarado cuando el seguro esté habilitado. Valida límites de campos, fecha, códigos postales, dimensiones y caracteres que OCA advierte que pueden fallar. Todavía no llama al Web Service ni persiste admisiones: faltan número de cuenta, operativa, centro de costo, sucursal y datos de QA asignados a la cuenta.
 
+### Cliente de admisión implementado
+
+Se agregó `api/src/services/oca-admission.ts`:
+- Usa el endpoint `IngresoORMultiplesRetiros_v2` del ambiente configurado y envía credenciales/XML por HTTP POST form-urlencoded (no en la URL).
+- La confirmación inmediata queda desactivada por defecto. Solo se activa si el llamador la solicita explícitamente; `false` deja el envío en el carrito e-Pak para confirmación manual.
+- Interpreta `OrdenRetiro`, `NumeroEnvio`, `Remito`, `Estado` y el resumen de ingresados/rechazados.
+- Distingue rechazos de respuestas incompletas o timeouts. Una respuesta incierta no debe reintentarse automáticamente: primero hay que consultar e-Pak para evitar duplicar una admisión.
+- Tiene pruebas con respuestas sintéticas de aceptación, rechazo, XML escapado, SOAP Fault y resultado incierto.
+
+Este cliente todavía no se invoca desde una ruta administrativa ni persiste por sí mismo. La siguiente etapa es conectar la admisión con el pedido, completar los datos de cuenta/origen que hoy no existen en la configuración y aplicar bloqueo/idempotencia antes de hacer una llamada real.
+
 ### Etiquetas
 OCA documenta métodos de etiquetas HTML y PDF, además de ZPL para impresoras compatibles.
 
