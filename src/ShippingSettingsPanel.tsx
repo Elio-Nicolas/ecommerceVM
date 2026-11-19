@@ -17,7 +17,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
   const [settings, setSettings] = useState<ShippingSettings>(defaults)
   const [ocaUsername, setOcaUsername] = useState(''), [ocaPassword, setOcaPassword] = useState('')
   const [ocaCuit, setOcaCuit] = useState(''), [ocaOperative, setOcaOperative] = useState('')
-  const [clearOcaCredentials, setClearOcaCredentials] = useState(false), [postalCodesText, setPostalCodesText] = useState('5730')
+  const [clearOcaCredentials, setClearOcaCredentials] = useState(false), [postalCodesText, setPostalCodesText] = useState('5730'), [testingOca, setTestingOca] = useState(false)
   const [andreaniUsername, setAndreaniUsername] = useState(''), [andreaniPassword, setAndreaniPassword] = useState('')
   const [andreaniClientCode, setAndreaniClientCode] = useState(''), [andreaniContract, setAndreaniContract] = useState('')
   const [clearAndreaniCredentials, setClearAndreaniCredentials] = useState(false), [testingAndreani, setTestingAndreani] = useState(false)
@@ -64,6 +64,15 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.') }
     finally { setSaving(false) }
   }
+  async function testOca() {
+    if (testingOca || settings.ocaEnvironment !== 'QA' || !settings.ocaConfigured) return
+    setTestingOca(true); setError(''); setNotice('')
+    try {
+      const result = await request<{ data: { environment: string; priceArs: number }; message: string }>('/admin/shipping-settings/oca/test', { method: 'POST' })
+      setNotice(`OCA respondió correctamente en ${result.data.environment}. Tarifa de prueba: ${result.data.priceArs.toLocaleString('es-AR')}. No se creó ningún envío.`)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo validar OCA en QA.') }
+    finally { setTestingOca(false) }
+  }
   async function testAndreani() {
     if (testingAndreani) return
     setTestingAndreani(true); setError(''); setNotice('')
@@ -88,6 +97,9 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
           <label>Número de operativa<input value={ocaOperative} onChange={(e) => setOcaOperative(e.target.value)} placeholder="Lo informa OCA" /></label>
         </div>
         <p className="shipping-settings-help">Para admisión y etiquetas también faltan número de cuenta, centro de costo y modalidad de despacho desde Villa Mercedes.</p>
+        <div className="admin-category-actions">
+          {settings.ocaConfigured && <button type="button" className="archive-action" disabled={testingOca || settings.ocaEnvironment !== 'QA'} onClick={() => void testOca()}>{testingOca ? 'Probando OCA en QA...' : 'Probar conexión OCA (solo QA)'}</button>}
+        </div>
         {settings.ocaConfigured && <div className="admin-category-actions"><button type="button" className="archive-action" onClick={() => { setClearOcaCredentials((v) => !v); setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative('') }}>{clearOcaCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales OCA'}</button></div>}
       </section>
       <section className="shipping-setting-section">

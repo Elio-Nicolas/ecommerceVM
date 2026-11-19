@@ -23,15 +23,19 @@ function readXmlValue(xml: string, names: string[]): string | null {
   return null
 }
 
-export async function quoteOca(input: {
-  postalCode: string
-  weightGrams: number
-  volumeCm3: number
-  packages: number
-  declaredValueArs: number
-  originPostalCode: string
-}) {
-  const credentials = await getStoredOcaCredentials()
+export async function quoteOca(
+  input: {
+    postalCode: string
+    weightGrams: number
+    volumeCm3: number
+    packages: number
+    declaredValueArs: number
+    originPostalCode: string
+  },
+  credentialsOverride?: NonNullable<Awaited<ReturnType<typeof getStoredOcaCredentials>>>,
+) {
+  // Keep guarded diagnostics pinned to the exact credential/environment snapshot they validated.
+  const credentials = credentialsOverride ?? await getStoredOcaCredentials()
   if (!credentials) throw new OcaError('OCA todavía no está configurado. Cargá usuario e-Pak, contraseña, CUIT y operativa en Administración > Envíos.', 503)
   const url = new URL(`${endpoints[credentials.environment]}/Tarifar_Envio_Corporativo`)
   url.search = new URLSearchParams({
