@@ -509,7 +509,7 @@ export default function AdminOrders() {
             {activeOrder.paymentMethod === 'CASH' && <section className="order-payment-card">
               <div className="order-payment-heading"><div><span className="admin-kicker">COBRO MANUAL</span><h3>Efectivo / a coordinar</h3></div><small>{activeOrder.paymentReceivedAt ? `Cobrado · ${formatDate(activeOrder.paymentReceivedAt)}` : 'Pendiente de cobro'}</small></div>
               {activeOrder.paymentReceivedAt
-                ? <p className="order-payment-empty">El cobro fue registrado. El correo de confirmación se envió o quedó pendiente de reintento si Resend informó un error.</p>
+                ? <div className="order-payment-attempt"><p>El cobro fue registrado el {formatDate(activeOrder.paymentReceivedAt)}.</p><button type="button" className="admin-quiet-button" disabled={paymentReceivingId !== null} onClick={() => void registerCashPayment(activeOrder)}>{paymentReceivingId === activeOrder.id ? 'Verificando correo...' : 'Verificar / reintentar correo de confirmación'}</button></div>
                 : <div className="order-payment-attempt"><p>Registrá el cobro únicamente después de recibir el dinero. Esta acción confirma el pedido si todavía estaba pendiente y dispara el correo de pago confirmado.</p><button type="button" className="admin-primary" disabled={paymentReceivingId !== null || activeOrder.status === 'CANCELLED'} onClick={() => void registerCashPayment(activeOrder)}>{paymentReceivingId === activeOrder.id ? 'Registrando cobro...' : 'Registrar pago recibido'}</button></div>}
             </section>}
             <section className="order-payment-card">
