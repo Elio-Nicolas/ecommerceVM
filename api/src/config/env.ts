@@ -25,6 +25,8 @@ const envSchema = z.object({
   ARCA_CERTIFICATE_PATH: z.string().min(1).optional(),
   ARCA_PRIVATE_KEY_PATH: z.string().min(1).optional(),
   ARCA_OPENSSL_PATH: z.string().min(1).default('openssl'),
+  RESEND_API_KEY: optionalTrimmedString(20),
+  ORDER_EMAIL_FROM: optionalTrimmedString(5),
   MP_ACCESS_TOKEN: optionalTrimmedString(20),
   MP_WEBHOOK_SECRET: optionalTrimmedString(20),
   MP_CHECKOUT_SURCHARGE_MILLIPERCENT: z.coerce.number().int().min(0).max(100000).default(5610), // Mercado Pago a 10 días: 5,61% para cubrir 4,39% + IVA estimado.
