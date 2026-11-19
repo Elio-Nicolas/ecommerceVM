@@ -11,6 +11,8 @@ Este documento separa lo que existe en el código de lo que todavía requiere da
 - Pantalla: `src/ShippingSettingsPanel.tsx`.
 - API: `GET/PUT /api/v1/admin/shipping-settings`.
 - Las credenciales de e-Pak (usuario, contraseña, CUIT y operativa) se guardan cifradas en `ShippingSettings`.
+- Se agregaron campos cifrados para número de cuenta (`nrocuenta`), centro de costo y `idcentroimposicionorigen`, necesarios para construir la admisión.
+- La API expone únicamente `ocaAdmissionConfigured`; nunca devuelve los valores descifrados. Los tres datos de admisión se guardan juntos y se validan con los formatos publicados por OCA.
 - La API no devuelve los secretos al frontend; solo expone `ocaConfigured` y `ocaEnvironment`.
 - La clave recomendada para cifrado es `SHIPPING_ENCRYPTION_KEY` (mínimo 32 caracteres). No guardar credenciales ni claves en Git, issues o chats.
 - El selector permite QA y producción. No seleccionar producción hasta completar QA y confirmar expresamente la habilitación comercial.
@@ -106,11 +108,12 @@ No solicitar ni almacenar estos datos en Git:
 1. CUIT habilitado y número de cuenta comercial.
 2. Usuario y contraseña e-Pak.
 3. Operativa asignada para el servicio elegido (puerta a puerta, puerta a sucursal u otra modalidad habilitada).
-4. Centro de costo / dirección de devolución.
-5. Modalidad de despacho desde Villa Mercedes: ingreso en sucursal o retiro por OCA.
-6. Si hay retiro: sucursal/origen, franja horaria, días y condiciones.
-7. Formato de etiqueta requerido (PDF A4 o 10×15 cm) y confirmación de impresión.
-8. Credenciales y endpoint de QA habilitados para la cuenta.
+4. Número de cuenta e-Pak habilitado (formato `NNNNNN/NNN`), centro de costo retornado por `GetCentroCostoPorOperativa` e ID de sucursal de admisión retornado por `GetCentrosImposicionConServiciosByCP` para CP 5730, con servicio de admisión habilitado.
+5. Centro de costo / dirección de devolución.
+6. Modalidad de despacho desde Villa Mercedes: ingreso en sucursal o retiro por OCA.
+7. Si hay retiro: sucursal/origen, franja horaria, días y condiciones.
+8. Formato de etiqueta requerido (PDF A4 o 10×15 cm) y confirmación de impresión.
+9. Credenciales y endpoint de QA habilitados para la cuenta.
 
 No usar los usuarios/credenciales de ejemplo publicados por OCA como credenciales comerciales ni como sustituto de la cuenta del vendedor.
 
