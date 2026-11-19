@@ -76,7 +76,9 @@ Antes de implementar la admisión hay que obtener y validar con OCA el XML compl
 Se agregó `buildOcaAdmissionXml()` como serializador puro del contrato publicado: arma la estructura `ROWS/origenes/origen/envios/envio`, requiere la sucursal de admisión de origen, permite `idci` solo cuando el destinatario retira en sucursal y representa un único paquete consolidado por pedido (`cant=1`). Para una operativa sin seguro envía `valor=0`; solo incluye valor declarado cuando el seguro esté habilitado. Valida límites de campos, fecha, códigos postales, dimensiones y caracteres que OCA advierte que pueden fallar. Todavía no llama al Web Service ni persiste admisiones: faltan número de cuenta, operativa, centro de costo, sucursal y datos de QA asignados a la cuenta.
 
 ### Etiquetas
-OCA documenta métodos de etiquetas HTML y PDF, además de ZPL para impresoras compatibles. Entre los métodos publicados:
+OCA documenta métodos de etiquetas HTML y PDF, además de ZPL para impresoras compatibles.
+
+Se agregó `api/src/services/oca-label.ts`: consulta `GetPdfDeEtiquetasPorOrdenOrNumeroEnvio` por HTTP GET en el ambiente configurado, decodifica la respuesta XML/Base64, valida firma `%PDF-` y limita el archivo a 15 MB. No inventa un PDF ni acepta respuestas de error como etiqueta. El endpoint protegido `GET /api/v1/admin/shipping-labels/orders/:orderId/oca` recupera la etiqueta para una admisión OCA ya persistida, la guarda en `ShippingShipment.labelPdf` y responde `application/pdf` para abrir/imprimir. Si ya está guardada, reutiliza la copia local y no vuelve a llamar a OCA. Requiere `externalAdmissionId`; todavía no crea la admisión ni asigna ese identificador. Entre los métodos publicados:
 - `GetPdfDeEtiquetasPorOrdenOrNumeroEnvio`
 - `GetPdfDeEtiquetasPorOrdenOrNumeroEnvioParaEtiquetadora`
 - `GetHtmlDeEtiquetasPorOrdenOrNumeroEnvio`
