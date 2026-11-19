@@ -122,8 +122,8 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
         </div>
         <div className="admin-form-grid">
           <label>Número de cuenta OCA<input value={ocaAccountNumber} onChange={(e) => setOcaAccountNumber(e.target.value)} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Ej. 123456/001'} /></label>
-          <label>Centro de costo<input inputMode="numeric" value={ocaCostCenter} onChange={(e) => setOcaCostCenter(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Asignado por OCA'} /></label>
-          <label>ID sucursal de admisión<input inputMode="numeric" value={ocaOriginBranchId} onChange={(e) => setOcaOriginBranchId(e.target.value.replace(/\D/g, '').slice(0, 3))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Sucursal OCA Villa Mercedes'} /></label>
+          <label>Centro de costo<input inputMode="numeric" readOnly value={ocaCostCenter} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Asignado por OCA'} /></label>
+          <label>ID sucursal de admisión<input inputMode="numeric" readOnly value={ocaOriginBranchId} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Sucursal OCA Villa Mercedes'} /></label>
         </div>
         <p className="shipping-settings-help">Los datos se cifran en el backend. La sucursal se consulta por CP 5730 y sólo se ofrecen centros que informan servicio de admisión. Las consultas quedan limitadas a QA; producción requiere autorización expresa.</p>
         <div className="admin-category-actions">
