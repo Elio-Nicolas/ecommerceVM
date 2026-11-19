@@ -35,7 +35,7 @@ testCase('genera XML OCA con admisión en sucursal y un único paquete consolida
   assert.match(xml, /idcentroimposicionorigen="123"/)
   assert.match(xml, /idoperativa="78254" nroremito="EV-ORDER-1001"/)
   assert.match(xml, /<paquete alto="20\.00" ancho="30\.00" largo="40\.00" peso="2\.50" valor="0\.00" cant="1"/)
-  assert.equal((xml.match(/<paquete\\b/g) || []).length, 1)
+  assert.equal((xml.match(/<paquete\b/g) || []).length, 1)
 })
 
 testCase('incluye identificador de sucursal destino solo cuando se elige entrega en sucursal', () => {
