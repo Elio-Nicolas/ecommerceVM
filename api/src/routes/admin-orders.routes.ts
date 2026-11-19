@@ -281,7 +281,7 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  if (order.deliveryMethod !== 'OCA' || order.status !== 'PREPARING' || order.status === 'CANCELLED') {
+  if (order.deliveryMethod !== 'OCA' || order.status !== 'PREPARING') {
     res.status(409).json({ error: { code: 'OCA_ADMISSION_ORDER_STATE_INVALID', message: 'La admisión OCA requiere un pedido OCA confirmado y en preparación.' } })
     return
   }
@@ -316,23 +316,23 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
   const dateValue = Object.fromEntries(dateParts.map((part) => [part.type, part.value]))
   const admissionDate = dateValue.year + dateValue.month + dateValue.day
   const xmlData = buildOcaAdmissionXml({
-      accountNumber: credentials.accountNumber,
-      operative: credentials.operative,
-      orderReference: order.code,
+    accountNumber: credentials.accountNumber,
+    operative: credentials.operative,
+    orderReference: order.code,
       admissionDate,
-      costCenter: credentials.costCenter,
-      originBranchId: branch.id,
-      origin: {
+    costCenter: credentials.costCenter,
+    originBranchId: branch.id,
+    origin: {
         street: branch.street,
         number: branch.number,
         postalCode: branch.postalCode!,
         locality: branch.locality,
         province: branch.province,
       },
-      recipient: {
+    recipient: {
         ...input.data.recipient,
       },
-      parcel: input.data.parcel,
+    parcel: input.data.parcel,
     })
 
   const shipment = await prisma.$transaction(async (tx) => {
