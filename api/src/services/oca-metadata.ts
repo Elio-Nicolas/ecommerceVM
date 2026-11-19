@@ -1,4 +1,3 @@
-import { prisma } from '../lib/prisma'
 import { getShippingSettings, getStoredOcaCredentials } from './shipping-settings'
 
 export class OcaMetadataError extends Error {
