@@ -159,8 +159,9 @@ export default function App() {
   const paymentParams = new URLSearchParams(window.location.search)
   const paymentOutcome = paymentParams.get('payment')
   const paymentOrderId = paymentParams.get('order')
+  const paymentProvider = paymentParams.get('provider') === 'gocuotas' ? 'gocuotas' : 'mercadopago'
   if (paymentOrderId && /^[0-9a-f-]{36}$/i.test(paymentOrderId) && ['success', 'failure', 'pending'].includes(paymentOutcome || '')) {
-    return <PaymentReturnPage orderId={paymentOrderId} outcome={paymentOutcome as 'success' | 'failure' | 'pending'} provider="mercadopago" />
+    return <PaymentReturnPage orderId={paymentOrderId} outcome={paymentOutcome as 'success' | 'failure' | 'pending'} provider={paymentProvider} />
   }
 
   if (window.location.pathname.replace(/\/$/, '') === '/arrepentimiento') return <RegretPage />
