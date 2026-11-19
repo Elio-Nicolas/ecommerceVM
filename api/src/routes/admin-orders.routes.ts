@@ -315,6 +315,26 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
   }).formatToParts(now)
   const dateValue = Object.fromEntries(dateParts.map((part) => [part.type, part.value]))
   const admissionDate = dateValue.year + dateValue.month + dateValue.day
+  const xmlData = buildOcaAdmissionXml({
+      accountNumber: credentials.accountNumber,
+      operative: credentials.operative,
+      orderReference: order.code,
+      admissionDate,
+      costCenter: credentials.costCenter,
+      originBranchId: branch.id,
+      origin: {
+        street: branch.street,
+        number: branch.number,
+        postalCode: branch.postalCode!,
+        locality: branch.locality,
+        province: branch.province,
+      },
+      recipient: {
+        ...input.data.recipient,
+      },
+      parcel: input.data.parcel,
+    })
+
   const shipment = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', order.id)
     const existing = await tx.shippingShipment.findUnique({
@@ -337,25 +357,6 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
   }
 
   try {
-    const xmlData = buildOcaAdmissionXml({
-      accountNumber: credentials.accountNumber,
-      operative: credentials.operative,
-      orderReference: order.code,
-      admissionDate,
-      costCenter: credentials.costCenter,
-      originBranchId: branch.id,
-      origin: {
-        street: branch.street,
-        number: branch.number,
-        postalCode: branch.postalCode!,
-        locality: branch.locality,
-        province: branch.province,
-      },
-      recipient: {
-        ...input.data.recipient,
-      },
-      parcel: input.data.parcel,
-    })
     const result = await createOcaAdmission({ xmlData, confirmImmediately: false })
     await prisma.$transaction(async (tx) => {
       await tx.shippingShipment.update({
