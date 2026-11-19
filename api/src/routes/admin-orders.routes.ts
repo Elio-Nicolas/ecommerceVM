@@ -272,7 +272,7 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
   }
   if (existing.paymentReceivedAt) {
     await sendPaidOrderConfirmationEmail(existing.id)
-    res.json({ data: { paymentReceivedAt: existing.paymentReceivedAt }, message: 'El cobro ya estaba registrado. Se verificó el envío del correo de confirmación.' })
+    res.json({ data: { paymentReceivedAt: existing.paymentReceivedAt }, message: 'El cobro ya estaba registrado. Se intentó enviar el correo; si falla, podés reintentar desde administración.' })
     return
   }
   const receivedAt = new Date()
@@ -299,7 +299,7 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
     return
   }
   await sendPaidOrderConfirmationEmail(existing.id)
-  res.json({ data: { paymentReceivedAt: updated }, message: 'Cobro registrado. Se procesó el envío del correo de confirmación.' })
+  res.json({ data: { paymentReceivedAt: updated }, message: 'Cobro registrado. Se intentó enviar el correo de confirmación; si falla, podés reintentar desde administración.' })
 })
 
 adminOrdersRouter.patch('/:id/status', async (req, res) => {
