@@ -252,7 +252,7 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
   }
   const existing = await prisma.order.findUnique({
     where: { id: orderId.data },
-    select: { id: true, code: true, paymentMethod: true, status: true, paymentReceivedAt: true },
+    select: { id: true, paymentMethod: true, status: true, paymentReceivedAt: true },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -267,7 +267,8 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
     return
   }
   if (existing.paymentReceivedAt) {
-    res.json({ data: { paymentReceivedAt: existing.paymentReceivedAt }, message: 'El cobro ya estaba registrado.' })
+    await sendPaidOrderConfirmationEmail(existing.id)
+    res.json({ data: { paymentReceivedAt: existing.paymentReceivedAt }, message: 'El cobro ya estaba registrado. Se verificó el envío del correo de confirmación.' })
     return
   }
   const receivedAt = new Date()
