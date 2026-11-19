@@ -77,7 +77,7 @@ export default function OcaAdmissionPanel({ order, token, onComplete }: { order:
           <label>Apellido<input value={lastName} onChange={(event) => setLastName(event.target.value)} required maxLength={30} /></label>
           <label>Calle de destino<input value={street} onChange={(event) => setStreet(event.target.value)} required maxLength={30} /></label>
           <label>Altura<input value={number} onChange={(event) => setNumber(event.target.value)} required maxLength={5} /></label>
-          <label>Código postal<input value={postalCode} onChange={(event) => setPostalCode(event.target.value)} required pattern="\\d{4}" maxLength={4} /></label>
+          <label>Código postal<input value={postalCode} onChange={(event) => setPostalCode(event.target.value)} required pattern="[0-9]{4}" maxLength={4} /></label>
           <label>Localidad<input value={locality} onChange={(event) => setLocality(event.target.value)} required maxLength={30} /></label>
           <label>Provincia<input value={province} onChange={(event) => setProvince(event.target.value)} required maxLength={30} /></label>
           <label>Teléfono<input value={phone} onChange={(event) => setPhone(event.target.value)} required /></label>
