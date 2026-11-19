@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import testCase from 'node:test'
 import { parseOcaCostCenters, OcaMetadataError } from '../src/services/oca-metadata'
 
-const response = \`<?xml version="1.0"?><NewDataSet><Table><NroCentroCosto>123</NroCentroCosto><Solicitante>Casa Central</Solicitante><CalleRetiro>San Martín</CalleRetiro><NumeroRetiro>123</NumeroRetiro><LocalidadRetiro>Villa Mercedes</LocalidadRetiro><codigopostal>5730</codigopostal></Table><Table><NroCentroCosto>456</NroCentroCosto><Solicitante>Depósito</Solicitante><LocalidadRetiro>San Luis</LocalidadRetiro><CodigoPostal>5700</CodigoPostal></Table></NewDataSet>\`
+const response = `<?xml version="1.0"?><NewDataSet><Table><NroCentroCosto>123</NroCentroCosto><Solicitante>Casa Central</Solicitante><CalleRetiro>San Martín</CalleRetiro><NumeroRetiro>123</NumeroRetiro><LocalidadRetiro>Villa Mercedes</LocalidadRetiro><codigopostal>5730</codigopostal></Table><Table><NroCentroCosto>456</NroCentroCosto><Solicitante>Depósito</Solicitante><LocalidadRetiro>San Luis</LocalidadRetiro><CodigoPostal>5700</CodigoPostal></Table></NewDataSet>`
 
 testCase('parsea centros de costo devueltos por OCA', () => {
   assert.deepEqual(parseOcaCostCenters(response), [
@@ -24,7 +24,7 @@ testCase('rechaza SOAP Fault y estructuras desconocidas', () => {
 
 import { parseOcaAdmissionBranches } from '../src/services/oca-metadata'
 
-const branches = \`<?xml version="1.0"?><soap:Envelope><soap:Body><GetCentrosImposicionConServiciosByCPResponse><GetCentrosImposicionConServiciosByCPResult><CentrosDeImposicion xmlns=""><Centro><IdCentroImposicion>25</IdCentroImposicion><Sigla>VM1</Sigla><Sucursal>SUCURSAL VILLA MERCEDES</Sucursal><Calle>MITRE</Calle><Numero>123</Numero><Localidad>VILLA MERCEDES</Localidad><CodigoPostal>5730</CodigoPostal><Provincia>SAN LUIS</Provincia><Servicios><Servicio><IdTipoServicio>1</IdTipoServicio><ServicioDesc>Admisión de paquetes</ServicioDesc></Servicio><Servicio><IdTipoServicio>2</IdTipoServicio><ServicioDesc>Entrega de paquetes</ServicioDesc></Servicio></Servicios></Centro><Centro><IdCentroImposicion>26</IdCentroImposicion><Sigla>VM2</Sigla><Sucursal>SOLO ENTREGA</Sucursal><Servicios><Servicio><IdTipoServicio>2</IdTipoServicio><ServicioDesc>Entrega de paquetes</ServicioDesc></Servicio></Servicios></Centro></CentrosDeImposicion></GetCentrosImposicionConServiciosByCPResult></soap:Body></soap:Envelope>\`
+const branches = `<?xml version="1.0"?><soap:Envelope><soap:Body><GetCentrosImposicionConServiciosByCPResponse><GetCentrosImposicionConServiciosByCPResult><CentrosDeImposicion xmlns=""><Centro><IdCentroImposicion>25</IdCentroImposicion><Sigla>VM1</Sigla><Sucursal>SUCURSAL VILLA MERCEDES</Sucursal><Calle>MITRE</Calle><Numero>123</Numero><Localidad>VILLA MERCEDES</Localidad><CodigoPostal>5730</CodigoPostal><Provincia>SAN LUIS</Provincia><Servicios><Servicio><IdTipoServicio>1</IdTipoServicio><ServicioDesc>Admisión de paquetes</ServicioDesc></Servicio><Servicio><IdTipoServicio>2</IdTipoServicio><ServicioDesc>Entrega de paquetes</ServicioDesc></Servicio></Servicios></Centro><Centro><IdCentroImposicion>26</IdCentroImposicion><Sigla>VM2</Sigla><Sucursal>SOLO ENTREGA</Sucursal><Servicios><Servicio><IdTipoServicio>2</IdTipoServicio><ServicioDesc>Entrega de paquetes</ServicioDesc></Servicio></Servicios></Centro></CentrosDeImposicion></GetCentrosImposicionConServiciosByCPResult></soap:Body></soap:Envelope>`
 
 testCase('incluye sólo sucursales con servicio de admisión', () => {
   assert.deepEqual(parseOcaAdmissionBranches(branches), [{
