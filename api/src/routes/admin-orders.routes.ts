@@ -255,7 +255,7 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
       lastName: z.string().trim().min(1).max(30),
       street: z.string().trim().min(1).max(30),
       number: z.string().trim().min(1).max(5),
-      postalCode: z.string().regex(/^\\d{4}$/),
+      postalCode: z.string().regex(/^[0-9]{4}$/),
       locality: z.string().trim().min(1).max(30),
       province: z.string().trim().min(1).max(30),
       phone: z.string().trim().max(30).optional(),
@@ -285,7 +285,7 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
     res.status(409).json({ error: { code: 'OCA_ADMISSION_ORDER_STATE_INVALID', message: 'La admisión OCA requiere un pedido OCA confirmado y en preparación.' } })
     return
   }
-  const paid = Boolean(order.paymentReceivedAt) || order.paymentAttempts.some((attempt) => attempt.provider === 'MERCADO_PAGO' && attempt.status === 'APPROVED' && attempt.approvedAt)
+  const paid = Boolean(order.paymentReceivedAt) || order.paymentAttempts.some((attempt) => attempt.status === 'APPROVED' && attempt.approvedAt)
   if (!paid) {
     res.status(409).json({ error: { code: 'OCA_ADMISSION_PAYMENT_REQUIRED', message: 'No se puede admitir el envío hasta que el cobro esté confirmado.' } })
     return
