@@ -38,6 +38,12 @@ testCase('genera XML OCA con admisión en sucursal y un único paquete consolida
   assert.equal((xml.match(/<paquete\b/g) || []).length, 1)
 })
 
+testCase('omite franja horaria para admisión en sucursal y la incluye solo si se informa', () => {
+  const xml = buildOcaAdmissionXml({ ...validInput, timeWindowId: undefined })
+  assert.doesNotMatch(xml, /idfranjahoraria=/)
+  assert.match(buildOcaAdmissionXml(validInput), /idfranjahoraria="1"/)
+})
+
 testCase('incluye identificador de sucursal destino solo cuando se elige entrega en sucursal', () => {
   const xml = buildOcaAdmissionXml({
     ...validInput,
