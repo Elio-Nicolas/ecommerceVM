@@ -151,3 +151,13 @@ No usar los usuarios/credenciales de ejemplo publicados por OCA como credenciale
 - `api/src/routes/admin-orders.routes.ts`: protección del cambio a enviado.
 
 Este documento debe actualizarse en el mismo PR que cada avance de OCA.
+
+## Consultas de metadatos en Administración
+
+- `GET /api/v1/admin/shipping-settings/oca/admission-branches?postalCode=5730` consulta sucursales por CP y devuelve exclusivamente las que tienen el servicio OCA `IdTipoServicio=1` (Admisión de paquetes). El identificador se toma de `IdCentroImposicion`; nombre, domicilio y ubicación se leen de los nodos del centro.
+- `GET /api/v1/admin/shipping-settings/oca/cost-centers` consulta centros de costo con CUIT y operativa guardados. El identificador se toma de `NroCentroCosto`.
+- Los dos endpoints son administrativos, de sólo lectura y están limitados al entorno QA. Si la configuración está en Producción, responden con error controlado y no llaman al endpoint productivo.
+- Las consultas no crean órdenes, no generan etiquetas y no confirman admisiones.
+- El panel permite seleccionar el centro de costo y la sucursal devueltos por OCA; ambos valores se guardan cifrados junto con el resto de la configuración.
+
+La estructura del XML de sucursales se contrastó con una respuesta SOAP documentada que contiene `CentrosDeImposicion/Centro/Servicios/Servicio`. La elegibilidad de origen se filtra por `IdTipoServicio=1`, correspondiente a Admisión de paquetes. El XML de centros de costo se procesa como `NewDataSet/Table`, tomando `NroCentroCosto`.
