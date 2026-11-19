@@ -44,8 +44,8 @@ function money(value: number) {
 }
 
 function paymentLabel(method: string) {
-  if (method === 'MERCADO_PAGO') return 'Pago online iniciado; pendiente de confirmación de Mercado Pago.'
-  if (method === 'GOCUOTAS') return 'Pago iniciado; pendiente de confirmación de GOcuotas.'
+  if (method === 'MERCADO_PAGO') return 'Pago online seleccionado; se confirmará cuando Mercado Pago informe la acreditación.'
+  if (method === 'GOCUOTAS') return 'Pago con GOcuotas seleccionado; se confirmará cuando el proveedor informe la acreditación.'
   return 'Pago a coordinar con la tienda.'
 }
 
