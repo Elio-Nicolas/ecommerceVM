@@ -48,7 +48,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     if (clearOcaCredentials && credentials.some(Boolean)) { setError('No podés reemplazar y eliminar las credenciales OCA en la misma operación.'); setSaving(false); return }
     const admissionSettings = [ocaAccountNumber.trim(), ocaCostCenter.trim(), ocaOriginBranchId.trim()]
     if (admissionSettings.some(Boolean) && !admissionSettings.every(Boolean)) { setError('Para admisión OCA completá número de cuenta, centro de costo e ID de sucursal de origen.'); setSaving(false); return }
-    if (admissionSettings.every(Boolean) && (!/^\\d{1,10}\\/\\d{1,3}$/.test(admissionSettings[0]) || !/^\\d{1,10}$/.test(admissionSettings[1]) || !/^\\d{1,3}$/.test(admissionSettings[2]))) { setError('Revisá el formato de cuenta, centro de costo e ID de sucursal OCA.'); setSaving(false); return }
+    if (admissionSettings.every(Boolean) && (!/^\d{1,10}\/\d{1,3}$/.test(admissionSettings[0]) || !/^\d{1,10}$/.test(admissionSettings[1]) || !/^\d{1,3}$/.test(admissionSettings[2]))) { setError('Revisá el formato de cuenta, centro de costo e ID de sucursal OCA.'); setSaving(false); return }
     const andreaniCredentials = [andreaniUsername.trim(), andreaniPassword.trim(), andreaniClientCode.trim(), andreaniContract.trim()]
     if (andreaniCredentials.some(Boolean) && !andreaniCredentials.every(Boolean)) { setError('Para guardar Andreani completá usuario, contraseña, código de cliente y contrato.'); setSaving(false); return }
     if (clearAndreaniCredentials && andreaniCredentials.some(Boolean)) { setError('No podés reemplazar y eliminar las credenciales Andreani en la misma operación.'); setSaving(false); return }
@@ -93,8 +93,8 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
         </div>
         <div className="admin-form-grid">
           <label>Número de cuenta OCA<input value={ocaAccountNumber} onChange={(e) => setOcaAccountNumber(e.target.value)} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Ej. 123456/001'} /></label>
-          <label>Centro de costo<input inputMode="numeric" value={ocaCostCenter} onChange={(e) => setOcaCostCenter(e.target.value.replace(/\\D/g, '').slice(0, 10))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Asignado por OCA'} /></label>
-          <label>ID sucursal de admisión<input inputMode="numeric" value={ocaOriginBranchId} onChange={(e) => setOcaOriginBranchId(e.target.value.replace(/\\D/g, '').slice(0, 3))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Sucursal OCA Villa Mercedes'} /></label>
+          <label>Centro de costo<input inputMode="numeric" value={ocaCostCenter} onChange={(e) => setOcaCostCenter(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Asignado por OCA'} /></label>
+          <label>ID sucursal de admisión<input inputMode="numeric" value={ocaOriginBranchId} onChange={(e) => setOcaOriginBranchId(e.target.value.replace(/\D/g, '').slice(0, 3))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Sucursal OCA Villa Mercedes'} /></label>
         </div>
         <p className="shipping-settings-help">Los tres datos se cifran en el backend. El ID de sucursal debe corresponder a un centro OCA habilitado para admisión; no uses un ID supuesto.</p>
         {settings.ocaConfigured && <div className="admin-category-actions"><button type="button" className="archive-action" onClick={() => { setClearOcaCredentials((v) => !v); setOcaUsername(''); setOcaPassword(''); setOcaCuit(''); setOcaOperative('') }}>{clearOcaCredentials ? 'Cancelar eliminación' : 'Eliminar credenciales OCA'}</button></div>}
