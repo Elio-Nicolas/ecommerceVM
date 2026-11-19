@@ -74,3 +74,73 @@ export async function getOcaCostCenters(): Promise<OcaCostCenter[]> {
   if (!centers.length) throw new OcaMetadataError('OCA no devolvió centros de costo para la CUIT y operativa configuradas.')
   return centers
 }
+
+
+export type OcaAdmissionBranch = {
+  id: string
+  code: string | null
+  name: string
+  address: string | null
+  postalCode: string | null
+  locality: string | null
+  province: string | null
+  admissionEnabled: true
+}
+
+export function parseOcaAdmissionBranches(xml: string): OcaAdmissionBranch[] {
+  const decoded = decodeXml(xml)
+  if (!decoded.trim() || /<(?:[\w.-]+:)?Fault\b/i.test(decoded)) {
+    throw new OcaMetadataError('OCA devolvió una respuesta inválida al consultar sucursales.')
+  }
+  const centerRows = [...decoded.matchAll(/<(?:[\w.-]+:)?Centro(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Centro\s*>/gi)]
+  if (!centerRows.length && !/<(?:[\w.-]+:)?CentrosDeImposicion\b/i.test(decoded)) {
+    throw new OcaMetadataError('OCA devolvió un XML de sucursales con una estructura no reconocida.')
+  }
+
+  return centerRows.flatMap((match) => {
+    const row = match[1]
+    const services = [...row.matchAll(/<(?:[\w.-]+:)?Servicio(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Servicio\s*>/gi)]
+    const hasAdmission = services.some((service) => {
+      const id = readTag(service[1], 'IdTipoServicio')
+      const description = readTag(service[1], 'ServicioDesc')?.toLocaleLowerCase('es')
+      return id === '1' || description?.includes('admisión de paquetes') === true
+    })
+    if (!hasAdmission) return []
+    const id = readTag(row, 'IdCentroImposicion')
+    if (!id || !/^\d{1,3}$/.test(id)) return []
+    const street = readTag(row, 'Calle')
+    const number = readTag(row, 'Numero')
+    const address = [street, number].filter((part) => part && part.trim()).join(' ').trim()
+    return [{
+      id,
+      code: readTag(row, 'Sigla'),
+      name: readTag(row, 'Sucursal')?.trim() || readTag(row, 'Descripcion')?.trim() || 'Sucursal OCA',
+      address: address || null,
+      postalCode: readTag(row, 'CodigoPostal')?.trim() || null,
+      locality: readTag(row, 'Localidad')?.trim() || null,
+      province: readTag(row, 'Provincia')?.trim() || null,
+      admissionEnabled: true as const,
+    }]
+  })
+}
+
+export async function getOcaAdmissionBranches(postalCode: string): Promise<OcaAdmissionBranch[]> {
+  if (!/^\d{4}$/.test(postalCode)) throw new OcaMetadataError('El código postal debe tener cuatro dígitos.', 400)
+  const settings = await import('../lib/prisma').then(({ prisma }) => prisma.shippingSettings.findUnique({ where: { id: 'default' }, select: { ocaEnvironment: true } }))
+  const environment = (settings?.ocaEnvironment ?? 'QA') as 'QA' | 'PRODUCTION'
+  const base = environment === 'QA'
+    ? 'https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP'
+    : 'https://webservice.oca.com.ar/epak_tracking/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP'
+  const url = new URL(base)
+  url.search = new URLSearchParams({ CodigoPostal: postalCode }).toString()
+
+  let response: Response
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(15000) })
+  } catch {
+    throw new OcaMetadataError('No se pudo conectar con OCA para consultar sucursales.')
+  }
+  if (!response.ok) throw new OcaMetadataError('OCA respondió HTTP ' + response.status + ' al consultar sucursales.')
+  const branches = parseOcaAdmissionBranches(await response.text())
+  return branches
+}
