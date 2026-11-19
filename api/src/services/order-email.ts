@@ -55,7 +55,7 @@ export async function sendOrderReceiptEmail(order: ReceiptOrder) {
     return
   }
 
-  const appUrl = (env.PUBLIC_APP_URL || 'https://tienda.iored.com.ar').replace(/\\/+$/, '')
+    const appUrl = new URL(env.PUBLIC_APP_URL || 'https://tienda.iored.com.ar').origin
   const regretUrl = appUrl + '/arrepentimiento'
   const rows = order.items.map((item) => `
     <tr>
