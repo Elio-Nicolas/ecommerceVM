@@ -83,7 +83,7 @@ export default function OcaAdmissionPanel({ order, token, onComplete }: { order:
           <label>Teléfono<input value={phone} onChange={(event) => setPhone(event.target.value)} required /></label>
           <label className="admin-full-field">Correo electrónico<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>
           <div className="admin-full-field"><strong>Paquete consolidado del pedido</strong><small>Ingresá las medidas del bulto completo, no las de cada unidad.</small></div>
-          <label>Alto (cm)<input type="number" min="1" max="300" value={heightCm} onChange={(event) => setHeightCm(event.target.value)} required /></label>
+          <label>Alto (cm)<input type="number" min="1" max="200" value={heightCm} onChange={(event) => setHeightCm(event.target.value)} required /></label>
           <label>Ancho (cm)<input type="number" min="1" max="300" value={widthCm} onChange={(event) => setWidthCm(event.target.value)} required /></label>
           <label>Largo (cm)<input type="number" min="1" max="300" value={lengthCm} onChange={(event) => setLengthCm(event.target.value)} required /></label>
           <label>Peso (kg)<input type="number" min="0.01" step="0.01" value={weightKg} onChange={(event) => setWeightKg(event.target.value)} required /></label>
