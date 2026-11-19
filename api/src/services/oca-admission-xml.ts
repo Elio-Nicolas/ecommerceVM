@@ -20,7 +20,7 @@ export type OcaAdmissionXmlInput = {
   operative: string
   orderReference: string
   admissionDate: string
-  timeWindowId: 1 | 2 | 3
+  timeWindowId?: 1 | 2 | 3
   costCenter: string
   originBranchId: string
   origin: OcaAddress & {
@@ -106,7 +106,7 @@ export function buildOcaAdmissionXml(input: OcaAdmissionXmlInput): string {
   if (parsedDate.getUTCFullYear() !== year || parsedDate.getUTCMonth() !== month - 1 || parsedDate.getUTCDate() !== day) {
     throw new OcaAdmissionXmlError('La fecha de admisión no es una fecha válida.')
   }
-  if (![1, 2, 3].includes(input.timeWindowId)) {
+  if (input.timeWindowId !== undefined && ![1, 2, 3].includes(input.timeWindowId)) {
     throw new OcaAdmissionXmlError('La franja horaria OCA debe ser 1, 2 o 3.')
   }
   if (!/^\d{4}$/.test(input.origin.postalCode) || !/^\d{4}$/.test(input.recipient.postalCode)) {
@@ -120,7 +120,7 @@ export function buildOcaAdmissionXml(input: OcaAdmissionXmlInput): string {
     attr('solicitante', text(input.origin.applicant, 'el solicitante', 30)),
     attr('observaciones', text(input.origin.observations, 'las observaciones de origen', 100)),
     attr('centrocosto', costCenter),
-    attr('idfranjahoraria', input.timeWindowId),
+    ...(input.timeWindowId === undefined ? [] : [attr('idfranjahoraria', input.timeWindowId)]),
     attr('idcentroimposicionorigen', originBranchId),
     attr('fecha', input.admissionDate),
   ].join('')
