@@ -278,8 +278,8 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
   const receivedAt = new Date()
   const updated = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
-    const current = await tx.order.findUnique({ where: { id: existing.id }, select: { status: true, paymentMethod: true, paymentReceivedAt: true } })
-    if (!current || current.status === 'CANCELLED' || current.paymentMethod !== 'CASH') return null
+    const current = await tx.order.findUnique({ where: { id: existing.id }, select: { status: true, paymentMethod: true, paymentReceivedAt: true, totalArs: true } })
+    if (!current || current.status === 'CANCELLED' || current.paymentMethod !== 'CASH' || current.totalArs === null) return null
     if (current.paymentReceivedAt) return current.paymentReceivedAt
     const nextStatus = current.status === 'PENDING' ? 'CONFIRMED' : current.status
     await tx.order.update({ where: { id: existing.id }, data: { paymentReceivedAt: receivedAt, status: nextStatus } })
