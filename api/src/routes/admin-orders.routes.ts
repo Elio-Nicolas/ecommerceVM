@@ -7,7 +7,8 @@ import { requireAdmin } from '../middleware/require-admin'
 import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
 import { sendPaidOrderConfirmationEmail } from '../services/order-email'
 import { createOcaAdmission, OcaAdmissionError } from '../services/oca-admission'
-import { buildOcaAdmissionXml } from '../services/oca-admission-xml'
+import { buildOcaAdmissionXml, OcaAdmissionXmlError } from '../services/oca-admission-xml'
+import { getOcaAdmissionDate, isCompleteOcaOriginBranch, isOcaOrderPaid, matchesOcaRecipient } from '../services/oca-admission-validation'
 import { getOcaAdmissionBranches } from '../services/oca-metadata'
 import { getStoredOcaCredentials } from '../services/shipping-settings'
 
@@ -285,20 +286,13 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
     res.status(409).json({ error: { code: 'OCA_ADMISSION_ORDER_STATE_INVALID', message: 'La admisión OCA requiere un pedido OCA confirmado y en preparación.' } })
     return
   }
-  const paid = Boolean(order.paymentReceivedAt) || order.paymentAttempts.some((attempt) => attempt.status === 'APPROVED' && attempt.approvedAt)
+  const paid = isOcaOrderPaid(order.paymentReceivedAt, order.paymentAttempts)
   if (!paid) {
     res.status(409).json({ error: { code: 'OCA_ADMISSION_PAYMENT_REQUIRED', message: 'No se puede admitir el envío hasta que el cobro esté confirmado.' } })
     return
   }
-  const normalizeRecipientText = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es')
-  const recipientName = normalizeRecipientText(input.data.recipient.firstName + ' ' + input.data.recipient.lastName)
-  if (recipientName !== normalizeRecipientText(order.customerName)
-    || (input.data.recipient.phone && input.data.recipient.phone.replace(/\D/g, '') !== order.customerPhone.replace(/\D/g, ''))
-    || (input.data.recipient.email && input.data.recipient.email.toLocaleLowerCase('es') !== order.customerEmail?.toLocaleLowerCase('es'))
-    || input.data.recipient.postalCode !== order.postalCode
-    || normalizeRecipientText(input.data.recipient.locality) !== normalizeRecipientText(order.city)
-    || normalizeRecipientText(input.data.recipient.province) !== normalizeRecipientText(order.province)) {
-    res.status(409).json({ error: { code: 'OCA_RECIPIENT_ADDRESS_MISMATCH', message: 'Los datos de localidad, provincia y código postal deben coincidir con el domicilio del pedido.' } })
+  if (!matchesOcaRecipient(order, input.data.recipient)) {
+    res.status(409).json({ error: { code: 'OCA_RECIPIENT_ADDRESS_MISMATCH', message: 'Los datos de nombre, teléfono, correo, localidad, provincia y código postal deben coincidir con el pedido.' } })
     return
   }
 
@@ -308,37 +302,41 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
     return
   }
   const branches = await getOcaAdmissionBranches('5730')
-  const branch = branches.find((item) => item.id === credentials.originBranchId)
-  if (!branch || !branch.street || !branch.number || branch.postalCode !== '5730' || !branch.locality || !branch.province) {
+  const originBranch = branches.find((item) => item.id === credentials.originBranchId) ?? null
+  if (!isCompleteOcaOriginBranch(originBranch, credentials.originBranchId, '5730')) {
     res.status(409).json({ error: { code: 'OCA_ORIGIN_BRANCH_INCOMPLETE', message: 'OCA no devolvió calle, altura, localidad, provincia y CP completos para la sucursal de admisión configurada. No se usará otro domicilio.' } })
     return
   }
 
-  const now = new Date()
-  const dateParts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(now)
-  const dateValue = Object.fromEntries(dateParts.map((part) => [part.type, part.value]))
-  const admissionDate = dateValue.year + dateValue.month + dateValue.day
-  const xmlData = buildOcaAdmissionXml({
+  const admissionDate = getOcaAdmissionDate()
+  let xmlData: string
+  try {
+    xmlData = buildOcaAdmissionXml({
     accountNumber: credentials.accountNumber,
     operative: credentials.operative,
     orderReference: order.code,
       admissionDate,
     costCenter: credentials.costCenter,
-    originBranchId: branch.id,
+    originBranchId: originBranch.id,
     origin: {
-        street: branch.street,
-        number: branch.number,
-        postalCode: branch.postalCode!,
-        locality: branch.locality,
-        province: branch.province,
+        street: originBranch.street,
+        number: originBranch.number,
+        postalCode: originBranch.postalCode!,
+        locality: originBranch.locality,
+        province: originBranch.province,
       },
     recipient: {
         ...input.data.recipient,
       },
     parcel: input.data.parcel,
     })
+  } catch (error) {
+    if (error instanceof OcaAdmissionXmlError) {
+      res.status(400).json({ error: { code: 'OCA_ADMISSION_XML_INVALID', message: error.message } })
+      return
+    }
+    throw error
+  }
 
   const shipment = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', order.id)
@@ -352,7 +350,7 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
         provider: 'OCA',
         status: 'ADMISSION_PENDING',
         parcels: { count: 1, ...input.data.parcel },
-        events: { create: { eventType: 'ADMISSION_REQUESTED', status: 'RECEIVED', payload: { environment: 'QA', originBranchId: branch.id } } },
+        events: { create: { eventType: 'ADMISSION_REQUESTED', status: 'RECEIVED', payload: { environment: 'QA', originBranchId: originBranch.id } } },
       },
     })
   })
@@ -362,7 +360,7 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
   }
 
   try {
-    const result = await createOcaAdmission({ xmlData, confirmImmediately: false })
+    const result = await createOcaAdmission({ xmlData, confirmImmediately: false, requiredEnvironment: 'QA' })
     await prisma.$transaction(async (tx) => {
       await tx.shippingShipment.update({
         where: { id: shipment.id },
