@@ -161,3 +161,40 @@ Este documento debe actualizarse en el mismo PR que cada avance de OCA.
 - El panel permite seleccionar el centro de costo y la sucursal devueltos por OCA; ambos valores se guardan cifrados junto con el resto de la configuración.
 
 La estructura del XML de sucursales se contrastó con una respuesta SOAP documentada que contiene `CentrosDeImposicion/Centro/Servicios/Servicio`. La elegibilidad de origen se filtra por `IdTipoServicio=1`, correspondiente a Admisión de paquetes. El XML de centros de costo se procesa como `NewDataSet/Table`, tomando `NroCentroCosto`.
+
+
+## Admisión administrativa en QA
+
+La API administrativa expone `POST /api/v1/admin/orders/:id/oca-admission` (requiere sesión de administrador). La operación está limitada a pedidos OCA en estado `PREPARING`, con cobro confirmado, y a credenciales OCA configuradas en ambiente `QA`.
+
+El cuerpo requiere los datos estructurados del destinatario y las dimensiones/peso del único bulto consolidado:
+
+```json
+{
+  "recipient": {
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "street": "Calle destino",
+    "number": "123",
+    "postalCode": "5730",
+    "locality": "Villa Mercedes",
+    "province": "San Luis",
+    "phone": "2657...",
+    "email": "cliente@example.com"
+  },
+  "parcel": {
+    "heightCm": 10,
+    "widthCm": 20,
+    "lengthCm": 30,
+    "weightKg": 1.2
+  }
+}
+```
+
+Localidad, provincia y CP del destinatario deben coincidir con el pedido. Calle y altura se solicitan estructuradas para no adivinar cómo separar el domicilio guardado en `addressLine`. Las medidas son ingresadas por administración: no se suman dimensiones de productos ni se presume una geometría de embalaje.
+
+El origen se obtiene exclusivamente de la sucursal OCA de admisión configurada y consultada por CP 5730. La ruta exige calle, altura, localidad, provincia y CP de esa sucursal; nunca usa `pickupAddress`, `ShippingOrigins` ni el domicilio particular del vendedor.
+
+Antes de llamar a OCA se reserva un único `ShippingShipment` por pedido/proveedor bajo bloqueo transaccional. Los intentos existentes no se repiten automáticamente. Un timeout o respuesta no concluyente queda en `ADMISSION_UNKNOWN` y requiere conciliación manual en e-Pak. La llamada usa `ConfirmarRetiro=false`: registra la orden en el carrito e-Pak, sin confirmarla ni despacharla. Un resultado aceptado queda en `ADMITTED`; no habilita por sí solo marcar el pedido como `SHIPPED`, que continúa condicionado al procesamiento y tracking.
+
+Esta ruta es backend-only por ahora; todavía no hay formulario de admisión en el panel administrativo. No ejecutar contra producción hasta validar datos comerciales y credenciales con OCA.
