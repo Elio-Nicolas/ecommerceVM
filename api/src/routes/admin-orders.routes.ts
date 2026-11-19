@@ -290,9 +290,14 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
     res.status(409).json({ error: { code: 'OCA_ADMISSION_PAYMENT_REQUIRED', message: 'No se puede admitir el envío hasta que el cobro esté confirmado.' } })
     return
   }
-  if (input.data.recipient.postalCode !== order.postalCode
-    || input.data.recipient.locality.toLocaleLowerCase('es') !== order.city.toLocaleLowerCase('es')
-    || input.data.recipient.province.toLocaleLowerCase('es') !== order.province.toLocaleLowerCase('es')) {
+  const normalizeRecipientText = (value: string) => value.trim().replace(/\\s+/g, ' ').toLocaleLowerCase('es')
+  const recipientName = normalizeRecipientText(input.data.recipient.firstName + ' ' + input.data.recipient.lastName)
+  if (recipientName !== normalizeRecipientText(order.customerName)
+    || (input.data.recipient.phone && input.data.recipient.phone.replace(/\\D/g, '') !== order.customerPhone.replace(/\\D/g, ''))
+    || (input.data.recipient.email && input.data.recipient.email.toLocaleLowerCase('es') !== order.customerEmail?.toLocaleLowerCase('es'))
+    || input.data.recipient.postalCode !== order.postalCode
+    || normalizeRecipientText(input.data.recipient.locality) !== normalizeRecipientText(order.city)
+    || normalizeRecipientText(input.data.recipient.province) !== normalizeRecipientText(order.province)) {
     res.status(409).json({ error: { code: 'OCA_RECIPIENT_ADDRESS_MISMATCH', message: 'Los datos de localidad, provincia y código postal deben coincidir con el domicilio del pedido.' } })
     return
   }
