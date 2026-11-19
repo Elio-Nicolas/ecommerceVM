@@ -21,11 +21,19 @@ export default function PaymentReturnPage({ orderId, outcome, provider }: Props)
   const [error, setError] = useState('')
 
   const getAccessToken = () => {
-    try { return sessionStorage.getItem('ecommercevm:order-access:' + orderId) || '' } catch { return '' }
+    try {
+      return localStorage.getItem('ecommercevm:order-access:' + orderId)
+        || sessionStorage.getItem('ecommercevm:order-access:' + orderId)
+        || ''
+    } catch { return '' }
   }
 
   const orderCode = (() => {
-    try { return sessionStorage.getItem('ecommercevm:order-code:' + orderId) || '' } catch { return '' }
+    try {
+      return localStorage.getItem('ecommercevm:order-code:' + orderId)
+        || sessionStorage.getItem('ecommercevm:order-code:' + orderId)
+        || ''
+    } catch { return '' }
   })()
 
   const refresh = useCallback(async (signal?: AbortSignal) => {

@@ -247,7 +247,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       } catch {
         requestKey = crypto.randomUUID()
       }
-      const accessToken = accessTokenOverride || sessionStorage.getItem(`ecommercevm:order-access:${orderId}`) || createdOrder?.customerAccessToken || ''
+      const accessToken = accessTokenOverride || localStorage.getItem(`ecommercevm:order-access:${orderId}`) || sessionStorage.getItem(`ecommercevm:order-access:${orderId}`) || createdOrder?.customerAccessToken || ''
       if (!accessToken) throw new Error('No encontramos el acceso seguro de este pedido. Volvé a consultar el comprobante.')
       const paymentPath = provider === 'GOCUOTAS' ? '/api/v1/payments/gocuotas/orders/' : '/api/v1/payments/orders/'
       const response = await fetch(`${API_URL}${paymentPath}${encodeURIComponent(orderId)}`, {
@@ -308,6 +308,10 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       }
       try {
         sessionStorage.removeItem(checkoutStorageKey)
+        // Persistir el acceso fuera de la sesión de pestaña permite recuperar el retorno
+        // aunque el proveedor abra la URL de regreso en otra pestaña o restaure la navegación.
+        localStorage.setItem(`ecommercevm:order-access:${payload.data.id}`, payload.data.customerAccessToken)
+        localStorage.setItem(`ecommercevm:order-code:${payload.data.id}`, payload.data.code)
         sessionStorage.setItem(`ecommercevm:order-access:${payload.data.id}`, payload.data.customerAccessToken)
         sessionStorage.setItem(`ecommercevm:order-code:${payload.data.id}`, payload.data.code)
       } catch { /* El pedido ya quedó registrado; el almacenamiento es opcional. */ }
