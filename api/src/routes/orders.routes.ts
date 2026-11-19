@@ -10,6 +10,7 @@ import { createCheckoutFingerprint } from '../services/order-checkout-fingerprin
 import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
 import { env } from '../config/env'
 import { deriveOrderAccessToken, hashOrderAccessToken, hasValidOrderAccessToken } from '../services/order-access-token'
+import { sendOrderReceiptEmail } from '../services/order-email'
 
 export const ordersRouter = Router()
 
@@ -24,7 +25,7 @@ const createOrderLimiter = rateLimit({
 const createOrderSchema = z.object({
   checkoutRequestKey: z.string().uuid().optional(),
   customerName: z.string().trim().min(2).max(120),
-  customerEmail: z.union([z.string().trim().email().max(160), z.literal('')]).optional().transform((value) => value || null),
+  customerEmail: z.string().trim().email().max(160),
   customerPhone: z.string().trim().min(8).max(30).regex(/^[+0-9\s().-]+$/, 'Ingresá un teléfono válido.').refine((value) => value.replace(/\D/g, '').length >= 8, 'Ingresá al menos 8 dígitos.'),
   addressLine: z.string().trim().min(4).max(180),
   city: z.string().trim().min(2).max(100),
@@ -276,6 +277,26 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         include: { items: true },
       })
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    if (order.customerEmail) {
+      await sendOrderReceiptEmail({
+        id: order.id,
+        code: order.code,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        addressLine: order.addressLine,
+        city: order.city,
+        province: order.province,
+        postalCode: order.postalCode,
+        paymentMethod: order.paymentMethod,
+        status: order.status,
+        subtotalArs: order.subtotalArs,
+        shippingCostArs: order.shippingCostArs,
+        totalArs: order.totalArs,
+        paymentSurchargeArs: order.paymentSurchargeArs,
+        shippingCarrier: order.shippingCarrier,
+        items: order.items,
+      });
+    }
     res.setHeader('Cache-Control', 'no-store')
     res.status(201).json({
       data: {
