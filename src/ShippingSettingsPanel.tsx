@@ -21,6 +21,8 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
   const [clearOcaCredentials, setClearOcaCredentials] = useState(false), [postalCodesText, setPostalCodesText] = useState('5730')
   const [ocaCostCenters, setOcaCostCenters] = useState<{ number: string; requester: string | null; locality: string | null; postalCode: string | null }[]>([])
   const [loadingOcaCostCenters, setLoadingOcaCostCenters] = useState(false)
+  const [ocaBranches, setOcaBranches] = useState<{ id: string; code: string | null; name: string; address: string | null; postalCode: string | null; locality: string | null; province: string | null; admissionEnabled: true }[]>([])
+  const [loadingOcaBranches, setLoadingOcaBranches] = useState(false)
   const [andreaniUsername, setAndreaniUsername] = useState(''), [andreaniPassword, setAndreaniPassword] = useState('')
   const [andreaniClientCode, setAndreaniClientCode] = useState(''), [andreaniContract, setAndreaniContract] = useState('')
   const [clearAndreaniCredentials, setClearAndreaniCredentials] = useState(false), [testingAndreani, setTestingAndreani] = useState(false)
@@ -71,6 +73,17 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar la configuración.') }
     finally { setSaving(false) }
   }
+  async function loadOcaBranches() {
+    if (loadingOcaBranches) return
+    setLoadingOcaBranches(true); setError(''); setNotice('')
+    try {
+      const result = await request<{ data: typeof ocaBranches }>('/admin/shipping-settings/oca/admission-branches?postalCode=5730')
+      setOcaBranches(result.data)
+      if (!result.data.some((branch) => branch.id === ocaOriginBranchId)) setOcaOriginBranchId('')
+      setNotice(result.data.length ? 'Sucursales habilitadas para admisión obtenidas de OCA (CP 5730).' : 'OCA no informó sucursales con admisión de paquetes para el CP 5730.')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudieron consultar las sucursales OCA.') }
+    finally { setLoadingOcaBranches(false) }
+  }
   async function loadOcaCostCenters() {
     if (loadingOcaCostCenters) return
     setLoadingOcaCostCenters(true); setError(''); setNotice('')
@@ -110,7 +123,11 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
           <label>Centro de costo<input inputMode="numeric" value={ocaCostCenter} onChange={(e) => setOcaCostCenter(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Asignado por OCA'} /></label>
           <label>ID sucursal de admisión<input inputMode="numeric" value={ocaOriginBranchId} onChange={(e) => setOcaOriginBranchId(e.target.value.replace(/\D/g, '').slice(0, 3))} placeholder={settings.ocaAdmissionConfigured && !clearOcaCredentials ? 'Guardado · dejar vacío para conservar' : 'Sucursal OCA Villa Mercedes'} /></label>
         </div>
-        <p className="shipping-settings-help">Los datos se cifran en el backend. El centro de costo se puede consultar a OCA cuando guardes usuario, CUIT y operativa.</p>
+        <p className="shipping-settings-help">Los datos se cifran en el backend. La sucursal se consulta por CP 5730 y sólo se ofrecen centros que informan servicio de admisión.</p>
+        <div className="admin-category-actions">
+          <button type="button" className="archive-action" disabled={loadingOcaBranches} onClick={() => void loadOcaBranches()}>{loadingOcaBranches ? 'Consultando sucursales...' : 'Consultar sucursales de admisión (Villa Mercedes)'}</button>
+        </div>
+        {ocaBranches.length > 0 && <label>Seleccionar sucursal de admisión<select value={ocaOriginBranchId} onChange={(e) => setOcaOriginBranchId(e.target.value)}><option value="">Seleccioná una sucursal</option>{ocaBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}{branch.code ? ' · ' + branch.code : ''}{branch.address ? ' · ' + branch.address : ''}</option>)}</select></label>}
         <div className="admin-category-actions">
           <button type="button" className="archive-action" disabled={loadingOcaCostCenters || !settings.ocaConfigured || clearOcaCredentials} onClick={() => void loadOcaCostCenters()}>{loadingOcaCostCenters ? 'Consultando OCA...' : 'Consultar centros de costo OCA'}</button>
         </div>
