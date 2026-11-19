@@ -24,13 +24,13 @@ function decodeXml(xml: string): string {
 function readXmlValue(xml: string, names: string[]): string | null {
   const decoded = decodeXml(xml)
   for (const name of names) {
-    const escaped = name.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
+    const escaped = name.replace(/[.*+?^$()|[\]\\]/g, '\\$&')
     const expression = new RegExp('<(?:[\\w.-]+:)?' + escaped + '(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?' + escaped + '\\s*>', 'i')
     const match = decoded.match(expression)
     if (match?.[1]) {
       return match[1]
-        .replace(/^\\s*<!\\[CDATA\\[/i, '')
-        .replace(/\\]\\]>\\s*$/i, '')
+        .replace(/^\s*<!\[CDATA\[/i, '')
+        .replace(/\]\]>\s*$/i, '')
         .replace(/<[^>]+>/g, '')
         .trim()
     }
