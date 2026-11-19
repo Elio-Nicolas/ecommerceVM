@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { formatPrice } from './products'
+import OcaAdmissionPanel from './OcaAdmissionPanel'
 import './order-logistics.css'
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
@@ -505,6 +506,7 @@ export default function AdminOrders() {
               <div><span>NOTAS</span><strong>{activeOrder.customerNotes || 'Sin indicaciones adicionales'}</strong></div>
             </div>
             <div className="order-items-list"><h3>Productos</h3>{activeOrder.items.map((item) => <div key={item.id}><span>{item.quantity} × {item.productName}<small>{item.productSku} · {formatPrice(item.unitPriceArs)} c/u</small></span><strong>{formatPrice(item.lineTotalArs)}</strong></div>)}</div>
+            {activeOrder.deliveryMethod === 'OCA' && <OcaAdmissionPanel order={activeOrder} token={token} onComplete={() => { void loadOrders(token) }} />}
             <div className="order-totals"><span>Subtotal</span><strong>{formatPrice(activeOrder.subtotalArs)}</strong><small>{activeOrder.shippingCostArs === null ? 'Envío: pendiente de coordinación' : `Envío: ${formatPrice(activeOrder.shippingCostArs)}`}</small><span>Total del pedido</span><strong>{activeOrder.totalArs === null ? 'Pendiente de coordinación' : formatPrice(activeOrder.totalArs)}</strong></div>
             {activeOrder.paymentMethod === 'CASH' && <section className="order-payment-card">
               <div className="order-payment-heading"><div><span className="admin-kicker">COBRO MANUAL</span><h3>Efectivo / a coordinar</h3></div><small>{activeOrder.paymentReceivedAt ? `Cobrado · ${formatDate(activeOrder.paymentReceivedAt)}` : 'Pendiente de cobro'}</small></div>
