@@ -389,11 +389,10 @@ ordersRouter.post('/regret', regretRequestLimiter, async (req, res) => {
     select: {
       id: true,
       status: true,
-      paymentAttempts: { where: { provider: 'MERCADO_PAGO', status: { in: ['APPROVED', 'PARTIALLY_REFUNDED'] } }, select: { id: true }, take: 1 },
     },
   })
-  if (!order || order.paymentAttempts.length === 0) {
-    res.status(404).json({ error: { code: 'REGRET_ORDER_NOT_FOUND', message: 'No encontramos un pedido con esos datos y un pago aprobado. Revisá el código y el correo.' } })
+  if (!order) {
+    res.status(404).json({ error: { code: 'REGRET_ORDER_NOT_FOUND', message: 'No encontramos un pedido con esos datos. Revisá el código y el correo utilizado en la compra.' } })
     return
   }
   if (order.status === 'CANCELLED') {
