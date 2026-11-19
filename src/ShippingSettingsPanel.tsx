@@ -51,7 +51,7 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
     if (credentials.some(Boolean) && !credentials.every(Boolean)) { setError('Para guardar OCA completá usuario, contraseña, CUIT y operativa.'); setSaving(false); return }
     if (clearOcaCredentials && credentials.some(Boolean)) { setError('No podés reemplazar y eliminar las credenciales OCA en la misma operación.'); setSaving(false); return }
     const admissionSettings = [ocaAccountNumber.trim(), ocaCostCenter.trim(), ocaOriginBranchId.trim()]
-    if (admissionSettings.some(Boolean) && !admissionSettings.every(Boolean)) { setError('Para admisión OCA completá número de cuenta, centro de costo e ID de sucursal de origen.'); setSaving(false); return }
+    if (admissionSettings.some(Boolean) && !admissionSettings.every(Boolean) && !settings.ocaAdmissionConfigured) { setError('Para configurar admisión OCA por primera vez completá número de cuenta, centro de costo e ID de sucursal de origen.'); setSaving(false); return }
     if (admissionSettings.every(Boolean) && (!/^\d{1,10}\/\d{1,3}$/.test(admissionSettings[0]) || !/^\d{1,10}$/.test(admissionSettings[1]) || !/^\d{1,3}$/.test(admissionSettings[2]))) { setError('Revisá el formato de cuenta, centro de costo e ID de sucursal OCA.'); setSaving(false); return }
     const andreaniCredentials = [andreaniUsername.trim(), andreaniPassword.trim(), andreaniClientCode.trim(), andreaniContract.trim()]
     if (andreaniCredentials.some(Boolean) && !andreaniCredentials.every(Boolean)) { setError('Para guardar Andreani completá usuario, contraseña, código de cliente y contrato.'); setSaving(false); return }
@@ -61,7 +61,9 @@ export default function ShippingSettingsPanel({ token }: { token: string }) {
       ...(andreaniCredentials.every(Boolean) ? { andreaniUsername: andreaniCredentials[0], andreaniPassword: andreaniCredentials[1], andreaniClientCode: andreaniCredentials[2], andreaniContract: andreaniCredentials[3] } : {}),
       ...(clearAndreaniCredentials ? { clearAndreaniCredentials: true } : {}),
       ...(credentials.every(Boolean) ? { ocaUsername: credentials[0], ocaPassword: credentials[1], ocaCuit: credentials[2].replace(/\D/g, ''), ocaOperative: credentials[3] } : {}),
-      ...(admissionSettings.every(Boolean) ? { ocaAccountNumber: admissionSettings[0], ocaCostCenter: admissionSettings[1], ocaOriginBranchId: admissionSettings[2] } : {}),
+      ...(admissionSettings[0] ? { ocaAccountNumber: admissionSettings[0] } : {}),
+      ...(admissionSettings[1] ? { ocaCostCenter: admissionSettings[1] } : {}),
+      ...(admissionSettings[2] ? { ocaOriginBranchId: admissionSettings[2] } : {}),
       ...(clearOcaCredentials ? { clearOcaCredentials: true } : {}),
     }
     try {
