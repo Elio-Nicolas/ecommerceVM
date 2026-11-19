@@ -36,7 +36,7 @@ function xmlTag(xml: string, names: string[]): string | null {
 
 function integerTag(xml: string, names: string[]): number | null {
   const value = xmlTag(xml, names)
-  if (value === null || !/^\\d+$/.test(value)) return null
+  if (value === null || !/^\d+$/.test(value)) return null
   return Number(value)
 }
 
@@ -52,12 +52,12 @@ export type OcaAdmissionResult = {
 
 export function parseOcaAdmissionResponse(responseXml: string): OcaAdmissionResult {
   const xml = decodeXml(responseXml)
-  if (!xml.trim() || /<(?:[\\w.-]+:)?Fault\\b/i.test(xml)) {
+  if (!xml.trim() || /<(?:[\w.-]+:)?Fault\b/i.test(xml)) {
     throw new OcaAdmissionError('OCA devolvió una respuesta inválida al registrar el envío.')
   }
 
-  const detailMatch = xml.match(/<(?:[\\w.-]+:)?DetalleIngresos(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?DetalleIngresos\\s*>/i)
-  const summaryMatch = xml.match(/<(?:[\\w.-]+:)?Resumen(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?Resumen\\s*>/i)
+  const detailMatch = xml.match(/<(?:[\w.-]+:)?DetalleIngresos(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?DetalleIngresos\s*>/i)
+  const summaryMatch = xml.match(/<(?:[\w.-]+:)?Resumen(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?Resumen\s*>/i)
   const detail = detailMatch?.[1] ?? ''
   const summary = summaryMatch?.[1] ?? ''
   const admissionId = xmlTag(detail, ['OrdenRetiro'])
