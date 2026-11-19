@@ -102,9 +102,13 @@ export function parseOcaAdmissionResponse(responseXml: string): OcaAdmissionResu
 export async function createOcaAdmission(input: {
   xmlData: string
   confirmImmediately?: boolean
+  requiredEnvironment?: keyof typeof endpoints
 }): Promise<OcaAdmissionResult> {
   const credentials = await getStoredOcaCredentials()
   if (!credentials) throw new OcaAdmissionError('OCA todavía no está configurado.', 503)
+  if (input.requiredEnvironment && credentials.environment !== input.requiredEnvironment) {
+    throw new OcaAdmissionError('El ambiente OCA cambió o no coincide con el ambiente autorizado para esta operación.', 409)
+  }
   if (!input.xmlData.trim() || input.xmlData.length > 100_000) {
     throw new OcaAdmissionError('Los datos XML de admisión están vacíos o superan el tamaño permitido.', 400)
   }
