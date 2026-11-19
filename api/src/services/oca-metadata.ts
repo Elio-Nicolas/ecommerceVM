@@ -1,4 +1,5 @@
-import { getStoredOcaCredentials } from './shipping-settings'
+import { prisma } from '../lib/prisma'
+import { getShippingSettings, getStoredOcaCredentials } from './shipping-settings'
 
 export class OcaMetadataError extends Error {
   constructor(message: string, readonly statusCode = 502) {
@@ -126,8 +127,8 @@ export function parseOcaAdmissionBranches(xml: string): OcaAdmissionBranch[] {
 
 export async function getOcaAdmissionBranches(postalCode: string): Promise<OcaAdmissionBranch[]> {
   if (!/^\d{4}$/.test(postalCode)) throw new OcaMetadataError('El código postal debe tener cuatro dígitos.', 400)
-  const settings = await import('../lib/prisma').then(({ prisma }) => prisma.shippingSettings.findUnique({ where: { id: 'default' }, select: { ocaEnvironment: true } }))
-  const environment = (settings?.ocaEnvironment ?? 'QA') as 'QA' | 'PRODUCTION'
+  const settings = await getShippingSettings()
+  const environment = settings.ocaEnvironment as 'QA' | 'PRODUCTION'
   const base = environment === 'QA'
     ? 'https://integraciones.ocadev.com.ar/epak_tracking_test/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP'
     : 'https://webservice.oca.com.ar/epak_tracking/Oep_TrackEPak.asmx/GetCentrosImposicionConServiciosByCP'
