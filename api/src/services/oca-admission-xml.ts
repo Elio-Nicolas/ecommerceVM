@@ -68,7 +68,7 @@ function attr(name: string, value: string | number | undefined): string {
 
 function numericIdentifier(value: string, field: string, maxLength: number): string {
   const normalized = text(value, field, maxLength, true)
-  if (!/^\\d+$/.test(normalized)) throw new OcaAdmissionXmlError(field + ' debe contener solo dígitos.')
+  if (!/^\d+$/.test(normalized)) throw new OcaAdmissionXmlError(field + ' debe contener solo dígitos.')
   return normalized
 }
 
@@ -93,11 +93,18 @@ export function buildOcaAdmissionXml(input: OcaAdmissionXmlInput): string {
   const accountNumber = text(input.accountNumber, 'el número de cuenta OCA', 10, true)
   const operative = numericIdentifier(input.operative, 'la operativa OCA', 6)
   const orderReference = text(input.orderReference, 'el número de remito', 30, true)
-  const costCenter = text(input.costCenter, 'el centro de costo', 10, true)
-  const originBranchId = text(input.originBranchId, 'la sucursal OCA de admisión', 3, true)
+  const costCenter = numericIdentifier(input.costCenter, 'el centro de costo', 10)
+  const originBranchId = numericIdentifier(input.originBranchId, 'la sucursal OCA de admisión', 3)
 
   if (!/^\d{8}$/.test(input.admissionDate)) {
     throw new OcaAdmissionXmlError('La fecha de admisión debe tener formato AAAAMMDD.')
+  }
+  const year = Number(input.admissionDate.slice(0, 4))
+  const month = Number(input.admissionDate.slice(4, 6))
+  const day = Number(input.admissionDate.slice(6, 8))
+  const parsedDate = new Date(Date.UTC(year, month - 1, day))
+  if (parsedDate.getUTCFullYear() !== year || parsedDate.getUTCMonth() !== month - 1 || parsedDate.getUTCDate() !== day) {
+    throw new OcaAdmissionXmlError('La fecha de admisión no es una fecha válida.')
   }
   if (![1, 2, 3].includes(input.timeWindowId)) {
     throw new OcaAdmissionXmlError('La franja horaria OCA debe ser 1, 2 o 3.')
