@@ -4,6 +4,7 @@ import { fetchCategories, fetchProducts } from './catalog-api'
 import CheckoutPage from './CheckoutPage'
 import PaymentReturnPage from './PaymentReturnPage'
 import RegretPage from './RegretPage'
+import RegretPolicyPage from './RegretPolicyPage'
 
 type CartLine = { product: Product; quantity: number }
 
@@ -165,6 +166,7 @@ export default function App() {
   }
 
   if (window.location.pathname.replace(/\/$/, '') === '/arrepentimiento') return <RegretPage />
+  if (window.location.pathname.replace(/\/$/, '') === '/derecho-de-arrepentimiento') return <RegretPolicyPage />
 
   return (
     <div className="site-shell">
@@ -282,7 +284,7 @@ export default function App() {
           <div className="footer-column">
             <h3>Ayuda e información</h3>
             <a href="/arrepentimiento">Botón de arrepentimiento</a>
-            <a href="/arrepentimiento">Derecho de arrepentimiento</a>
+            <a href="/derecho-de-arrepentimiento">Derecho de arrepentimiento</a>
             <a href={WHATSAPP_URL} target="_blank" rel="noreferrer">Contactanos por WhatsApp</a>
           </div>
         </div>
@@ -296,7 +298,7 @@ export default function App() {
         </div>
         <div className="floating-actions">
           <a className="whatsapp-floating-link" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Contactar a Tu TiendaVM por WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.4-4.7A8.5 8.5 0 1 1 20.5 11.7Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M8.2 7.8c-.3.4-.6.8-.5 1.4.2 1.1 1.4 3 3.1 4.2 1.2.9 2.5 1.4 3.1 1.2.5-.2 1-.8 1.1-1.2l-1.8-.9-.8.9c-.9-.4-1.8-1.2-2.3-2.1l.7-.9-.9-1.8c-.5-.2-1.3-.2-1.7.2Z" fill="currentColor"/></svg></a>
-          <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Arrepentimiento</a>
+          <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Iniciar solicitud</a>
         </div>
       </footer>
 
