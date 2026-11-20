@@ -265,17 +265,28 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
       const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
       if (!current) return
       const effective = current.status === 'APPROVED' ? 'APPROVED' : next
+      const paymentReceivedAt = effective === 'APPROVED' ? current.approvedAt || new Date() : current.approvedAt
       await tx.paymentAttempt.update({ where: { id: current.id }, data: {
         providerOrderId: current.providerOrderId || providerOrderId,
         status: effective,
         statusDetail: String(payload.status || (payload.delivered_at ? 'delivered' : payload.discarded_at ? 'discarded' : 'pending')).slice(0, 200),
         responsePayload: payload as Prisma.InputJsonValue,
-        approvedAt: effective === 'APPROVED' ? current.approvedAt || new Date() : current.approvedAt,
+        approvedAt: paymentReceivedAt,
         lastError: matches ? null : 'La orden notificada no coincide con la referencia o el importe del pedido.',
       } })
-      if (matches && effective === 'APPROVED' && attempt.order.status === 'PENDING') {
-        const changed = await tx.order.updateMany({ where: { id: attempt.orderId, status: 'PENDING', totalArs: attempt.amountArs }, data: { status: 'CONFIRMED' } })
-        if (changed.count === 1) await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: 'PENDING', toStatus: 'CONFIRMED', note: 'Pago aprobado por GOcuotas. Orden ' + String(id.data) + '.' } })
+      if (matches && effective === 'APPROVED') {
+        const changed = await tx.order.updateMany({
+          where: {
+            id: attempt.orderId,
+            status: { in: ['PENDING', 'CONFIRMED'] },
+            totalArs: attempt.amountArs,
+            paymentReceivedAt: null,
+          },
+          data: { status: 'CONFIRMED', paymentReceivedAt },
+        })
+        if (changed.count === 1 && attempt.order.status === 'PENDING') {
+          await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: 'PENDING', toStatus: 'CONFIRMED', note: 'Pago aprobado por GOcuotas. Orden ' + String(id.data) + '.' } })
+        }
       }
     })
     const approved = await prisma.paymentAttempt.findUnique({
