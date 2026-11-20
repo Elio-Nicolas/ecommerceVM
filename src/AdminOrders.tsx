@@ -46,12 +46,11 @@ function historyEventLabel(entry: OrderHistory): string {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
+  const paymentStatuses = (order.paymentAttempts || []).map((payment) => payment.status)
+  if (paymentStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
+  if (paymentStatuses.includes('APPROVED') || paymentStatuses.includes('PARTIALLY_REFUNDED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
+  if (paymentStatuses.includes('REFUNDED')) return nextStatuses[order.status].includes('CANCELLED') ? ['CANCELLED'] : []
   if (order.status === 'PREPARING' && (order.deliveryMethod === 'OCA' || order.deliveryMethod === 'ANDREANI') && !order.shipments?.some((shipment) => shipment.provider === order.deliveryMethod && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
-  const mpStatuses = (order.paymentAttempts || []).filter((payment) => payment.provider === 'MERCADO_PAGO').map((payment) => payment.status)
-  if (order.status === 'PENDING' && mpStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
-  if (mpStatuses.includes('PARTIALLY_REFUNDED')) return []
-  if (mpStatuses.includes('REFUNDED')) return nextStatuses[order.status].includes('CANCELLED') ? ['CANCELLED'] : []
-  if (mpStatuses.includes('APPROVED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'PICKUP') return ['DELIVERED', 'CANCELLED']
   if (order.status === 'PREPARING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
@@ -204,6 +203,47 @@ export default function AdminOrders() {
       setError(cause instanceof Error ? cause.message : 'No se pudo registrar el cobro.')
     } finally {
       setPaymentReceivingId(null)
+    }
+  }
+
+  async function prepareRefund(order: Order) {
+    if (!token || refundProcessing) return
+    setRefundProcessing(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await request<{ message: string }>(
+        `/admin/orders/${order.id}/refund/request`, token, { method: 'POST' },
+      )
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo iniciar la gestión de reintegro.')
+    } finally {
+      setRefundProcessing(false)
+    }
+  }
+
+  async function confirmGoCuotasRefund(order: Order) {
+    if (!token || refundProcessing || !order.cancellationRequest) return
+    const confirmed = window.confirm(
+      `Confirmás que ya ingresaste al panel de GOcuotas y ejecutaste allí el reintegro total del pedido ${order.code}? Esta acción solo registra la confirmación en la tienda; no mueve dinero.`,
+    )
+    if (!confirmed) return
+    setRefundProcessing(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await request<{ message: string }>(
+        `/admin/orders/${order.id}/refund/gocuotas-confirmation`, token,
+        { method: 'POST', body: JSON.stringify({}) },
+      )
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo registrar la confirmación de GOcuotas.')
+    } finally {
+      setRefundProcessing(false)
     }
   }
 
@@ -397,42 +437,6 @@ export default function AdminOrders() {
     }
   }
 
-  function hasUnpaidTestPayment(order: Order) {
-    return order.status === 'PENDING'
-      && (order.paymentAttempts || []).some((payment) =>
-        payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status),
-      )
-  }
-
-  async function cancelUnpaidTestOrder(order: Order) {
-    if (!token || updating || !hasUnpaidTestPayment(order)) return
-    const confirmed = window.confirm(
-      `Vas a cancelar el pedido de prueba ${order.code} y devolver al stock las cantidades reservadas. Esta acción no consulta ni reembolsa Mercado Pago. Confirmás que este pedido nunca fue pagado?`,
-    )
-    if (!confirmed) return
-    setUpdating(true)
-    setError('')
-    setNotice('')
-    try {
-      await request(`/admin/orders/${order.id}/status`, token, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status: 'CANCELLED',
-          forceCancelUnpaidTest: true,
-          note: 'Cancelación administrativa de pedido de prueba confirmado como no pagado; stock repuesto.',
-        }),
-      })
-      setSelected(null)
-      setNote('')
-      setNotice(`Pedido ${order.code} cancelado. El stock reservado fue repuesto.`)
-      await loadOrders(token)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo cancelar el pedido de prueba.')
-    } finally {
-      setUpdating(false)
-    }
-  }
-
   function togglePrintSelection(id: string) {
     setPrintSelection((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
   }
@@ -526,15 +530,21 @@ export default function AdminOrders() {
               </div>)}
               {!(activeOrder.paymentAttempts || []).length && <p className="order-payment-empty">Este pedido no tiene intentos de pago online registrados.</p>}
             </section>
+            {(activeOrder.paymentAttempts || []).some((payment) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status)) && !activeOrder.cancellationRequest && <section className="order-payment-card">
+              <div className="order-payment-heading"><div><span className="admin-kicker">GESTIÓN DE REINTEGRO</span><h3>Pago cobrado</h3></div></div>
+              <p>Antes de cancelar un pedido pagado, iniciá la gestión de reintegro con el mismo proveedor que cobró.</p>
+              <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void prepareRefund(activeOrder)}>{refundProcessing ? 'Registrando...' : 'Iniciar gestión de reintegro'}</button>
+            </section>}
             {activeOrder.cancellationRequest && <section className="order-payment-card">
-              <div className="order-payment-heading"><div><span className="admin-kicker">ARREPENTIMIENTO DE COMPRA</span><h3>Solicitud del comprador</h3></div><small>{formatDate(activeOrder.cancellationRequest.createdAt)}</small></div>
+              <div className="order-payment-heading"><div><span className="admin-kicker">GESTIÓN DE REINTEGRO</span><h3>{activeOrder.paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}</h3></div><small>{formatDate(activeOrder.cancellationRequest.createdAt)}</small></div>
               <div className="order-payment-attempt">
-                <strong>{activeOrder.cancellationRequest.status === 'REQUESTED' ? 'Solicitud recibida' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Reembolso en proceso' : activeOrder.cancellationRequest.status === 'REFUNDED' ? 'Reembolso confirmado' : 'Reembolso con error'}</strong>
-                <small>{activeOrder.cancellationRequest.providerStatus || activeOrder.cancellationRequest.lastError || 'El comprador solicitó arrepentirse de la compra.'}</small>
-                {activeOrder.cancellationRequest.providerRefundId && <small className="order-payment-reference">Reembolso MP: {activeOrder.cancellationRequest.providerRefundId}</small>}
-                {activeOrder.cancellationRequest.status !== 'REFUNDED' && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void processRefund(activeOrder)}>{refundProcessing ? 'Consultando Mercado Pago…' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Consultar estado del reembolso' : 'Procesar reembolso en Mercado Pago'}</button>}
+                <strong>{activeOrder.cancellationRequest.status === 'REQUESTED' ? 'Gestión iniciada' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Reembolso en proceso' : activeOrder.cancellationRequest.status === 'REFUNDED' ? 'Reembolso confirmado' : 'Reembolso con error'}</strong>
+                <small>{activeOrder.cancellationRequest.providerStatus || activeOrder.cancellationRequest.lastError || 'El reintegro todavía no fue confirmado.'}</small>
+                {activeOrder.cancellationRequest.providerRefundId && <small className="order-payment-reference">Referencia de reintegro: {activeOrder.cancellationRequest.providerRefundId}</small>}
+                {activeOrder.paymentMethod === 'MERCADO_PAGO' && activeOrder.cancellationRequest.status !== 'REFUNDED' && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void processRefund(activeOrder)}>{refundProcessing ? 'Consultando Mercado Pago…' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Consultar estado del reembolso' : 'Procesar reintegro en Mercado Pago'}</button>}
+                {activeOrder.paymentMethod === 'GOCUOTAS' && activeOrder.cancellationRequest.status !== 'REFUNDED' && (activeOrder.paymentAttempts || []).some((payment) => payment.provider === 'GOCUOTAS' && payment.status === 'APPROVED') && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void confirmGoCuotasRefund(activeOrder)}>{refundProcessing ? 'Registrando...' : 'Registrar reintegro ya realizado en GOcuotas'}</button>}
               </div>
-              <p className="order-payment-empty">El reembolso se procesa a través de Mercado Pago. No se repone stock automáticamente; gestioná la devolución física del producto por separado.</p>
+              <p className="order-payment-empty">{activeOrder.paymentMethod === 'GOCUOTAS' ? 'GOcuotas no tiene un endpoint de reintegro documentado en la integración API Redirect utilizada por esta tienda. Ejecutá primero la devolución desde el panel de GOcuotas y usá el botón anterior únicamente después de que el proveedor la confirme. La tienda no devuelve dinero.' : 'El reintegro se procesa a través de Mercado Pago. No se repone stock automáticamente; gestioná la devolución física del producto por separado.'}</p>
             </section>}
             <section className="order-fiscal-card">
               <div className="order-fiscal-heading"><div><span className="admin-kicker">ARCA · HOMOLOGACIÓN</span><h3>Factura C</h3></div><small>Emisión manual de prueba</small></div>
@@ -601,7 +611,6 @@ export default function AdminOrders() {
             </section>}
             <div className="order-history"><h3>Historial de actividad</h3>{activeOrder.history.map((entry) => <div key={entry.id}><span>{historyEventLabel(entry)}{entry.fromStatus === entry.toStatus && <small>El pedido continúa {statusLabels[entry.toStatus].toLowerCase()}</small>}<small>{entry.note || 'Sin observaciones'}{entry.changedByAdmin?.email ? ` · ${entry.changedByAdmin.email}` : ''}</small></span><time>{formatDate(entry.createdAt)}</time></div>)}</div>
             {availableNextStatuses(activeOrder).length > 0 && <div className="order-update-status"><label>Observación (opcional)<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Ej. Cliente contactado, envío coordinado..." /></label><div>{availableNextStatuses(activeOrder).map((next) => <button key={next} disabled={updating} className={next === 'CANCELLED' ? 'order-cancel-button' : 'admin-primary'} onClick={() => void changeStatus(activeOrder, next)}>{updating ? 'Actualizando...' : next === 'CANCELLED' ? 'Cancelar pedido' : activeOrder.deliveryMethod === 'LOCAL_DELIVERY' && activeOrder.shippingService === 'A coordinar' && activeOrder.status === 'PENDING' && next === 'CONFIRMED' ? 'Confirmar costo y continuar' : `Marcar: ${statusLabels[next]}`}</button>)}</div></div>}
-            {hasUnpaidTestPayment(activeOrder) && <div className="order-update-status"><p>Pedido de prueba con pago pendiente. Si confirmás que nunca se cobró, podés cancelarlo y reponer automáticamente las unidades reservadas.</p><button type="button" disabled={updating} className="order-cancel-button" onClick={() => void cancelUnpaidTestOrder(activeOrder)}>{updating ? 'Cancelando y reponiendo stock...' : 'Cancelar prueba y reponer stock'}</button></div>}
           </section>}
           <p className="admin-footnote">Los pedidos admiten retiro, entrega local y envío nacional por OCA según la configuración. Mercado Pago solo estará disponible cuando sus credenciales y notificaciones estén configuradas.</p>
         </section>
