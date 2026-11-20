@@ -113,3 +113,43 @@
   .checkout-card,.checkout-summary{border-radius:10px}
   .checkout-card h2,.checkout-summary h2{font-size:16px}
 }
+
+
+/* Storefront checkout and order confirmation hierarchy */
+.checkout-back{
+  display:inline-flex;align-items:center;gap:10px;min-height:46px;padding:0 17px;
+  margin:0 0 28px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;
+  color:#0a2540;font-size:14px;font-weight:700;box-shadow:0 3px 12px rgba(10,37,64,.05);
+  transition:background .16s ease,border-color .16s ease,transform .16s ease;
+}
+.checkout-back:hover{background:#f1f5f9;border-color:#94a3b8;transform:translateX(-2px)}
+.checkout-top>p{font-size:14px;line-height:1.75;color:#475569}
+.checkout-success{
+  width:min(100%,640px);margin:clamp(24px,6vh,64px) auto;padding:clamp(28px,5vw,52px);
+  border-radius:18px;text-align:center;box-shadow:0 18px 55px rgba(10,37,64,.08);
+}
+.checkout-success-mark{width:64px;height:64px;font-size:30px;margin-bottom:24px}
+.checkout-success h1{font-size:clamp(30px,5vw,38px);line-height:1.15;color:#0a2540}
+.checkout-success>p{font-size:14px;line-height:1.75;color:#475569}
+.checkout-order-code{margin:28px 0;padding:22px;border:1px solid #dce4ec;background:#f8fafc}
+.checkout-order-code span{font-size:10px}
+.checkout-order-code strong{font-size:clamp(21px,4vw,25px)}
+.checkout-success-total{padding:14px 2px;border-bottom:1px solid #edf0f2;font-size:14px}
+.checkout-success-total strong{font-size:14px}
+.checkout-success .checkout-submit{
+  min-height:54px;margin-top:18px;border-radius:9px;font-size:15px;font-weight:800;
+  box-shadow:0 8px 20px rgba(225,29,72,.16);transition:background .16s ease,transform .16s ease;
+}
+.checkout-success .checkout-submit:hover{background:#be123c;transform:translateY(-1px)}
+.checkout-success .checkout-whatsapp-contact{
+  display:flex;align-items:center;justify-content:center;min-height:48px;margin:16px 0 4px;
+  border:1px solid #cbd5e1;border-radius:9px;color:#0a2540;font-size:13px;font-weight:700;
+}
+.checkout-success .checkout-small{font-size:12px;line-height:1.7}
+@media(max-width:760px){
+  .checkout-page{padding:22px 16px 42px}
+  .checkout-back{margin-bottom:22px;width:100%;justify-content:flex-start}
+  .checkout-top>p{font-size:13px}
+  .checkout-success{margin:8px auto;padding:28px 20px}
+  .checkout-success-total{font-size:13px}
+}
