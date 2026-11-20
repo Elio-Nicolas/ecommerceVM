@@ -11,6 +11,7 @@ import { buildOcaAdmissionXml, OcaAdmissionXmlError } from '../services/oca-admi
 import { getOcaAdmissionDate, isCompleteOcaOriginBranch, isOcaOrderPaid, matchesOcaRecipient } from '../services/oca-admission-validation'
 import { getOcaAdmissionBranches } from '../services/oca-metadata'
 import { getStoredOcaCredentials } from '../services/shipping-settings'
+import { getPaymentCancellationBlock, hasUnresolvedOnlinePayment } from '../services/payment-cancellation-policy'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -489,23 +490,20 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  if (input.status !== existing.status && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'REFUNDED') && input.status !== 'CANCELLED') {
+  if (input.status !== existing.status && existing.paymentAttempts.some((payment) => payment.status === 'REFUNDED') && input.status !== 'CANCELLED') {
     res.status(409).json({ error: { code: 'PAYMENT_REFUNDED', message: 'El pago fue reembolsado por completo. Cancelá el pedido antes de continuar con la preparación o el despacho.' } })
     return
   }
-  if (input.status !== existing.status && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && payment.status === 'PARTIALLY_REFUNDED')) {
-    res.status(409).json({ error: { code: 'PAYMENT_PARTIALLY_REFUNDED', message: 'El pago tuvo un reembolso parcial. Revisá la operación en Mercado Pago antes de cambiar el estado del pedido.' } })
+  if (input.status !== existing.status && existing.paymentAttempts.some((payment) => payment.status === 'PARTIALLY_REFUNDED')) {
+    res.status(409).json({ error: { code: 'PAYMENT_PARTIALLY_REFUNDED', message: 'El pago tuvo un reembolso parcial. Revisá la operación con el proveedor antes de cambiar el estado del pedido.' } })
     return
   }
   if (input.status === 'CANCELLED') {
-    const blockingPayments = existing.paymentAttempts.filter((payment) =>
-      payment.provider === 'MERCADO_PAGO'
-      && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status),
-    )
-    const unsafePayments = blockingPayments.some((payment) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status))
-    const hasUnresolvedPayments = blockingPayments.length > 0
-    if (unsafePayments || (hasUnresolvedPayments && !input.forceCancelUnpaidTest)) {
-      res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'No se puede cancelar: hay un pago aprobado, parcialmente reembolsado o pendiente de resolución. Para pedidos de prueba no pagados, usá la acción administrativa específica.' } })
+    const block = getPaymentCancellationBlock(existing.paymentAttempts)
+    if (block) {
+      res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: block === 'PAYMENT_APPROVED'
+        ? 'No se puede cancelar: el proveedor confirmó el cobro. Primero gestioná y confirmá el reintegro en el medio de pago.'
+        : 'No se puede cancelar: hay un intento de pago pendiente o con resultado incierto. Conciliá el estado con el proveedor antes de cancelar.' } })
       return
     }
     if (input.forceCancelUnpaidTest && existing.status !== 'PENDING') {
@@ -513,8 +511,8 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       return
     }
   }
-  if (input.status === 'CONFIRMED' && existing.paymentAttempts.some((payment) => payment.provider === 'MERCADO_PAGO' && ['CREATING', 'PENDING', 'UNKNOWN'].includes(payment.status))) {
-    res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'Este pedido tiene un pago de Mercado Pago pendiente o sin resultado concluyente. Verificá el estado del pago antes de confirmarlo manualmente.' } })
+  if (input.status === 'CONFIRMED' && hasUnresolvedOnlinePayment(existing.paymentAttempts)) {
+    res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'Este pedido tiene un pago pendiente o sin resultado concluyente. Verificá el estado con el proveedor antes de confirmarlo manualmente.' } })
     return
   }
   if (input.status === 'CONFIRMED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
@@ -558,12 +556,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       })
       if (!currentOrder || currentOrder.status !== existing.status) throw new Error('ORDER_STATUS_CONFLICT')
       if (input.status === 'CANCELLED') {
-        const currentBlockingPayments = currentOrder.paymentAttempts.filter((payment) =>
-          payment.provider === 'MERCADO_PAGO'
-          && ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status),
-        )
-        const currentUnsafePayment = currentBlockingPayments.some((payment) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status))
-        if (currentUnsafePayment || (currentBlockingPayments.length > 0 && !input.forceCancelUnpaidTest)) {
+        if (getPaymentCancellationBlock(currentOrder.paymentAttempts)) {
           throw new Error('PAYMENT_NOT_RESOLVED')
         }
         if (input.forceCancelUnpaidTest && currentOrder.status !== 'PENDING') {
@@ -603,7 +596,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       return
     }
     if (error instanceof Error && error.message === 'PAYMENT_NOT_RESOLVED') {
-      res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'El pago cambió mientras se cancelaba el pedido. No se modificó el stock.' } })
+      res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'El estado del pago cambió o sigue sin resolverse. No se canceló el pedido ni se modificó el stock.' } })
       return
     }
     if (error instanceof Error && error.message === 'TEST_CANCELLATION_NOT_ALLOWED') {
@@ -614,6 +607,72 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }
 })
 
+
+adminOrdersRouter.post('/:id/refund/request', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  if (!orderId.success) {
+    res.status(400).json({ error: { code: 'ORDER_ID_INVALID', message: 'El pedido no es válido.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { paymentAttempts: { orderBy: { createdAt: 'desc' } } } })
+    if (!order) return { error: 'ORDER_NOT_FOUND' as const }
+    const paidAttempt = order.paymentAttempts.find((attempt) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))
+    if (!paidAttempt) return { error: 'APPROVED_PAYMENT_NOT_FOUND' as const }
+    const existingRequest = await tx.cancellationRequest.findUnique({ where: { orderId: order.id } })
+    if (existingRequest) return { request: existingRequest }
+    const request = await tx.cancellationRequest.create({
+      data: { orderId: order.id, customerEmail: order.customerEmail || 'no-email@invalid.local', status: 'REQUESTED' },
+    })
+    await tx.orderStatusHistory.create({
+      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración inició la gestión de reintegro mediante ' + paidAttempt.provider + '.', changedByAdminId: req.admin?.id || null },
+    })
+    return { request }
+  })
+  if ('error' in result) {
+    const status = result.error === 'ORDER_NOT_FOUND' ? 404 : 409
+    res.status(status).json({ error: { code: result.error, message: result.error === 'ORDER_NOT_FOUND' ? 'Pedido no encontrado.' : 'No encontramos un pago aprobado o parcialmente reembolsado para este pedido.' } })
+    return
+  }
+  res.status(201).json({ data: { status: result.request.status }, message: 'Gestión de reintegro registrada.' })
+})
+
+adminOrdersRouter.post('/:id/refund/gocuotas-confirmation', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  const input = z.object({ providerRefundId: z.string().trim().max(120).optional() }).safeParse(req.body)
+  if (!orderId.success || !input.success) {
+    res.status(400).json({ error: { code: 'REFUND_CONFIRMATION_INVALID', message: 'La confirmación del reintegro no es válida.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, select: { id: true, status: true, cancellationRequest: true, paymentAttempts: { where: { provider: 'GOCUOTAS' }, orderBy: { createdAt: 'desc' } } } })
+    if (!order) return 'ORDER_NOT_FOUND' as const
+    if (!order.cancellationRequest) return 'REFUND_REQUEST_REQUIRED' as const
+    if (order.cancellationRequest.status === 'REFUNDED') return 'ALREADY_REFUNDED' as const
+    const payment = order.paymentAttempts.find((attempt) => attempt.status === 'APPROVED')
+    if (!payment) return 'APPROVED_GOCUOTAS_PAYMENT_NOT_FOUND' as const
+    await tx.paymentAttempt.update({ where: { id: payment.id }, data: { status: 'REFUNDED', statusDetail: 'Reintegro confirmado manualmente en GOcuotas', lastError: null } })
+    await tx.cancellationRequest.update({ where: { id: order.cancellationRequest.id }, data: { status: 'REFUNDED', providerRefundId: input.data.providerRefundId || null, providerStatus: 'MANUAL_CONFIRMED_IN_GOCUOTAS', lastError: null } })
+    await tx.orderStatusHistory.create({
+      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración confirmó manualmente el reintegro total en GOcuotas. La tienda solo registró la confirmación; no ejecutó la devolución.', changedByAdminId: req.admin?.id || null },
+    })
+    return 'REFUNDED' as const
+  })
+  if (result !== 'REFUNDED') {
+    const messages: Record<string, { status: number; message: string }> = {
+      ORDER_NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
+      REFUND_REQUEST_REQUIRED: { status: 409, message: 'Primero iniciá la gestión de reintegro.' },
+      ALREADY_REFUNDED: { status: 409, message: 'El reintegro ya figura confirmado.' },
+      APPROVED_GOCUOTAS_PAYMENT_NOT_FOUND: { status: 409, message: 'No encontramos un pago GOcuotas aprobado pendiente de reintegro total.' },
+    }
+    const error = messages[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  res.json({ data: { status: 'REFUNDED' }, message: 'Confirmación manual registrada. Ahora podés cancelar el pedido; el stock se repondrá una sola vez.' })
+})
 
 adminOrdersRouter.post('/:id/refund', async (req, res) => {
   const orderId = z.string().uuid().safeParse(req.params.id)
