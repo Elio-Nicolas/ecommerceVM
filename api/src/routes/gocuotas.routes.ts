@@ -287,6 +287,9 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
         if (changed.count === 1 && attempt.order.status === 'PENDING') {
           await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: 'PENDING', toStatus: 'CONFIRMED', note: 'Pago aprobado por GOcuotas. Orden ' + String(id.data) + '.' } })
         }
+        if (attempt.order.status === 'CANCELLED' && current.status !== 'APPROVED') {
+          await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: 'CANCELLED', toStatus: 'CANCELLED', note: 'ATENCIÓN: GOcuotas informó un pago aprobado para un pedido cancelado. Orden ' + providerOrderId + '; requiere revisión manual y contacto con el proveedor.' } })
+        }
       }
     })
     const approved = await prisma.paymentAttempt.findUnique({
