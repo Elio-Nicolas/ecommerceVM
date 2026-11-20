@@ -199,9 +199,22 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
 })
 
 goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
-  const id = z.union([z.string(), z.number()]).safeParse(req.body?.id ?? req.body?.order_id)
+  const body = req.body as unknown
+  const bodyIsRecord = body !== null && typeof body === 'object' && !Array.isArray(body)
+  const bodyKeys = bodyIsRecord ? Object.keys(body as Record<string, unknown>).slice(0, 20).sort() : []
+  const candidateId = bodyIsRecord
+    ? (body as Record<string, unknown>).id ?? (body as Record<string, unknown>).order_id
+    : undefined
+  const id = z.union([z.string(), z.number()]).safeParse(candidateId)
   if (!id.success) {
-    console.warn('[GOcuotas webhook] Notificación sin identificador reconocido.')
+    // Log shape only: never log webhook values, customer data, headers, or secrets.
+    console.warn('[GOcuotas webhook] Notificación sin identificador reconocido.', JSON.stringify({
+      contentType: req.get('content-type')?.split(';', 1)[0] || 'unknown',
+      bodyType: body === null ? 'null' : Array.isArray(body) ? 'array' : typeof body,
+      bodyKeys,
+      idFieldType: bodyIsRecord && 'id' in (body as Record<string, unknown>) ? typeof (body as Record<string, unknown>).id : 'missing',
+      orderIdFieldType: bodyIsRecord && 'order_id' in (body as Record<string, unknown>) ? typeof (body as Record<string, unknown>).order_id : 'missing',
+    }))
     res.status(400).send('Notificación inválida')
     return
   }
