@@ -86,3 +86,17 @@ No repetir el POST para un intento `UNKNOWN`: el proveedor podría haber creado 
 - El webhook interpreta `status=approved` como aprobación y `status=denied` como rechazo, además de los campos temporales `delivered_at` y `discarded_at`. En todos los casos exige coincidencia exacta de referencia e importe. El comportamiento de reintentos del webhook debe seguir verificándose con GOcuotas.
 - No se debe habilitar cobro real ni cambiar a credenciales productivas hasta completar Sandbox y autorizar explícitamente el paso a producción.
 - No hay migración de base de datos requerida por esta integración en este cambio.
+
+## Reintegros y cancelación administrativa
+
+La API Redirect implementada y documentada en esta integración no contiene un endpoint de reintegro que hayamos podido validar. No se debe inventar una ruta ni asumir que el webhook de pago puede devolver dinero.
+
+Para un pedido GOcuotas pagado que deba cancelarse:
+
+1. Iniciar la gestión de reintegro desde el detalle del pedido en administración.
+2. Ejecutar el reintegro desde el panel de GOcuotas o solicitarlo a su soporte, siguiendo las condiciones vigentes de la cuenta.
+3. Verificar en GOcuotas que la devolución total esté efectivamente confirmada.
+4. Recién entonces usar «Registrar reintegro ya realizado en GOcuotas» en ecommerceVM. Esta acción solo registra la confirmación manual y el administrador en el historial; no llama a GOcuotas ni mueve dinero.
+5. Cancelar el pedido. La tienda repone las cantidades reservadas una sola vez.
+
+Los intentos GOcuotas aprobados o con resultado pendiente/ incierto bloquean la cancelación. Si llega una aprobación tardía para un pedido ya cancelado, queda una alerta en el historial y no se reactiva el pedido.
