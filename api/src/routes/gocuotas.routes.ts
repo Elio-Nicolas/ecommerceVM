@@ -160,14 +160,29 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     if (!response.ok || !isValidPaymentCheckoutUrl(payload?.url_init)) {
       throw new Error('Respuesta de checkout no reconocida: ' + checkoutResponse.diagnostic)
     }
-    const attempt = await prisma.$transaction(async tx => {
+    const persisted = await prisma.$transaction(async tx => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', prepared.order.id)
       const current = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
+      const currentOrder = await tx.order.findUnique({ where: { id: prepared.order.id }, select: { cancellationRequest: { select: { id: true } } } })
       if (!current) throw new Error('El intento de pago dejó de existir.')
       if (providerOrderId && current.providerOrderId && current.providerOrderId !== providerOrderId) {
         throw new Error('GOcuotas devolvió un identificador distinto al asociado al intento.')
       }
-      return tx.paymentAttempt.update({
+      if (currentOrder?.cancellationRequest) {
+        await tx.paymentAttempt.update({
+          where: { id: current.id },
+          data: {
+            providerOrderId: current.providerOrderId || providerOrderId,
+            checkoutUrl: null,
+            status: 'UNKNOWN',
+            statusDetail: 'Checkout creado mientras se registraba una solicitud de arrepentimiento',
+            responsePayload: payload as Prisma.InputJsonValue,
+            lastError: 'GOcuotas pudo crear un checkout mientras el comprador solicitaba el arrepentimiento. Conciliación manual requerida.',
+          },
+        })
+        return { blocked: true as const }
+      }
+      const attempt = await tx.paymentAttempt.update({
         where: { id: current.id },
         data: {
           providerOrderId: current.providerOrderId || providerOrderId,
@@ -179,9 +194,14 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
           lastError: null,
         },
       })
+      return { blocked: false as const, attempt }
     })
+    if (persisted.blocked) {
+      res.status(409).json({ error: { code: 'REGRET_REQUEST_PENDING', message: 'Se registró una solicitud de arrepentimiento durante la creación del pago. No se entregó el enlace y el intento quedó pendiente de conciliación con GOcuotas.' } })
+      return
+    }
     res.setHeader('Cache-Control', 'no-store')
-    res.status(201).json({ data: { checkoutUrl: attempt.checkoutUrl, status: attempt.status } })
+    res.status(201).json({ data: { checkoutUrl: persisted.attempt.checkoutUrl, status: persisted.attempt.status } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo crear el checkout.'
     if (getGoCuotasFailureDisposition(checkoutRequestStarted) === 'RELEASE_ATTEMPT') {
