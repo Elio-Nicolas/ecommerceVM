@@ -355,19 +355,44 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
       },
       requestKey: prepared.attempt.requestKey,
     })
-    const attempt = await prisma.paymentAttempt.update({
-      where: { id: prepared.attempt.id },
-      data: {
-        providerOrderId: providerOrder.id,
-        checkoutUrl: providerOrder.checkout_url,
-        status: 'PENDING',
-        statusDetail: String(providerOrder.status_detail || providerOrder.status || 'created').slice(0, 200),
-        responsePayload: providerOrder as Prisma.InputJsonValue,
-        lastError: null,
-      },
+    const persisted = await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', prepared.order.id)
+      const currentOrder = await tx.order.findUnique({ where: { id: prepared.order.id }, select: { cancellationRequest: { select: { id: true } } } })
+      const currentAttempt = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
+      if (!currentAttempt) throw new Error('El intento de pago dejó de existir.')
+      if (currentOrder?.cancellationRequest) {
+        await tx.paymentAttempt.update({
+          where: { id: currentAttempt.id },
+          data: {
+            providerOrderId: providerOrder.id,
+            checkoutUrl: null,
+            status: 'UNKNOWN',
+            statusDetail: 'Checkout creado mientras se registraba una solicitud de arrepentimiento',
+            responsePayload: providerOrder as Prisma.InputJsonValue,
+            lastError: 'El proveedor pudo crear una orden de pago mientras el comprador solicitaba el arrepentimiento. Conciliación manual requerida.',
+          },
+        })
+        return { blocked: true as const }
+      }
+      const attempt = await tx.paymentAttempt.update({
+        where: { id: currentAttempt.id },
+        data: {
+          providerOrderId: providerOrder.id,
+          checkoutUrl: providerOrder.checkout_url,
+          status: 'PENDING',
+          statusDetail: String(providerOrder.status_detail || providerOrder.status || 'created').slice(0, 200),
+          responsePayload: providerOrder as Prisma.InputJsonValue,
+          lastError: null,
+        },
+      })
+      return { blocked: false as const, attempt }
     })
+    if (persisted.blocked) {
+      res.status(409).json({ error: { code: 'REGRET_REQUEST_PENDING', message: 'Se registró una solicitud de arrepentimiento durante la creación del pago. No se entregó el enlace de pago y el intento quedó pendiente de conciliación con Mercado Pago.' } })
+      return
+    }
     res.setHeader('Cache-Control', 'no-store')
-    res.status(201).json({ data: { checkoutUrl: attempt.checkoutUrl, status: attempt.status } })
+    res.status(201).json({ data: { checkoutUrl: persisted.attempt.checkoutUrl, status: persisted.attempt.status } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo crear el pago.'
     await prisma.paymentAttempt.update({
