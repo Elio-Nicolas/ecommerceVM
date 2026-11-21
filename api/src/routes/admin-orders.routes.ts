@@ -675,6 +675,45 @@ adminOrdersRouter.post('/:id/refund/request', async (req, res) => {
 })
 
 
+
+adminOrdersRouter.post('/:id/refund/no-payment-collected', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  if (!orderId.success) {
+    res.status(400).json({ error: { code: 'ORDER_ID_INVALID', message: 'El pedido no es válido.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, select: { id: true, status: true, paymentMethod: true, paymentReceivedAt: true, cancellationRequest: true, paymentAttempts: { select: { status: true } } } })
+    if (!order) return 'ORDER_NOT_FOUND' as const
+    if (order.paymentMethod !== 'CASH') return 'CASH_ONLY' as const
+    if (order.paymentReceivedAt) return 'PAYMENT_ALREADY_RECEIVED' as const
+    if (order.paymentAttempts.some((attempt) => !['REJECTED', 'CANCELLED'].includes(attempt.status))) return 'PAYMENT_ATTEMPT_EXISTS' as const
+    if (!order.cancellationRequest) return 'REFUND_REQUEST_REQUIRED' as const
+    if (order.cancellationRequest.status === 'REFUNDED') return 'ALREADY_RESOLVED' as const
+    await tx.cancellationRequest.update({ where: { id: order.cancellationRequest.id }, data: { status: 'REFUNDED', providerStatus: 'NO_PAYMENT_COLLECTED', lastError: null } })
+    await tx.orderStatusHistory.create({
+      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración verificó que no se recibió el pago en efectivo. No corresponde un reintegro monetario.', changedByAdminId: req.admin?.id || null },
+    })
+    return 'NO_PAYMENT_COLLECTED' as const
+  })
+  if (result !== 'NO_PAYMENT_COLLECTED') {
+    const errors: Record<string, { status: number; message: string }> = {
+      ORDER_NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
+      CASH_ONLY: { status: 409, message: 'Esta confirmación corresponde únicamente a pedidos en efectivo.' },
+      PAYMENT_ALREADY_RECEIVED: { status: 409, message: 'El cobro ya fue registrado. Usá el flujo de reintegro en efectivo.' },
+      PAYMENT_ATTEMPT_EXISTS: { status: 409, message: 'Existe un intento de pago online que debe conciliarse antes de resolver el pedido.' },
+      REFUND_REQUEST_REQUIRED: { status: 409, message: 'Primero registrá la solicitud de arrepentimiento.' },
+      ALREADY_RESOLVED: { status: 409, message: 'La solicitud ya fue resuelta.' },
+    }
+    const error = errors[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  const finalized = await finalizePreDispatchRefund(orderId.data, req.admin?.id || null, 'Solicitud resuelta: se verificó que no se había recibido el pago. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido sin cobro:', error); return 'FINALIZATION_PENDING' as const })
+  res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'Se verificó que no hubo cobro. Pedido cancelado y stock repuesto automáticamente.' : 'Se verificó que no hubo cobro. Si el pedido ya estaba despachado, corresponde gestionar la devolución física.' })
+})
+
 adminOrdersRouter.post('/:id/refund/manual-confirmation', async (req, res) => {
   const orderId = z.string().uuid().safeParse(req.params.id)
   const input = z.object({ reference: z.string().trim().min(3).max(120), note: z.string().trim().max(300).optional() }).safeParse(req.body)
@@ -684,9 +723,10 @@ adminOrdersRouter.post('/:id/refund/manual-confirmation', async (req, res) => {
   }
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
-    const order = await tx.order.findUnique({ where: { id: orderId.data }, select: { id: true, status: true, paymentMethod: true, cancellationRequest: true, paymentAttempts: { select: { status: true } } } })
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, select: { id: true, status: true, paymentMethod: true, paymentReceivedAt: true, cancellationRequest: true, paymentAttempts: { select: { status: true } } } })
     if (!order) return 'ORDER_NOT_FOUND' as const
     if (order.paymentMethod !== 'CASH') return 'MANUAL_REFUND_ONLY_FOR_CASH' as const
+    if (!order.paymentReceivedAt) return 'CASH_NOT_RECEIVED' as const
     if (!order.cancellationRequest) return 'REFUND_REQUEST_REQUIRED' as const
     if (order.cancellationRequest.status === 'REFUNDED') return 'ALREADY_REFUNDED' as const
     if (order.paymentAttempts.some((attempt) => ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))) return 'PAYMENT_ATTEMPT_UNRESOLVED' as const
@@ -703,6 +743,7 @@ adminOrdersRouter.post('/:id/refund/manual-confirmation', async (req, res) => {
     const errors: Record<string, { status: number; message: string }> = {
       ORDER_NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
       MANUAL_REFUND_ONLY_FOR_CASH: { status: 409, message: 'Este flujo manual está reservado para pedidos pagados en efectivo.' },
+      CASH_NOT_RECEIVED: { status: 409, message: 'El pedido no tiene un cobro en efectivo registrado; confirmá que no se recibió el dinero en lugar de registrar un reintegro.' },
       REFUND_REQUEST_REQUIRED: { status: 409, message: 'Primero registrá la solicitud de arrepentimiento o reintegro.' },
       ALREADY_REFUNDED: { status: 409, message: 'El reintegro ya figura confirmado.' },
       PAYMENT_ATTEMPT_UNRESOLVED: { status: 409, message: 'Hay un intento de pago online sin resolver. Conciliá el proveedor antes de confirmar el reintegro manual.' },
