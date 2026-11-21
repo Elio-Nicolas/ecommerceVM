@@ -648,15 +648,20 @@ adminOrdersRouter.post('/:id/refund/request', async (req, res) => {
     const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { paymentAttempts: { orderBy: { createdAt: 'desc' } } } })
     if (!order) return { error: 'ORDER_NOT_FOUND' as const }
     const paidAttempt = order.paymentAttempts.find((attempt) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))
-    if (!paidAttempt) return { error: 'APPROVED_PAYMENT_NOT_FOUND' as const }
+    if (!paidAttempt && order.paymentMethod !== 'CASH') return { error: 'APPROVED_PAYMENT_NOT_FOUND' as const }
     if (!order.customerEmail) return { error: 'CUSTOMER_EMAIL_MISSING' as const }
     const existingRequest = await tx.cancellationRequest.findUnique({ where: { orderId: order.id } })
     if (existingRequest) return { request: existingRequest }
     const request = await tx.cancellationRequest.create({
-      data: { orderId: order.id, customerEmail: order.customerEmail, status: 'REQUESTED' },
+      data: {
+        orderId: order.id,
+        customerEmail: order.customerEmail,
+        status: 'REQUESTED',
+        returnStatus: ['SHIPPED', 'DELIVERED'].includes(order.status) ? 'RETURN_PENDING' : 'NOT_REQUIRED',
+      },
     })
     await tx.orderStatusHistory.create({
-      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración inició la gestión de reintegro mediante ' + paidAttempt.provider + '.', changedByAdminId: req.admin?.id || null },
+      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración inició la gestión de reintegro mediante ' + (paidAttempt?.provider || 'reintegro manual de efectivo') + '.', changedByAdminId: req.admin?.id || null },
     })
     return { request }
   })
@@ -667,6 +672,47 @@ adminOrdersRouter.post('/:id/refund/request', async (req, res) => {
     return
   }
   res.status(201).json({ data: { status: result.request.status }, message: 'Gestión de reintegro registrada.' })
+})
+
+
+adminOrdersRouter.post('/:id/refund/manual-confirmation', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  const input = z.object({ reference: z.string().trim().min(3).max(120), note: z.string().trim().max(300).optional() }).safeParse(req.body)
+  if (!orderId.success || !input.success) {
+    res.status(400).json({ error: { code: 'MANUAL_REFUND_CONFIRMATION_INVALID', message: 'Ingresá una referencia o comprobante válido del reintegro.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, select: { id: true, status: true, paymentMethod: true, cancellationRequest: true, paymentAttempts: { select: { status: true } } } })
+    if (!order) return 'ORDER_NOT_FOUND' as const
+    if (order.paymentMethod !== 'CASH') return 'MANUAL_REFUND_ONLY_FOR_CASH' as const
+    if (!order.cancellationRequest) return 'REFUND_REQUEST_REQUIRED' as const
+    if (order.cancellationRequest.status === 'REFUNDED') return 'ALREADY_REFUNDED' as const
+    if (order.paymentAttempts.some((attempt) => ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))) return 'PAYMENT_ATTEMPT_UNRESOLVED' as const
+    await tx.cancellationRequest.update({
+      where: { id: order.cancellationRequest.id },
+      data: { status: 'REFUNDED', providerRefundId: input.data.reference, providerStatus: 'MANUAL_CONFIRMED_CASH', lastError: null },
+    })
+    await tx.orderStatusHistory.create({
+      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración confirmó el reintegro manual en efectivo. Referencia: ' + input.data.reference + (input.data.note ? '. ' + input.data.note : ''), changedByAdminId: req.admin?.id || null },
+    })
+    return 'REFUNDED' as const
+  })
+  if (result !== 'REFUNDED') {
+    const errors: Record<string, { status: number; message: string }> = {
+      ORDER_NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
+      MANUAL_REFUND_ONLY_FOR_CASH: { status: 409, message: 'Este flujo manual está reservado para pedidos pagados en efectivo.' },
+      REFUND_REQUEST_REQUIRED: { status: 409, message: 'Primero registrá la solicitud de arrepentimiento o reintegro.' },
+      ALREADY_REFUNDED: { status: 409, message: 'El reintegro ya figura confirmado.' },
+      PAYMENT_ATTEMPT_UNRESOLVED: { status: 409, message: 'Hay un intento de pago online sin resolver. Conciliá el proveedor antes de confirmar el reintegro manual.' },
+    }
+    const error = errors[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  const finalized = await finalizePreDispatchRefund(orderId.data, req.admin?.id || null, 'Reintegro manual en efectivo confirmado. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido reembolsado en efectivo:', error); return 'FINALIZATION_PENDING' as const })
+  res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'Reintegro registrado. Pedido cancelado y stock repuesto automáticamente.' : 'Reintegro registrado. Si el pedido ya fue despachado, corresponde gestionar la devolución física.' })
 })
 
 adminOrdersRouter.post('/:id/refund/gocuotas-confirmation', async (req, res) => {
