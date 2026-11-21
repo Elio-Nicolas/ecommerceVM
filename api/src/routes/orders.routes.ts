@@ -366,10 +366,7 @@ ordersRouter.post('/regret', regretRequestLimiter, async (req, res) => {
 
   const order = await prisma.order.findFirst({
     where: { code: { equals: input.data.orderCode, mode: 'insensitive' }, customerEmail: { equals: input.data.email, mode: 'insensitive' } },
-    select: {
-      id: true,
-      status: true,
-    },
+    select: { id: true, status: true },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'REGRET_ORDER_NOT_FOUND', message: 'No encontramos un pedido con esos datos. Revisá el código y el correo utilizado en la compra.' } })
@@ -381,19 +378,31 @@ ordersRouter.post('/regret', regretRequestLimiter, async (req, res) => {
   }
 
   try {
-    const request = await prisma.cancellationRequest.upsert({
-      where: { orderId: order.id },
-      create: { orderId: order.id, customerEmail: input.data.email, status: 'REQUESTED' },
-      update: {},
-      select: { status: true },
+    const request = await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', order.id)
+      const current = await tx.order.findUnique({
+        where: { id: order.id },
+        select: { status: true, cancellationRequest: { select: { id: true, status: true } } },
+      })
+      if (!current || current.status === 'CANCELLED') throw new Error('ORDER_NO_LONGER_ACTIVE')
+      return tx.cancellationRequest.upsert({
+        where: { orderId: order.id },
+        create: { orderId: order.id, customerEmail: input.data.email, status: 'REQUESTED' },
+        update: {},
+        select: { id: true, status: true },
+      })
     })
     res.setHeader('Cache-Control', 'no-store')
     if (request.status !== 'REQUESTED') {
-      res.status(200).json({ data: { status: request.status }, message: 'La solicitud ya está registrada y se encuentra en revisión.' })
+      res.status(200).json({ data: { requestId: request.id, status: request.status }, message: 'La solicitud ya está registrada y se encuentra en revisión.' })
       return
     }
-    res.status(201).json({ data: { status: request.status }, message: 'Recibimos tu solicitud de arrepentimiento. La tienda revisará el pedido y gestionará el reembolso cuando corresponda.' })
-  } catch {
+    res.status(201).json({ data: { requestId: request.id, status: request.status }, message: 'Recibimos tu solicitud de arrepentimiento. Guardá el número de gestión: ' + request.id + '. La tienda debe detener la preparación y revisar el reintegro con el medio de pago.' })
+  } catch (error) {
+    if (error instanceof Error && error.message === 'ORDER_NO_LONGER_ACTIVE') {
+      res.status(409).json({ error: { code: 'REGRET_ORDER_CANCELLED', message: 'Este pedido ya figura cancelado.' } })
+      return
+    }
     res.status(500).json({ error: { code: 'REGRET_REQUEST_FAILED', message: 'No pudimos registrar la solicitud. Intentá nuevamente más tarde.' } })
   }
 })
