@@ -3,6 +3,7 @@ import test from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { prisma } from '../src/lib/prisma'
 import { finalizePreDispatchRefund } from '../src/services/refund-finalization'
+import { acceptReturnedOrderStock } from '../src/services/return-acceptance'
 
 const databaseAvailable = Boolean(process.env.DATABASE_URL)
 
@@ -69,6 +70,22 @@ test('un pedido ya despachado no se cancela ni repone stock automáticamente: re
     ])
     assert.equal(order?.status, 'SHIPPED')
     assert.equal(product?.stock, 0)
+  } finally {
+    await cleanupFixture(fixture)
+  }
+})
+
+test('una devolución física inspeccionada repone stock una sola vez', { skip: !databaseAvailable }, async () => {
+  const fixture = await createRefundFixture('SHIPPED')
+  try {
+    await prisma.cancellationRequest.update({
+      where: { orderId: fixture.orderId },
+      data: { returnStatus: 'RETURN_RECEIVED' },
+    })
+    assert.equal(await acceptReturnedOrderStock(fixture.orderId, null), 'RETURN_ACCEPTED')
+    assert.equal(await acceptReturnedOrderStock(fixture.orderId, null), 'ALREADY_ACCEPTED')
+    const product = await prisma.product.findUnique({ where: { id: fixture.productId }, select: { stock: true } })
+    assert.equal(product?.stock, 2)
   } finally {
     await cleanupFixture(fixture)
   }
