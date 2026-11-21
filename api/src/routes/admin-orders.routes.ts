@@ -13,6 +13,7 @@ import { getOcaAdmissionBranches } from '../services/oca-metadata'
 import { getStoredOcaCredentials } from '../services/shipping-settings'
 import { getPaymentCancellationBlock, hasUnresolvedOnlinePayment } from '../services/payment-cancellation-policy'
 import { getCancellationFulfillmentBlockMessage, isCancellationBlockingFulfillment } from '../services/fulfillment-policy'
+import { finalizePreDispatchRefund } from '../services/refund-finalization'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -701,7 +702,8 @@ adminOrdersRouter.post('/:id/refund/gocuotas-confirmation', async (req, res) => 
     res.status(error.status).json({ error: { code: result, message: error.message } })
     return
   }
-  res.json({ data: { status: 'REFUNDED' }, message: 'Confirmación manual registrada. Ahora podés cancelar el pedido; el stock se repondrá una sola vez.' })
+  const finalized = await finalizePreDispatchRefund(orderId.data, req.admin?.id || null, 'Reintegro total confirmado manualmente en GOcuotas. Pedido cancelado y stock repuesto automáticamente.')
+  res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'GOcuotas confirmó el reintegro. El pedido se canceló y el stock se repuso automáticamente.' : 'Confirmación manual registrada. Si el pedido ya fue despachado, corresponde gestionar la devolución física.' })
 })
 
 
