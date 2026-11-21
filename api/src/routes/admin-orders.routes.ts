@@ -91,7 +91,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  const cancellation = await prisma.cancellationRequest.findUnique({ where: { orderId: existing.id }, select: { status: true } })
+  const cancellation = await prisma.cancellationRequest.findUnique({ where: { orderId: existing.id }, select: { status: true, returnStatus: true } })
   if (isCancellationBlockingFulfillment(cancellation)) {
     res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
@@ -285,7 +285,7 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
 
   const order = await prisma.order.findUnique({
     where: { id: orderId.data },
-    include: { items: true, paymentAttempts: { select: { provider: true, status: true, approvedAt: true } }, cancellationRequest: { select: { status: true } } },
+    include: { items: true, paymentAttempts: { select: { provider: true, status: true, approvedAt: true } }, cancellationRequest: { select: { status: true, returnStatus: true } } },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
