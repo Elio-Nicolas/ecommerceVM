@@ -702,7 +702,7 @@ adminOrdersRouter.post('/:id/refund/gocuotas-confirmation', async (req, res) => 
     res.status(error.status).json({ error: { code: result, message: error.message } })
     return
   }
-  const finalized = await finalizePreDispatchRefund(orderId.data, req.admin?.id || null, 'Reintegro total confirmado manualmente en GOcuotas. Pedido cancelado y stock repuesto automáticamente.')
+  const finalized = await finalizePreDispatchRefund(orderId.data, req.admin?.id || null, 'Reintegro total confirmado manualmente en GOcuotas. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido GOcuotas ya reembolsado:', error); return 'FINALIZATION_PENDING' as const })
   res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'GOcuotas confirmó el reintegro. El pedido se canceló y el stock se repuso automáticamente.' : 'Confirmación manual registrada. Si el pedido ya fue despachado, corresponde gestionar la devolución física.' })
 })
 
@@ -826,7 +826,7 @@ adminOrdersRouter.post('/:id/refund', async (req, res) => {
           prisma.paymentAttempt.update({ where: { id: payment.id }, data: { status: 'REFUNDED', statusDetail: 'refunded', lastError: null } }),
           prisma.orderStatusHistory.create({ data: { orderId: request.orderId, fromStatus: request.order.status, toStatus: request.order.status, note: 'Reembolso total confirmado por Mercado Pago.', changedByAdminId: req.admin?.id || null } }),
         ])
-        const finalized = await finalizePreDispatchRefund(request.orderId, req.admin?.id || null, 'Reembolso total confirmado por Mercado Pago. Pedido cancelado y stock repuesto automáticamente.')
+        const finalized = await finalizePreDispatchRefund(request.orderId, req.admin?.id || null, 'Reembolso total confirmado por Mercado Pago. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido Mercado Pago ya reembolsado:', error); return 'FINALIZATION_PENDING' as const })
         res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'Mercado Pago confirmó el reintegro. El pedido se canceló y el stock se repuso automáticamente.' : 'Mercado Pago confirmó el reintegro. Si el pedido ya fue despachado, corresponde gestionar la devolución física.' })
         return
       }
