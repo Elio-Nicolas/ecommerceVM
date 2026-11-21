@@ -162,7 +162,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
     const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
     const currentOrder = await tx.order.findUnique({
       where: { id: attempt.orderId },
-      select: { code: true, status: true, totalArs: true, customerEmail: true, cancellationRequest: { select: { id: true, status: true } }, shipments: { select: { status: true } } },
+      select: { code: true, status: true, totalArs: true, customerEmail: true, cancellationRequest: { select: { id: true, status: true, returnStatus: true } }, shipments: { select: { status: true } } },
     })
     if (!current || !currentOrder) return
 
@@ -221,7 +221,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
             providerRefundId: payload.transactions?.refunds?.[0]?.id || null,
             providerStatus: 'REFUNDED_BY_MERCADO_PAGO',
             lastError: null,
-            ...(returnRequired ? { returnStatus: 'RETURN_PENDING' } : {}),
+            ...(returnRequired && !['RETURN_RECEIVED', 'RETURN_ACCEPTED'].includes(currentOrder.cancellationRequest.returnStatus) ? { returnStatus: 'RETURN_PENDING' } : {}),
           },
         })
       } else if (currentOrder.customerEmail) {
