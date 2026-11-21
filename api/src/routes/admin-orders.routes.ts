@@ -509,7 +509,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  if (['PREPARING', 'SHIPPED', 'DELIVERED'].includes(input.status) && isCancellationBlockingFulfillment(existing.cancellationRequest)) {
+  if ((['PREPARING', 'SHIPPED'].includes(input.status) || (input.status === 'DELIVERED' && existing.status !== 'SHIPPED')) && isCancellationBlockingFulfillment(existing.cancellationRequest)) {
     res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
   }
@@ -578,7 +578,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
         include: { items: true, paymentAttempts: { select: { provider: true, status: true } }, cancellationRequest: { select: { status: true } } },
       })
       if (!currentOrder || currentOrder.status !== existing.status) throw new Error('ORDER_STATUS_CONFLICT')
-      if (['PREPARING', 'SHIPPED', 'DELIVERED'].includes(input.status) && isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) throw new Error('CANCELLATION_REQUEST_PENDING')
+      if ((['PREPARING', 'SHIPPED'].includes(input.status) || (input.status === 'DELIVERED' && currentOrder.status !== 'SHIPPED')) && isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) throw new Error('CANCELLATION_REQUEST_PENDING')
       if (input.status === 'CANCELLED') {
         if (getPaymentCancellationBlock(currentOrder.paymentAttempts)) {
           throw new Error('PAYMENT_NOT_RESOLVED')
@@ -702,6 +702,80 @@ adminOrdersRouter.post('/:id/refund/gocuotas-confirmation', async (req, res) => 
     return
   }
   res.json({ data: { status: 'REFUNDED' }, message: 'Confirmación manual registrada. Ahora podés cancelar el pedido; el stock se repondrá una sola vez.' })
+})
+
+
+adminOrdersRouter.post('/:id/refund/return-received', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  if (!orderId.success) {
+    res.status(400).json({ error: { code: 'ORDER_ID_INVALID', message: 'El pedido no es válido.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const request = await tx.cancellationRequest.findUnique({
+      where: { orderId: orderId.data },
+      include: { order: { select: { status: true } } },
+    })
+    if (!request) return 'REQUEST_NOT_FOUND' as const
+    if (!['SHIPPED', 'DELIVERED'].includes(request.order.status)) return 'RETURN_NOT_REQUIRED' as const
+    if (request.returnStatus === 'RETURN_RECEIVED' || request.returnStatus === 'RETURN_ACCEPTED') return 'ALREADY_RECEIVED' as const
+    if (request.returnStatus !== 'RETURN_PENDING') return 'RETURN_NOT_PENDING' as const
+    await tx.cancellationRequest.update({ where: { id: request.id }, data: { returnStatus: 'RETURN_RECEIVED' } })
+    await tx.orderStatusHistory.create({
+      data: { orderId: orderId.data, fromStatus: request.order.status, toStatus: request.order.status, note: 'La tienda registró la recepción física del producto devuelto. Pendiente de inspección y resolución del reintegro.', changedByAdminId: req.admin?.id || null },
+    })
+    return 'RETURN_RECEIVED' as const
+  })
+  if (result !== 'RETURN_RECEIVED' && result !== 'ALREADY_RECEIVED') {
+    const errors: Record<string, { status: number; message: string }> = {
+      REQUEST_NOT_FOUND: { status: 404, message: 'El pedido no tiene una solicitud de arrepentimiento.' },
+      RETURN_NOT_REQUIRED: { status: 409, message: 'Este pedido no registra una devolución posterior al despacho.' },
+      RETURN_NOT_PENDING: { status: 409, message: 'La devolución no está pendiente de recepción.' },
+    }
+    const error = errors[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  res.json({ data: { returnStatus: result }, message: result === 'ALREADY_RECEIVED' ? 'La recepción ya estaba registrada.' : 'Recepción física registrada. Inspeccioná el producto antes de reingresarlo al stock.' })
+})
+
+adminOrdersRouter.post('/:id/refund/return-accepted', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  if (!orderId.success) {
+    res.status(400).json({ error: { code: 'ORDER_ID_INVALID', message: 'El pedido no es válido.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const request = await tx.cancellationRequest.findUnique({
+      where: { orderId: orderId.data },
+      include: { order: { include: { items: true } } },
+    })
+    if (!request) return 'REQUEST_NOT_FOUND' as const
+    if (request.returnStatus === 'RETURN_ACCEPTED') return 'ALREADY_ACCEPTED' as const
+    if (request.returnStatus !== 'RETURN_RECEIVED') return 'RETURN_NOT_RECEIVED' as const
+    for (const item of request.order.items) {
+      if (item.productId) {
+        await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } })
+      }
+    }
+    await tx.cancellationRequest.update({ where: { id: request.id }, data: { returnStatus: 'RETURN_ACCEPTED' } })
+    await tx.orderStatusHistory.create({
+      data: { orderId: orderId.data, fromStatus: request.order.status, toStatus: request.order.status, note: 'La tienda inspeccionó y aceptó la devolución. El producto fue reingresado al stock.', changedByAdminId: req.admin?.id || null },
+    })
+    return 'RETURN_ACCEPTED' as const
+  })
+  if (result !== 'RETURN_ACCEPTED' && result !== 'ALREADY_ACCEPTED') {
+    const errors: Record<string, { status: number; message: string }> = {
+      REQUEST_NOT_FOUND: { status: 404, message: 'El pedido no tiene una solicitud de arrepentimiento.' },
+      RETURN_NOT_RECEIVED: { status: 409, message: 'Primero registrá la recepción física del producto.' },
+    }
+    const error = errors[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  res.json({ data: { returnStatus: result }, message: result === 'ALREADY_ACCEPTED' ? 'La devolución ya estaba aceptada; no se modificó el stock.' : 'Devolución aceptada y stock repuesto una sola vez.' })
 })
 
 adminOrdersRouter.post('/:id/refund', async (req, res) => {
