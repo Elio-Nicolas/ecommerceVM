@@ -355,7 +355,7 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', order.id)
     const currentOrder = await tx.order.findUnique({
       where: { id: order.id },
-      select: { status: true, cancellationRequest: { select: { status: true } } },
+      select: { status: true, cancellationRequest: { select: { status: true, returnStatus: true } } },
     })
     if (!currentOrder || currentOrder.status !== 'PREPARING' || isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) return { blocked: true as const }
     const existing = await tx.shippingShipment.findUnique({
@@ -505,7 +505,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }).parse(req.body)
   const existing = await prisma.order.findUnique({
     where: { id: req.params.id },
-    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } }, cancellationRequest: { select: { status: true } } },
+    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } }, cancellationRequest: { select: { status: true, returnStatus: true } } },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -577,7 +577,7 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
       const currentOrder = await tx.order.findUnique({
         where: { id: existing.id },
-        include: { items: true, paymentAttempts: { select: { provider: true, status: true } }, cancellationRequest: { select: { status: true } } },
+        include: { items: true, paymentAttempts: { select: { provider: true, status: true } }, cancellationRequest: { select: { status: true, returnStatus: true } } },
       })
       if (!currentOrder || currentOrder.status !== existing.status) throw new Error('ORDER_STATUS_CONFLICT')
       if ((['PREPARING', 'SHIPPED'].includes(input.status) || (input.status === 'DELIVERED' && currentOrder.status !== 'SHIPPED')) && isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) throw new Error('CANCELLATION_REQUEST_PENDING')
