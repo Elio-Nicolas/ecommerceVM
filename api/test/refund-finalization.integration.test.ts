@@ -60,6 +60,26 @@ test('un reintegro confirmado cancela el pedido previo al despacho y repone stoc
   }
 })
 
+
+test('un despacho admitido bloquea cancelación y reposición aunque el estado siga en preparación', { skip: !databaseAvailable }, async () => {
+  const fixture = await createRefundFixture('PREPARING')
+  try {
+    await prisma.cancellationRequest.update({
+      where: { orderId: fixture.orderId },
+      data: { returnStatus: 'RETURN_PENDING' },
+    })
+    assert.equal(await finalizePreDispatchRefund(fixture.orderId, null, 'CI admitted shipment'), 'RETURN_WORKFLOW_REQUIRED')
+    const [order, product] = await Promise.all([
+      prisma.order.findUnique({ where: { id: fixture.orderId }, select: { status: true } }),
+      prisma.product.findUnique({ where: { id: fixture.productId }, select: { stock: true } }),
+    ])
+    assert.equal(order?.status, 'PREPARING')
+    assert.equal(product?.stock, 0)
+  } finally {
+    await cleanupFixture(fixture)
+  }
+})
+
 test('un pedido ya despachado no se cancela ni repone stock automáticamente: requiere devolución física', { skip: !databaseAvailable }, async () => {
   const fixture = await createRefundFixture('SHIPPED')
   try {
