@@ -76,3 +76,12 @@ Este circuito solo controla pedidos creados en ecommerceVM. Si la compra se hizo
 ### Pruebas automatizadas
 
 CI ejecuta las pruebas de política y las pruebas de integración contra PostgreSQL aislado. Se verifica que un reintegro total previo al despacho cancele y reponga stock una sola vez, y que un pedido ya despachado no se cancele ni reingrese al stock sin devolución física registrada. No se usan pedidos reales ni credenciales de proveedores para estas pruebas.
+
+
+### Reintegros iniciados directamente en el proveedor
+
+Si Mercado Pago informa un reintegro total iniciado fuera de la tienda, el webhook/consulta de estado crea o actualiza el registro de gestión, registra el reintegro confirmado y aplica la misma finalización automática: cancelación y reposición de stock antes del despacho, o devolución física si el envío ya fue admitido/despachado. Los webhooks repetidos no vuelven a ingresar stock.
+
+Si el comprador inicia una gestión directamente en GOcuotas, la tienda debe verificarla en el panel o con soporte: la integración actual no permite afirmar automáticamente que GOcuotas ya devolvió el dinero. El administrador registra esa confirmación manual una vez verificada.
+
+En pedidos en efectivo, administración distingue entre dinero efectivamente cobrado (debe registrar el reintegro con referencia) y pedido nunca cobrado (puede cerrarse como «sin cobro», sin simular una devolución monetaria).
