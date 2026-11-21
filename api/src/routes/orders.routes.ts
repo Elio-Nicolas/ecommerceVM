@@ -382,12 +382,12 @@ ordersRouter.post('/regret', regretRequestLimiter, async (req, res) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', order.id)
       const current = await tx.order.findUnique({
         where: { id: order.id },
-        select: { status: true, cancellationRequest: { select: { id: true, status: true } } },
+        select: { status: true, cancellationRequest: { select: { id: true, status: true } }, shipments: { select: { status: true } } },
       })
       if (!current || current.status === 'CANCELLED') throw new Error('ORDER_NO_LONGER_ACTIVE')
       return tx.cancellationRequest.upsert({
         where: { orderId: order.id },
-        create: { orderId: order.id, customerEmail: input.data.email, status: 'REQUESTED', returnStatus: ['SHIPPED', 'DELIVERED'].includes(current.status) ? 'RETURN_PENDING' : 'NOT_REQUIRED' },
+        create: { orderId: order.id, customerEmail: input.data.email, status: 'REQUESTED', returnStatus: (['SHIPPED', 'DELIVERED'].includes(current.status) || current.shipments.some((shipment) => ['ADMISSION_PENDING', 'ADMITTED', 'PROCESSED', 'ADMISSION_UNKNOWN'].includes(shipment.status))) ? 'RETURN_PENDING' : 'NOT_REQUIRED' },
         update: {},
         select: { id: true, status: true },
       })
