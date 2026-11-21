@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { requireAdmin } from '../middleware/require-admin'
 import { getOcaLabelPdf, OcaLabelError } from '../services/oca-label'
+import { getCancellationFulfillmentBlockMessage, isCancellationBlockingFulfillment } from '../services/fulfillment-policy'
 
 export const adminShippingLabelsRouter = Router()
 adminShippingLabelsRouter.use(requireAdmin)
@@ -16,10 +17,14 @@ adminShippingLabelsRouter.get('/orders/:orderId/oca', async (req, res) => {
 
   const order = await prisma.order.findUnique({
     where: { id: parsedId.data },
-    select: { id: true, code: true, status: true, deliveryMethod: true },
+    select: { id: true, code: true, status: true, deliveryMethod: true, cancellationRequest: { select: { status: true } } },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (isCancellationBlockingFulfillment(order.cancellationRequest)) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
   }
   if (order.deliveryMethod !== 'OCA' || order.status === 'CANCELLED') {
