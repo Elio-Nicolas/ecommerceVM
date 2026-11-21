@@ -2,7 +2,7 @@ name: ecommerceVM CI
 
 on:
   pull_request:
-    branches: [main, 'fix/**', fix/admin-shipping-method-guard, feature/arca-invoicing-foundation, feature/arca-wsaa-client-v2, feature/arca-wsfe-readonly-v1, feat/gocuotas-redirect-v1]
+    branches: [main, 'fix/**', 'chore/**', fix/admin-shipping-method-guard, feature/arca-invoicing-foundation, feature/arca-wsaa-client-v2, feature/arca-wsfe-readonly-v1, feat/gocuotas-redirect-v1]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
   push:
@@ -49,6 +49,10 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - name: Report dependency vulnerabilities
+        run: |
+          npm audit --json > npm-audit-report.json || true
+          node -e "const r=require('./npm-audit-report.json'); const v=r.vulnerabilities||{}; for (const [name,item] of Object.entries(v)) console.log(JSON.stringify({name,severity:item.severity,isDirect:item.isDirect,range:item.range,fixAvailable:item.fixAvailable,via:item.via.map(x=>typeof x==='string'?x:{name:x.name,title:x.title,url:x.url,range:x.range})})); console.log('Totals:', JSON.stringify(r.metadata?.vulnerabilities||{}))"
       - run: npm run prisma:deploy
       - run: npm run prisma:generate
       - run: npm test
