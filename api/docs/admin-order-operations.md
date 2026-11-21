@@ -45,3 +45,34 @@ Desde el detalle administrativo se inicia la gestión de reintegro. La tienda ut
 La integración API Redirect utilizada por esta tienda no tiene un endpoint de reintegro documentado/validado en el contrato disponible. Por eso ecommerceVM **no intenta ejecutar una devolución**: el administrador debe realizarla desde el panel de GOcuotas o con soporte del proveedor. Solo después de verla confirmada puede usar «Registrar reintegro ya realizado en GOcuotas». Esa acción registra la confirmación manual y la identidad del administrador en el historial; no mueve dinero. Luego se cancela el pedido desde el flujo normal.
 
 La cancelación del pedido y la devolución física del producto son procesos separados. La tienda no repone stock por registrar un reintegro: el stock se repone al cancelar el pedido.
+
+
+## Arrepentimiento del comprador y bloqueo de fulfillment
+
+La solicitud pública `POST /api/v1/orders/regret` identifica el pedido por código y correo, registra una única solicitud idempotente bajo el bloqueo transaccional del pedido y devuelve un identificador de gestión. La tienda envía una constancia por correo con ese identificador. Si Resend no está disponible, la solicitud queda registrada y el fallo de correo se deja en logs para reintento operativo.
+
+Mientras la solicitud está en estado `REQUESTED`, `PROCESSING` o `FAILED`, el backend bloquea:
+- El paso a preparación, despacho o entrega cuando el pedido todavía no estaba en tránsito.
+- La admisión OCA y la descarga de etiqueta OCA.
+- Las modificaciones de datos logísticos desde administración.
+- El inicio de un nuevo checkout de Mercado Pago o GOcuotas.
+
+Los controles se repiten dentro de las transacciones que compiten por el pedido. Un webhook tardío puede registrar que el proveedor cobró, pero no confirma el pedido ni dispara el correo de compra si ya existe una solicitud de arrepentimiento. El cobro debe conciliarse y reembolsarse con el proveedor.
+
+### Reintegro y reposición
+
+- **Mercado Pago:** ecommerceVM solicita el reintegro mediante Orders API con idempotencia y espera la confirmación total. Si el pedido todavía no fue despachado, al confirmar el reintegro se cancela automáticamente y se repone stock en la misma transacción, una sola vez.
+- **GOcuotas:** la devolución se ejecuta fuera de ecommerceVM, desde GOcuotas o con su soporte. El administrador registra la confirmación manual únicamente después de verificarla. A partir de esa constancia, los pedidos no despachados se cancelan y reponen stock automáticamente.
+- **Efectivo:** el administrador registra el reintegro manual con una referencia o comprobante. El backend exige que no existan intentos online pendientes/aprobados y luego cancela y repone stock automáticamente si el pedido sigue bajo control de la tienda.
+- **Devolución después del despacho:** el pedido no se cancela ni se repone stock automáticamente. La solicitud queda marcada como `RETURN_PENDING`. La administración debe registrar la recepción física con `POST /api/v1/admin/orders/:id/refund/return-received`; después de inspeccionar el artículo, registra su aceptación con `POST /api/v1/admin/orders/:id/refund/return-accepted`. Solo esta segunda acción repone stock y es idempotente. El pedido conserva su historial de envío/entrega.
+- **Reembolsos parciales o intentos adicionales sin resolver:** no se consideran reintegro total. La preparación/cancelación permanece bloqueada hasta conciliar el saldo completo con el proveedor.
+
+La confirmación manual de GOcuotas o efectivo es una declaración auditable del administrador; no significa que ecommerceVM haya movido dinero. El comprobante/referencia debe corresponder a una devolución efectivamente ejecutada.
+
+### Alcance de plataformas externas
+
+Este circuito solo controla pedidos creados en ecommerceVM. Si la compra se hizo directamente en Mercado Libre u otra plataforma externa, esa plataforma gestiona su propia solicitud de arrepentimiento, logística y reintegro. ecommerceVM no puede bloquear despachos ni devolver pagos que no originó.
+
+### Pruebas automatizadas
+
+CI ejecuta las pruebas de política y las pruebas de integración contra PostgreSQL aislado. Se verifica que un reintegro total previo al despacho cancele y reponga stock una sola vez, y que un pedido ya despachado no se cancele ni reingrese al stock sin devolución física registrada. No se usan pedidos reales ni credenciales de proveedores para estas pruebas.
