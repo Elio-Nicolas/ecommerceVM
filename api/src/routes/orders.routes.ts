@@ -392,6 +392,7 @@ ordersRouter.post('/regret', regretRequestLimiter, async (req, res) => {
         select: { id: true, status: true },
       })
     })
+    await sendRegretRequestConfirmationEmail(order.id, request.id)
     res.setHeader('Cache-Control', 'no-store')
     if (request.status !== 'REQUESTED') {
       res.status(200).json({ data: { requestId: request.id, status: request.status }, message: 'La solicitud ya está registrada y se encuentra en revisión.' })
