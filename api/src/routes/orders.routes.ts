@@ -10,6 +10,7 @@ import { createCheckoutFingerprint } from '../services/order-checkout-fingerprin
 import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/checkout-pricing'
 import { env } from '../config/env'
 import { deriveOrderAccessToken, hashOrderAccessToken, hasValidOrderAccessToken } from '../services/order-access-token'
+import { sendRegretRequestConfirmationEmail } from '../services/order-email'
 
 export const ordersRouter = Router()
 
