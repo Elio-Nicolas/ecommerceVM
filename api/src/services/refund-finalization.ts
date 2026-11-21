@@ -10,11 +10,11 @@ export async function finalizePreDispatchRefund(orderId: string, changedByAdminI
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId)
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      include: { items: true, paymentAttempts: { select: { status: true } }, cancellationRequest: { select: { status: true } } },
+      include: { items: true, paymentAttempts: { select: { status: true } }, cancellationRequest: { select: { status: true, returnStatus: true } } },
     })
     if (!order) return 'ORDER_NOT_FOUND' as const
     if (order.status === 'CANCELLED') return 'ALREADY_CANCELLED' as const
-    if (['SHIPPED', 'DELIVERED'].includes(order.status)) return 'RETURN_WORKFLOW_REQUIRED' as const
+    if (['SHIPPED', 'DELIVERED'].includes(order.status) || ['RETURN_PENDING', 'RETURN_RECEIVED'].includes(order.cancellationRequest?.returnStatus || 'NOT_REQUIRED')) return 'RETURN_WORKFLOW_REQUIRED' as const
     if (order.cancellationRequest?.status !== 'REFUNDED') return 'REFUND_NOT_CONFIRMED' as const
     if (order.paymentAttempts.some((attempt) => ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))) {
       return 'OTHER_PAYMENT_ATTEMPT_UNRESOLVED' as const
@@ -25,7 +25,7 @@ export async function finalizePreDispatchRefund(orderId: string, changedByAdminI
     })
     if (changed.count !== 1) return 'ORDER_STATE_CHANGED' as const
     for (const item of order.items) {
-      if (item.productId) {
+      if (order.cancellationRequest.returnStatus !== 'RETURN_ACCEPTED' && item.productId) {
         await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } })
       }
     }
