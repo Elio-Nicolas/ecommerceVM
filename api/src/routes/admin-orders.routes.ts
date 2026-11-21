@@ -766,8 +766,8 @@ adminOrdersRouter.post('/:id/refund/return-received', async (req, res) => {
       include: { order: { select: { status: true } } },
     })
     if (!request) return 'REQUEST_NOT_FOUND' as const
-    if (request.returnStatus !== 'RETURN_PENDING') return 'RETURN_NOT_PENDING' as const
     if (request.returnStatus === 'RETURN_RECEIVED' || request.returnStatus === 'RETURN_ACCEPTED') return 'ALREADY_RECEIVED' as const
+    if (request.returnStatus !== 'RETURN_PENDING') return 'RETURN_NOT_PENDING' as const
     await tx.cancellationRequest.update({ where: { id: request.id }, data: { returnStatus: 'RETURN_RECEIVED' } })
     await tx.orderStatusHistory.create({
       data: { orderId: orderId.data, fromStatus: request.order.status, toStatus: request.order.status, note: 'La tienda registró la recepción física del producto devuelto. Pendiente de inspección y resolución del reintegro.', changedByAdminId: req.admin?.id || null },
@@ -777,7 +777,6 @@ adminOrdersRouter.post('/:id/refund/return-received', async (req, res) => {
   if (result !== 'RETURN_RECEIVED' && result !== 'ALREADY_RECEIVED') {
     const errors: Record<string, { status: number; message: string }> = {
       REQUEST_NOT_FOUND: { status: 404, message: 'El pedido no tiene una solicitud de arrepentimiento.' },
-      RETURN_NOT_REQUIRED: { status: 409, message: 'Este pedido no registra una devolución posterior al despacho.' },
       RETURN_NOT_PENDING: { status: 409, message: 'La devolución no está pendiente de recepción.' },
     }
     const error = errors[result]
