@@ -8,5 +8,5 @@ export function isCancellationBlockingFulfillment(request: CancellationStateForF
 }
 
 export function getCancellationFulfillmentBlockMessage(): string {
-  return 'El pedido tiene una solicitud de arrepentimiento o reintegro pendiente. No puede prepararse, despacharse ni entregarse hasta resolverla.'
+  return 'El pedido tiene una solicitud de arrepentimiento o reintegro pendiente. No puede iniciar la preparación ni el despacho hasta resolverla. Si ya estaba en tránsito, registrá la entrega real y gestioná la devolución física.'
 }
