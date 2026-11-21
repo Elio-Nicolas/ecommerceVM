@@ -74,8 +74,9 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
 
   const prepared = await prisma.$transaction(async tx => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', orderId.data)
-    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { items: true } })
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { items: true, cancellationRequest: { select: { id: true, status: true } } } })
     if (!order) return { error: 'NOT_FOUND' as const }
+    if (order.cancellationRequest) return { error: 'REGRET_REQUEST_PENDING' as const }
     if (order.paymentMethod !== 'GOCUOTAS') return { error: 'PAYMENT_METHOD_MISMATCH' as const }
     if (!['PENDING', 'CONFIRMED'].includes(order.status) || !order.totalArs || !order.customerEmail) return { error: 'ORDER_NOT_PAYABLE' as const }
     const paid = await tx.paymentAttempt.findFirst({ where: { orderId: order.id, status: 'APPROVED' } })
@@ -113,6 +114,7 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     const errors: Record<string, { status: number; message: string }> = {
       NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
       PAYMENT_METHOD_MISMATCH: { status: 409, message: 'El pedido no está configurado para pagar con GOcuotas.' },
+      REGRET_REQUEST_PENDING: { status: 409, message: 'El pedido tiene una solicitud de arrepentimiento registrada y no puede iniciar un nuevo pago.' },
       ORDER_NOT_PAYABLE: { status: 409, message: 'El pedido todavía no está disponible para pagar.' },
       ALREADY_PAID: { status: 409, message: 'Este pedido ya tiene un pago aprobado.' },
       REQUEST_KEY_CONFLICT: { status: 409, message: 'La clave de pago ya fue utilizada para otra operación.' },
@@ -225,7 +227,7 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
     const providerOrderId = String(payload.id ?? id.data)
     let attempt = await prisma.paymentAttempt.findFirst({
       where: { provider: 'GOCUOTAS', providerOrderId },
-      include: { order: { select: { id: true, code: true, status: true, totalArs: true } } },
+      include: { order: { select: { id: true, code: true, status: true, totalArs: true, cancellationRequest: { select: { id: true, status: true } } } } },
     })
 
     // A webhook can arrive before the checkout request has persisted the provider ID
@@ -263,7 +265,8 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
     await prisma.$transaction(async tx => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', attempt.orderId)
       const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
-      if (!current) return
+      const currentOrder = await tx.order.findUnique({ where: { id: attempt.orderId }, select: { status: true, cancellationRequest: { select: { id: true, status: true } } } })
+      if (!current || !currentOrder) return
       const effective = current.status === 'REFUNDED'
         ? 'REFUNDED'
         : current.status === 'APPROVED'
@@ -280,7 +283,9 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
         approvedAt: paymentReceivedAt,
         lastError: matches ? null : 'La orden notificada no coincide con la referencia o el importe del pedido.',
       } })
-      if (matches && effective === 'APPROVED') {
+      if (matches && effective === 'APPROVED' && currentOrder.cancellationRequest) {
+        await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: currentOrder.status, toStatus: currentOrder.status, note: 'ATENCIÓN: GOcuotas aprobó el pago mientras existe una solicitud de arrepentimiento. El pedido permanece bloqueado para fulfillment y requiere conciliación del reintegro.' } })
+      } else if (matches && effective === 'APPROVED') {
         const changed = await tx.order.updateMany({
           where: {
             id: attempt.orderId,
@@ -300,9 +305,9 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
     })
     const approved = await prisma.paymentAttempt.findUnique({
       where: { id: attempt.id },
-      select: { status: true, order: { select: { id: true, status: true } } },
+      select: { status: true, order: { select: { id: true, status: true, cancellationRequest: { select: { id: true } } } } },
     })
-    if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED') {
+    if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED' && !approved.order.cancellationRequest) {
       await sendPaidOrderConfirmationEmail(approved.order.id)
     }
     res.status(200).send('OK')
