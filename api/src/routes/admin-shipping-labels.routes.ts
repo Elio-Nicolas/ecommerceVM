@@ -17,7 +17,7 @@ adminShippingLabelsRouter.get('/orders/:orderId/oca', async (req, res) => {
 
   const order = await prisma.order.findUnique({
     where: { id: parsedId.data },
-    select: { id: true, code: true, status: true, deliveryMethod: true, cancellationRequest: { select: { status: true } } },
+    select: { id: true, code: true, status: true, deliveryMethod: true, cancellationRequest: { select: { status: true, returnStatus: true } } },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
