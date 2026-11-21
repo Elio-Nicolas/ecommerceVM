@@ -103,3 +103,63 @@ export async function sendPaidOrderConfirmationEmail(orderId: string) {
     return false
   }
 }
+
+
+/**
+ * Confirms receipt of a consumer regret request and supplies its durable
+ * tracking identifier. Delivery failure is logged; the request remains stored.
+ */
+export async function sendRegretRequestConfirmationEmail(orderId: string, requestId: string) {
+  if (!env.RESEND_API_KEY || !env.ORDER_EMAIL_FROM) {
+    console.warn('[order-email] No se envió la constancia de arrepentimiento: faltan RESEND_API_KEY u ORDER_EMAIL_FROM.')
+    return false
+  }
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { code: true, customerName: true, customerEmail: true },
+  })
+  if (!order?.customerEmail) return false
+  const subject = 'Solicitud de arrepentimiento recibida · Pedido ' + order.code
+  const html = `
+    <div style="font-family:Arial,Helvetica,sans-serif;color:#0f172a;max-width:600px;margin:24px auto;padding:24px">
+      <h1 style="font-size:22px">Recibimos tu solicitud</h1>
+      <p>Hola ${escapeHtml(order.customerName)},</p>
+      <p>Registramos tu solicitud de arrepentimiento para el pedido <strong>${escapeHtml(order.code)}</strong>.</p>
+      <p>Tu número de gestión es:</p>
+      <p style="font-size:20px;font-weight:bold;word-break:break-all">${escapeHtml(requestId)}</p>
+      <p>Conservá este identificador. La tienda revisará la operación y gestionará el reintegro a través del medio de pago utilizado. No necesitás gestionar el dinero por separado con la tienda y la plataforma de pago.</p>
+      <p>Tu TiendaVM</p>
+    </div>`
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + env.RESEND_API_KEY,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'regret-request-confirmation/' + requestId,
+      },
+      body: JSON.stringify({
+        from: env.ORDER_EMAIL_FROM,
+        to: [order.customerEmail],
+        subject,
+        html,
+        text: [
+          'Recibimos tu solicitud de arrepentimiento.',
+          'Pedido: ' + order.code,
+          'Número de gestión: ' + requestId,
+          'Conservá este identificador. La tienda revisará la operación y gestionará el reintegro a través del medio de pago utilizado.',
+          'Tu TiendaVM',
+        ].join('\\n'),
+      }),
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!response.ok) {
+      console.error('[order-email] Resend rechazó la constancia de arrepentimiento:', response.status)
+      return false
+    }
+    return true
+  } catch (error) {
+    console.error('[order-email] No se pudo enviar la constancia de arrepentimiento:', error instanceof Error ? error.message : 'Error desconocido')
+    return false
+  }
+}
