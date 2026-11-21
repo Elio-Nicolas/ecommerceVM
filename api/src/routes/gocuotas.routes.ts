@@ -174,8 +174,8 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
           data: {
             providerOrderId: current.providerOrderId || providerOrderId,
             checkoutUrl: null,
-            status: 'UNKNOWN',
-            statusDetail: 'Checkout creado mientras se registraba una solicitud de arrepentimiento',
+            status: current.status === 'APPROVED' ? 'APPROVED' : 'UNKNOWN',
+            statusDetail: current.status === 'APPROVED' ? current.statusDetail : 'Checkout creado mientras se registraba una solicitud de arrepentimiento',
             responsePayload: payload as Prisma.InputJsonValue,
             lastError: 'GOcuotas pudo crear un checkout mientras el comprador solicitaba el arrepentimiento. Conciliación manual requerida.',
           },
