@@ -1,0 +1,1 @@
+ALTER TABLE "CancellationRequest" ADD COLUMN "returnStatus" TEXT NOT NULL DEFAULT 'NOT_REQUIRED';
