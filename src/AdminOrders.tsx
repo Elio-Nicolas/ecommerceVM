@@ -46,7 +46,8 @@ function historyEventLabel(entry: OrderHistory): string {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
-  if (order.cancellationRequest && ['REQUESTED', 'PROCESSING', 'FAILED'].includes(order.cancellationRequest.status) && order.status !== 'SHIPPED') return []
+  if (order.status === 'SHIPPED') return ['DELIVERED']
+  if (order.cancellationRequest && ['REQUESTED', 'PROCESSING', 'FAILED'].includes(order.cancellationRequest.status)) return []
   const paymentStatuses = (order.paymentAttempts || []).map((payment) => payment.status)
   if (paymentStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
   if (paymentStatuses.includes('APPROVED') || paymentStatuses.includes('PARTIALLY_REFUNDED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
