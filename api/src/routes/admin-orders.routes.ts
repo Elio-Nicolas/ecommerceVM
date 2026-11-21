@@ -870,7 +870,7 @@ adminOrdersRouter.post('/:id/refund', async (req, res) => {
       await prisma.paymentAttempt.update({ where: { id: payment.id }, data: { status: 'REFUNDED', statusDetail: 'refunded', lastError: null } })
       await prisma.orderStatusHistory.create({ data: { orderId: request.orderId, fromStatus: request.order.status, toStatus: request.order.status, note: 'Reembolso total confirmado por Mercado Pago.', changedByAdminId: req.admin?.id || null } })
     }
-    const finalized = completed ? await finalizePreDispatchRefund(request.orderId, req.admin?.id || null, 'Reembolso total confirmado por Mercado Pago. Pedido cancelado y stock repuesto automáticamente.') : null
+    const finalized = completed ? await finalizePreDispatchRefund(request.orderId, req.admin?.id || null, 'Reembolso total confirmado por Mercado Pago. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido Mercado Pago ya reembolsado:', error); return 'FINALIZATION_PENDING' as const }) : null
     res.status(completed ? 200 : 202).json({
       data: { status: completed ? 'REFUNDED' : 'PROCESSING', orderFinalization: finalized },
       message: completed ? (finalized === 'CANCELLED' ? 'Mercado Pago confirmó el reintegro. El pedido se canceló y el stock se repuso automáticamente.' : 'Mercado Pago confirmó el reintegro. Si el pedido ya fue despachado, corresponde gestionar la devolución física.') : 'Mercado Pago recibió el reembolso y lo está procesando. Consultá nuevamente en unos minutos.',
