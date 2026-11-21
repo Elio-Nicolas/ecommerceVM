@@ -10,6 +10,7 @@ import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consi
 import { verifyMercadoPagoWebhookSignature } from '../services/payment-webhook-signature'
 import { hasValidOrderAccessToken } from '../services/order-access-token'
 import { sendPaidOrderConfirmationEmail } from '../services/order-email'
+import { finalizePreDispatchRefund } from '../services/refund-finalization'
 
 export const paymentsRouter = Router()
 
@@ -144,6 +145,7 @@ async function refreshMercadoPagoOrder(providerOrderId: string) {
     total_amount?: string | number
     total_paid_amount?: string | number
     currency?: string
+    transactions?: { refunds?: Array<{ id?: string; status?: string }> }
   }
 }
 
@@ -160,7 +162,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
     const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
     const currentOrder = await tx.order.findUnique({
       where: { id: attempt.orderId },
-      select: { code: true, status: true, totalArs: true, cancellationRequest: { select: { id: true, status: true } } },
+      select: { code: true, status: true, totalArs: true, customerEmail: true, cancellationRequest: { select: { id: true, status: true } }, shipments: { select: { status: true } } },
     })
     if (!current || !currentOrder) return
 
@@ -208,6 +210,42 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
       },
     })
 
+    if (matchesOrder && effectiveStatus === 'REFUNDED') {
+      const returnRequired = ['SHIPPED', 'DELIVERED'].includes(currentOrder.status)
+        || currentOrder.shipments.some((shipment) => ['ADMISSION_PENDING', 'ADMITTED', 'PROCESSED', 'ADMISSION_UNKNOWN'].includes(shipment.status))
+      if (currentOrder.cancellationRequest) {
+        await tx.cancellationRequest.update({
+          where: { id: currentOrder.cancellationRequest.id },
+          data: {
+            status: 'REFUNDED',
+            providerRefundId: payload.transactions?.refunds?.[0]?.id || null,
+            providerStatus: 'REFUNDED_BY_MERCADO_PAGO',
+            lastError: null,
+            ...(returnRequired ? { returnStatus: 'RETURN_PENDING' } : {}),
+          },
+        })
+      } else if (currentOrder.customerEmail) {
+        await tx.cancellationRequest.create({
+          data: {
+            orderId: attempt.orderId,
+            customerEmail: currentOrder.customerEmail,
+            status: 'REFUNDED',
+            providerRefundId: payload.transactions?.refunds?.[0]?.id || null,
+            providerStatus: 'REFUNDED_BY_MERCADO_PAGO',
+            returnStatus: returnRequired ? 'RETURN_PENDING' : 'NOT_REQUIRED',
+          },
+        })
+      }
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: attempt.orderId,
+          fromStatus: currentOrder.status,
+          toStatus: currentOrder.status,
+          note: 'Mercado Pago informó un reintegro total. ecommerceVM registró el estado del proveedor y bloquea la preparación o gestiona la devolución física según el estado del envío.',
+        },
+      })
+    }
+
     if (matchesOrder && effectiveStatus === 'APPROVED' && currentOrder.cancellationRequest) {
       await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: currentOrder.status, toStatus: currentOrder.status, note: 'ATENCIÓN: Mercado Pago aprobó el pago mientras existe una solicitud de arrepentimiento. El pedido permanece bloqueado para fulfillment y requiere conciliación del reintegro.' } })
     } else if (matchesOrder && effectiveStatus === 'APPROVED' && currentOrder.status === 'PENDING') {
@@ -242,6 +280,10 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
   })
   if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED' && !approved.order.cancellationRequest) {
     await sendPaidOrderConfirmationEmail(approved.orderId)
+  } else if (approved?.status === 'REFUNDED') {
+    await finalizePreDispatchRefund(approved.orderId, null, 'Mercado Pago confirmó el reintegro total. Pedido cancelado y stock repuesto automáticamente.').catch((error) => {
+      console.error('No se pudo finalizar automáticamente un reintegro confirmado por Mercado Pago:', error)
+    })
   }
   return true
 }
