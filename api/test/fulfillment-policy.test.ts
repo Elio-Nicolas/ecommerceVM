@@ -11,9 +11,15 @@ test('bloquea fulfillment mientras el arrepentimiento o reintegro no está resue
 test('no bloquea por ausencia de solicitud ni después del reintegro confirmado', () => {
   assert.equal(isCancellationBlockingFulfillment(null), false)
   assert.equal(isCancellationBlockingFulfillment(undefined), false)
-  assert.equal(isCancellationBlockingFulfillment({ status: 'REFUNDED' }), false)
+  assert.equal(isCancellationBlockingFulfillment({ status: 'REFUNDED', returnStatus: 'NOT_REQUIRED' }), false)
 })
 
 test('explica que la operación debe quedar detenida', () => {
   assert.match(getCancellationFulfillmentBlockMessage(), /no puede iniciar la preparación ni el despacho/i)
+})
+
+test('mantiene bloqueado el fulfillment mientras la devolución física no se cierre', () => {
+  for (const returnStatus of ['RETURN_PENDING', 'RETURN_RECEIVED', 'RETURN_ACCEPTED']) {
+    assert.equal(isCancellationBlockingFulfillment({ status: 'REFUNDED', returnStatus }), true, returnStatus)
+  }
 })
