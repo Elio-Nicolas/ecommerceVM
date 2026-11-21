@@ -18,7 +18,7 @@ type Order = {
   shipments?: { provider: string; status: string; trackingNumber: string | null }[]
   shippingCostOptions: { priceArs?: number; serviceCode?: string; sellerCostStatus?: 'AVAILABLE' | 'UNAVAILABLE'; sellerOptions?: { carrierId: string; carrierName: string; costArs: number; estimatedHours: number | null; fulfillmentMode: string }[] } | null
   createdAt: string; paymentReceivedAt: string | null; receiptEmailSentAt: string | null; items: OrderItem[]; history: OrderHistory[]
-  cancellationRequest?: { id: string; status: 'REQUESTED' | 'PROCESSING' | 'REFUNDED' | 'FAILED'; providerRefundId: string | null; providerStatus: string | null; lastError: string | null; createdAt: string } | null
+  cancellationRequest?: { id: string; status: 'REQUESTED' | 'PROCESSING' | 'REFUNDED' | 'FAILED'; returnStatus: 'NOT_REQUIRED' | 'RETURN_PENDING' | 'RETURN_RECEIVED' | 'RETURN_ACCEPTED'; providerRefundId: string | null; providerStatus: string | null; lastError: string | null; createdAt: string } | null
   paymentAttempts?: { id: string; provider: string; providerOrderId: string | null; status: 'CREATING' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'UNKNOWN' | 'REFUNDED' | 'PARTIALLY_REFUNDED'; statusDetail: string | null; amountArs: number; approvedAt: string | null; createdAt: string }[]
   fiscalDocuments?: { id: string; type: 'INVOICE_C' | 'CREDIT_NOTE_C' | 'DEBIT_NOTE_C'; status: 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'; pointOfSale: number | null; voucherType: number; voucherNumber: number | null; cae: string | null; caeExpiresAt: string | null; lastErrorMessage: string | null; createdAt: string }[]
 }
@@ -46,6 +46,7 @@ function historyEventLabel(entry: OrderHistory): string {
 }
 
 function availableNextStatuses(order: Order): OrderStatus[] {
+  if (order.cancellationRequest && ['REQUESTED', 'PROCESSING', 'FAILED'].includes(order.cancellationRequest.status) && order.status !== 'SHIPPED') return []
   const paymentStatuses = (order.paymentAttempts || []).map((payment) => payment.status)
   if (paymentStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
   if (paymentStatuses.includes('APPROVED') || paymentStatuses.includes('PARTIALLY_REFUNDED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
@@ -242,6 +243,59 @@ export default function AdminOrders() {
       await loadOrders(token)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo registrar la confirmación de GOcuotas.')
+    } finally {
+      setRefundProcessing(false)
+    }
+  }
+
+
+  async function confirmCashRefund(order: Order) {
+    if (!token || refundProcessing || !order.cancellationRequest) return
+    const reference = window.prompt('Ingresá el número de recibo, comprobante o referencia del reintegro en efectivo:')
+    if (!reference?.trim()) return
+    const confirmed = window.confirm('Confirmás que el dinero ya fue devuelto al comprador? Esta acción registra la constancia y puede cancelar el pedido y reponer el stock.')
+    if (!confirmed) return
+    setRefundProcessing(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await request<{ message: string }>(`/admin/orders/${order.id}/refund/manual-confirmation`, token, {
+        method: 'POST', body: JSON.stringify({ reference: reference.trim() }),
+      })
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo registrar el reintegro en efectivo.')
+    } finally {
+      setRefundProcessing(false)
+    }
+  }
+
+  async function markReturnReceived(order: Order) {
+    if (!token || refundProcessing) return
+    if (!window.confirm('Confirmás que el producto devuelto ya llegó físicamente a la tienda?')) return
+    setRefundProcessing(true)
+    try {
+      const result = await request<{ message: string }>(`/admin/orders/${order.id}/refund/return-received`, token, { method: 'POST' })
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo registrar la recepción física.')
+    } finally {
+      setRefundProcessing(false)
+    }
+  }
+
+  async function acceptReturn(order: Order) {
+    if (!token || refundProcessing) return
+    if (!window.confirm('Confirmás que inspeccionaste el producto y está en condiciones de reingresar al stock? Esta acción repone las unidades una sola vez.')) return
+    setRefundProcessing(true)
+    try {
+      const result = await request<{ message: string }>(`/admin/orders/${order.id}/refund/return-accepted`, token, { method: 'POST' })
+      setNotice(result.message)
+      await loadOrders(token)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo aceptar la devolución.')
     } finally {
       setRefundProcessing(false)
     }
@@ -519,7 +573,7 @@ export default function AdminOrders() {
                 : <div className="order-payment-attempt"><p>Registrá el cobro únicamente después de recibir el dinero. Esta acción confirma el pedido si todavía estaba pendiente y dispara el correo de pago confirmado.</p><button type="button" className="admin-primary" disabled={paymentReceivingId !== null || activeOrder.status === 'CANCELLED'} onClick={() => void registerCashPayment(activeOrder)}>{paymentReceivingId === activeOrder.id ? 'Registrando cobro...' : 'Registrar pago recibido'}</button></div>}
             </section>}
             <section className="order-payment-card">
-              <div className="order-payment-heading"><div><span className="admin-kicker">COBROS ONLINE</span><h3>{activeOrder.paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}</h3></div><small>Estado informado por el proveedor</small></div>
+              <div className="order-payment-heading"><div><span className="admin-kicker">COBROS ONLINE</span><h3>{activeOrder.paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : activeOrder.paymentMethod === 'CASH' ? 'Efectivo' : 'Mercado Pago'}</h3></div><small>Estado informado por el proveedor</small></div>
               {(activeOrder.paymentAttempts || []).map((payment) => <div className="order-payment-attempt" key={payment.id}>
                 <div><strong>{payment.status === 'APPROVED' ? 'Pago aprobado' : payment.status === 'REJECTED' ? 'Pago rechazado' : payment.status === 'CANCELLED' ? 'Pago cancelado' : payment.status === 'REFUNDED' ? 'Pago reembolsado' : payment.status === 'PARTIALLY_REFUNDED' ? 'Reembolso parcial' : payment.status === 'UNKNOWN' ? 'Resultado incierto' : payment.status === 'CREATING' ? 'Creando pago' : 'Pago pendiente'}</strong><small>{payment.statusDetail || 'Sin detalle informado'} · {formatDate(payment.createdAt)}</small></div>
                 <strong>{formatPrice(payment.amountArs)}</strong>
@@ -530,21 +584,24 @@ export default function AdminOrders() {
               </div>)}
               {!(activeOrder.paymentAttempts || []).length && <p className="order-payment-empty">Este pedido no tiene intentos de pago online registrados.</p>}
             </section>
-            {(activeOrder.paymentAttempts || []).some((payment) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status)) && !activeOrder.cancellationRequest && <section className="order-payment-card">
-              <div className="order-payment-heading"><div><span className="admin-kicker">GESTIÓN DE REINTEGRO</span><h3>Pago cobrado</h3></div></div>
-              <p>Antes de cancelar un pedido pagado, iniciá la gestión de reintegro con el mismo proveedor que cobró.</p>
+            {(((activeOrder.paymentAttempts || []).some((payment) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(payment.status))) || activeOrder.paymentMethod === 'CASH') && !activeOrder.cancellationRequest && <section className="order-payment-card">
+              <div className="order-payment-heading"><div><span className="admin-kicker">GESTIÓN DE REINTEGRO</span><h3>{activeOrder.paymentMethod === 'CASH' ? 'Reintegro en efectivo' : 'Pago cobrado'}</h3></div></div>
+              <p>{activeOrder.paymentMethod === 'CASH' ? 'Registrá la solicitud para dejar bloqueada la preparación mientras se coordina el reintegro en efectivo.' : 'Antes de cancelar un pedido pagado, iniciá la gestión de reintegro con el mismo proveedor que cobró.'}</p>
               <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void prepareRefund(activeOrder)}>{refundProcessing ? 'Registrando...' : 'Iniciar gestión de reintegro'}</button>
             </section>}
             {activeOrder.cancellationRequest && <section className="order-payment-card">
               <div className="order-payment-heading"><div><span className="admin-kicker">GESTIÓN DE REINTEGRO</span><h3>{activeOrder.paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : 'Mercado Pago'}</h3></div><small>{formatDate(activeOrder.cancellationRequest.createdAt)}</small></div>
               <div className="order-payment-attempt">
-                <strong>{activeOrder.cancellationRequest.status === 'REQUESTED' ? 'Gestión iniciada' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Reembolso en proceso' : activeOrder.cancellationRequest.status === 'REFUNDED' ? 'Reembolso confirmado' : 'Reembolso con error'}</strong>
-                <small>{activeOrder.cancellationRequest.providerStatus || activeOrder.cancellationRequest.lastError || 'El reintegro todavía no fue confirmado.'}</small>
+                <strong>{activeOrder.cancellationRequest.status === 'REQUESTED' ? 'Solicitud recibida · preparación bloqueada' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Reembolso en proceso' : activeOrder.cancellationRequest.status === 'REFUNDED' ? 'Reembolso confirmado' : 'Reembolso con error'}</strong>
+                <small>N.º de gestión: {activeOrder.cancellationRequest.id}</small><small>{activeOrder.cancellationRequest.providerStatus || activeOrder.cancellationRequest.lastError || 'El reintegro todavía no fue confirmado.'}</small><small>Devolución física: {activeOrder.cancellationRequest.returnStatus === 'RETURN_PENDING' ? 'Pendiente de recepción' : activeOrder.cancellationRequest.returnStatus === 'RETURN_RECEIVED' ? 'Recibida · pendiente de inspección' : activeOrder.cancellationRequest.returnStatus === 'RETURN_ACCEPTED' ? 'Inspeccionada y aceptada · stock repuesto' : 'No requiere devolución física'}</small>
                 {activeOrder.cancellationRequest.providerRefundId && <small className="order-payment-reference">Referencia de reintegro: {activeOrder.cancellationRequest.providerRefundId}</small>}
                 {activeOrder.paymentMethod === 'MERCADO_PAGO' && activeOrder.cancellationRequest.status !== 'REFUNDED' && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void processRefund(activeOrder)}>{refundProcessing ? 'Consultando Mercado Pago…' : activeOrder.cancellationRequest.status === 'PROCESSING' ? 'Consultar estado del reembolso' : 'Procesar reintegro en Mercado Pago'}</button>}
                 {activeOrder.paymentMethod === 'GOCUOTAS' && activeOrder.cancellationRequest.status !== 'REFUNDED' && (activeOrder.paymentAttempts || []).some((payment) => payment.provider === 'GOCUOTAS' && payment.status === 'APPROVED') && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void confirmGoCuotasRefund(activeOrder)}>{refundProcessing ? 'Registrando...' : 'Registrar reintegro ya realizado en GOcuotas'}</button>}
+                {activeOrder.paymentMethod === 'CASH' && activeOrder.cancellationRequest.status !== 'REFUNDED' && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void confirmCashRefund(activeOrder)}>{refundProcessing ? 'Registrando...' : 'Registrar reintegro en efectivo ya realizado'}</button>}
+                {activeOrder.cancellationRequest.returnStatus === 'RETURN_PENDING' && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void markReturnReceived(activeOrder)}>Registrar recepción física</button>}
+                {activeOrder.cancellationRequest.returnStatus === 'RETURN_RECEIVED' && <button type="button" className="admin-primary" disabled={refundProcessing} onClick={() => void acceptReturn(activeOrder)}>Aceptar devolución y reponer stock</button>}
               </div>
-              <p className="order-payment-empty">{activeOrder.paymentMethod === 'GOCUOTAS' ? 'GOcuotas no tiene un endpoint de reintegro documentado en la integración API Redirect utilizada por esta tienda. Ejecutá primero la devolución desde el panel de GOcuotas y usá el botón anterior únicamente después de que el proveedor la confirme. La tienda no devuelve dinero.' : 'El reintegro se procesa a través de Mercado Pago. No se repone stock automáticamente; gestioná la devolución física del producto por separado.'}</p>
+              <p className="order-payment-empty">{activeOrder.paymentMethod === 'GOCUOTAS' ? 'GOcuotas no tiene un endpoint de reintegro documentado en la integración utilizada. Ejecutá primero la devolución en el proveedor y registrá la confirmación después de verificarla.' : activeOrder.paymentMethod === 'CASH' ? 'Registrá el reintegro solo después de devolver efectivamente el dinero y conservá la referencia del comprobante.' : 'Mercado Pago procesa el reintegro. Si el pedido ya fue despachado, registrá la recepción e inspección física antes de reingresar el producto al stock.'}</p>
             </section>}
             <section className="order-fiscal-card">
               <div className="order-fiscal-heading"><div><span className="admin-kicker">ARCA · HOMOLOGACIÓN</span><h3>Factura C</h3></div><small>Emisión manual de prueba</small></div>
