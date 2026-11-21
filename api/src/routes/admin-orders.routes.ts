@@ -12,6 +12,9 @@ import { getOcaAdmissionDate, isCompleteOcaOriginBranch, isOcaOrderPaid, matches
 import { getOcaAdmissionBranches } from '../services/oca-metadata'
 import { getStoredOcaCredentials } from '../services/shipping-settings'
 import { getPaymentCancellationBlock, hasUnresolvedOnlinePayment } from '../services/payment-cancellation-policy'
+import { getCancellationFulfillmentBlockMessage, isCancellationBlockingFulfillment } from '../services/fulfillment-policy'
+import { finalizePreDispatchRefund } from '../services/refund-finalization'
+import { acceptReturnedOrderStock } from '../services/return-acceptance'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -86,6 +89,11 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
   const existing = await prisma.order.findUnique({ where: { id: req.params.id } })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  const cancellation = await prisma.cancellationRequest.findUnique({ where: { orderId: existing.id }, select: { status: true, returnStatus: true } })
+  if (isCancellationBlockingFulfillment(cancellation)) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
   }
   if (existing.deliveryMethod === 'LOCAL_DELIVERY') {
@@ -277,10 +285,14 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
 
   const order = await prisma.order.findUnique({
     where: { id: orderId.data },
-    include: { items: true, paymentAttempts: { select: { provider: true, status: true, approvedAt: true } } },
+    include: { items: true, paymentAttempts: { select: { provider: true, status: true, approvedAt: true } }, cancellationRequest: { select: { status: true, returnStatus: true } } },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (isCancellationBlockingFulfillment(order.cancellationRequest)) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
   }
   if (order.deliveryMethod !== 'OCA' || order.status !== 'PREPARING') {
@@ -341,6 +353,11 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
 
   const shipment = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', order.id)
+    const currentOrder = await tx.order.findUnique({
+      where: { id: order.id },
+      select: { status: true, cancellationRequest: { select: { status: true, returnStatus: true } } },
+    })
+    if (!currentOrder || currentOrder.status !== 'PREPARING' || isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) return { blocked: true as const }
     const existing = await tx.shippingShipment.findUnique({
       where: { orderId_provider: { orderId: order.id, provider: 'OCA' } },
     })
@@ -355,6 +372,10 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
       },
     })
   })
+  if (shipment && 'blocked' in shipment) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
+    return
+  }
   if (!shipment) {
     res.status(409).json({ error: { code: 'OCA_ADMISSION_ALREADY_ATTEMPTED', message: 'Ya existe un registro OCA para este pedido. No se repetirá la admisión automáticamente; verificá el resultado en e-Pak.' } })
     return
@@ -484,10 +505,14 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }).parse(req.body)
   const existing = await prisma.order.findUnique({
     where: { id: req.params.id },
-    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } } },
+    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } }, cancellationRequest: { select: { status: true, returnStatus: true } } },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if ((['PREPARING', 'SHIPPED'].includes(input.status) || (input.status === 'DELIVERED' && existing.status !== 'SHIPPED')) && isCancellationBlockingFulfillment(existing.cancellationRequest)) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
   }
   if (input.status !== existing.status && existing.paymentAttempts.some((payment) => payment.status === 'REFUNDED') && input.status !== 'CANCELLED') {
@@ -552,9 +577,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
       const currentOrder = await tx.order.findUnique({
         where: { id: existing.id },
-        include: { items: true, paymentAttempts: { select: { provider: true, status: true } } },
+        include: { items: true, paymentAttempts: { select: { provider: true, status: true } }, cancellationRequest: { select: { status: true, returnStatus: true } } },
       })
       if (!currentOrder || currentOrder.status !== existing.status) throw new Error('ORDER_STATUS_CONFLICT')
+      if ((['PREPARING', 'SHIPPED'].includes(input.status) || (input.status === 'DELIVERED' && currentOrder.status !== 'SHIPPED')) && isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) throw new Error('CANCELLATION_REQUEST_PENDING')
       if (input.status === 'CANCELLED') {
         if (getPaymentCancellationBlock(currentOrder.paymentAttempts)) {
           throw new Error('PAYMENT_NOT_RESOLVED')
@@ -595,6 +621,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       res.status(409).json({ error: { code: 'ORDER_STATUS_CONFLICT', message: 'El pedido fue actualizado por otra sesión. Recargá e intentá nuevamente.' } })
       return
     }
+    if (error instanceof Error && error.message === 'CANCELLATION_REQUEST_PENDING') {
+      res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
+      return
+    }
     if (error instanceof Error && error.message === 'PAYMENT_NOT_RESOLVED') {
       res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'El estado del pago cambió o sigue sin resolverse. No se canceló el pedido ni se modificó el stock.' } })
       return
@@ -616,18 +646,23 @@ adminOrdersRouter.post('/:id/refund/request', async (req, res) => {
   }
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
-    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { paymentAttempts: { orderBy: { createdAt: 'desc' } } } })
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { paymentAttempts: { orderBy: { createdAt: 'desc' } }, shipments: { select: { status: true } } } })
     if (!order) return { error: 'ORDER_NOT_FOUND' as const }
     const paidAttempt = order.paymentAttempts.find((attempt) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))
-    if (!paidAttempt) return { error: 'APPROVED_PAYMENT_NOT_FOUND' as const }
+    if (!paidAttempt && order.paymentMethod !== 'CASH') return { error: 'APPROVED_PAYMENT_NOT_FOUND' as const }
     if (!order.customerEmail) return { error: 'CUSTOMER_EMAIL_MISSING' as const }
     const existingRequest = await tx.cancellationRequest.findUnique({ where: { orderId: order.id } })
     if (existingRequest) return { request: existingRequest }
     const request = await tx.cancellationRequest.create({
-      data: { orderId: order.id, customerEmail: order.customerEmail, status: 'REQUESTED' },
+      data: {
+        orderId: order.id,
+        customerEmail: order.customerEmail,
+        status: 'REQUESTED',
+        returnStatus: (['SHIPPED', 'DELIVERED'].includes(order.status) || order.shipments.some((shipment) => ['ADMISSION_PENDING', 'ADMITTED', 'PROCESSED', 'ADMISSION_UNKNOWN'].includes(shipment.status))) ? 'RETURN_PENDING' : 'NOT_REQUIRED',
+      },
     })
     await tx.orderStatusHistory.create({
-      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración inició la gestión de reintegro mediante ' + paidAttempt.provider + '.', changedByAdminId: req.admin?.id || null },
+      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración inició la gestión de reintegro mediante ' + (paidAttempt?.provider || 'reintegro manual de efectivo') + '.', changedByAdminId: req.admin?.id || null },
     })
     return { request }
   })
@@ -638,6 +673,88 @@ adminOrdersRouter.post('/:id/refund/request', async (req, res) => {
     return
   }
   res.status(201).json({ data: { status: result.request.status }, message: 'Gestión de reintegro registrada.' })
+})
+
+
+
+adminOrdersRouter.post('/:id/refund/no-payment-collected', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  if (!orderId.success) {
+    res.status(400).json({ error: { code: 'ORDER_ID_INVALID', message: 'El pedido no es válido.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, select: { id: true, status: true, paymentMethod: true, paymentReceivedAt: true, cancellationRequest: true, paymentAttempts: { select: { status: true } } } })
+    if (!order) return 'ORDER_NOT_FOUND' as const
+    if (order.paymentMethod !== 'CASH') return 'CASH_ONLY' as const
+    if (order.paymentReceivedAt) return 'PAYMENT_ALREADY_RECEIVED' as const
+    if (order.paymentAttempts.some((attempt) => !['REJECTED', 'CANCELLED'].includes(attempt.status))) return 'PAYMENT_ATTEMPT_EXISTS' as const
+    if (!order.cancellationRequest) return 'REFUND_REQUEST_REQUIRED' as const
+    if (order.cancellationRequest.status === 'REFUNDED') return 'ALREADY_RESOLVED' as const
+    await tx.cancellationRequest.update({ where: { id: order.cancellationRequest.id }, data: { status: 'REFUNDED', providerStatus: 'NO_PAYMENT_COLLECTED', lastError: null } })
+    await tx.orderStatusHistory.create({
+      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración verificó que no se recibió el pago en efectivo. No corresponde un reintegro monetario.', changedByAdminId: req.admin?.id || null },
+    })
+    return 'NO_PAYMENT_COLLECTED' as const
+  })
+  if (result !== 'NO_PAYMENT_COLLECTED') {
+    const errors: Record<string, { status: number; message: string }> = {
+      ORDER_NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
+      CASH_ONLY: { status: 409, message: 'Esta confirmación corresponde únicamente a pedidos en efectivo.' },
+      PAYMENT_ALREADY_RECEIVED: { status: 409, message: 'El cobro ya fue registrado. Usá el flujo de reintegro en efectivo.' },
+      PAYMENT_ATTEMPT_EXISTS: { status: 409, message: 'Existe un intento de pago online que debe conciliarse antes de resolver el pedido.' },
+      REFUND_REQUEST_REQUIRED: { status: 409, message: 'Primero registrá la solicitud de arrepentimiento.' },
+      ALREADY_RESOLVED: { status: 409, message: 'La solicitud ya fue resuelta.' },
+    }
+    const error = errors[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  const finalized = await finalizePreDispatchRefund(orderId.data, req.admin?.id || null, 'Solicitud resuelta: se verificó que no se había recibido el pago. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido sin cobro:', error); return 'FINALIZATION_PENDING' as const })
+  res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'Se verificó que no hubo cobro. Pedido cancelado y stock repuesto automáticamente.' : 'Se verificó que no hubo cobro. Si el pedido ya estaba despachado, corresponde gestionar la devolución física.' })
+})
+
+adminOrdersRouter.post('/:id/refund/manual-confirmation', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  const input = z.object({ reference: z.string().trim().min(3).max(120), note: z.string().trim().max(300).optional() }).safeParse(req.body)
+  if (!orderId.success || !input.success) {
+    res.status(400).json({ error: { code: 'MANUAL_REFUND_CONFIRMATION_INVALID', message: 'Ingresá una referencia o comprobante válido del reintegro.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, select: { id: true, status: true, paymentMethod: true, paymentReceivedAt: true, cancellationRequest: true, paymentAttempts: { select: { status: true } } } })
+    if (!order) return 'ORDER_NOT_FOUND' as const
+    if (order.paymentMethod !== 'CASH') return 'MANUAL_REFUND_ONLY_FOR_CASH' as const
+    if (!order.paymentReceivedAt) return 'CASH_NOT_RECEIVED' as const
+    if (!order.cancellationRequest) return 'REFUND_REQUEST_REQUIRED' as const
+    if (order.cancellationRequest.status === 'REFUNDED') return 'ALREADY_REFUNDED' as const
+    if (order.paymentAttempts.some((attempt) => ['CREATING', 'PENDING', 'UNKNOWN', 'APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))) return 'PAYMENT_ATTEMPT_UNRESOLVED' as const
+    await tx.cancellationRequest.update({
+      where: { id: order.cancellationRequest.id },
+      data: { status: 'REFUNDED', providerRefundId: input.data.reference, providerStatus: 'MANUAL_CONFIRMED_CASH', lastError: null },
+    })
+    await tx.orderStatusHistory.create({
+      data: { orderId: order.id, fromStatus: order.status, toStatus: order.status, note: 'Administración confirmó el reintegro manual en efectivo. Referencia: ' + input.data.reference + (input.data.note ? '. ' + input.data.note : ''), changedByAdminId: req.admin?.id || null },
+    })
+    return 'REFUNDED' as const
+  })
+  if (result !== 'REFUNDED') {
+    const errors: Record<string, { status: number; message: string }> = {
+      ORDER_NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
+      MANUAL_REFUND_ONLY_FOR_CASH: { status: 409, message: 'Este flujo manual está reservado para pedidos pagados en efectivo.' },
+      CASH_NOT_RECEIVED: { status: 409, message: 'El pedido no tiene un cobro en efectivo registrado; confirmá que no se recibió el dinero en lugar de registrar un reintegro.' },
+      REFUND_REQUEST_REQUIRED: { status: 409, message: 'Primero registrá la solicitud de arrepentimiento o reintegro.' },
+      ALREADY_REFUNDED: { status: 409, message: 'El reintegro ya figura confirmado.' },
+      PAYMENT_ATTEMPT_UNRESOLVED: { status: 409, message: 'Hay un intento de pago online sin resolver. Conciliá el proveedor antes de confirmar el reintegro manual.' },
+    }
+    const error = errors[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  const finalized = await finalizePreDispatchRefund(orderId.data, req.admin?.id || null, 'Reintegro manual en efectivo confirmado. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido reembolsado en efectivo:', error); return 'FINALIZATION_PENDING' as const })
+  res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'Reintegro registrado. Pedido cancelado y stock repuesto automáticamente.' : 'Reintegro registrado. Si el pedido ya fue despachado, corresponde gestionar la devolución física.' })
 })
 
 adminOrdersRouter.post('/:id/refund/gocuotas-confirmation', async (req, res) => {
@@ -673,7 +790,61 @@ adminOrdersRouter.post('/:id/refund/gocuotas-confirmation', async (req, res) => 
     res.status(error.status).json({ error: { code: result, message: error.message } })
     return
   }
-  res.json({ data: { status: 'REFUNDED' }, message: 'Confirmación manual registrada. Ahora podés cancelar el pedido; el stock se repondrá una sola vez.' })
+  const finalized = await finalizePreDispatchRefund(orderId.data, req.admin?.id || null, 'Reintegro total confirmado manualmente en GOcuotas. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido GOcuotas ya reembolsado:', error); return 'FINALIZATION_PENDING' as const })
+  res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'GOcuotas confirmó el reintegro. El pedido se canceló y el stock se repuso automáticamente.' : 'Confirmación manual registrada. Si el pedido ya fue despachado, corresponde gestionar la devolución física.' })
+})
+
+
+adminOrdersRouter.post('/:id/refund/return-received', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  if (!orderId.success) {
+    res.status(400).json({ error: { code: 'ORDER_ID_INVALID', message: 'El pedido no es válido.' } })
+    return
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
+    const request = await tx.cancellationRequest.findUnique({
+      where: { orderId: orderId.data },
+      include: { order: { select: { status: true } } },
+    })
+    if (!request) return 'REQUEST_NOT_FOUND' as const
+    if (request.returnStatus === 'RETURN_RECEIVED' || request.returnStatus === 'RETURN_ACCEPTED') return 'ALREADY_RECEIVED' as const
+    if (request.returnStatus !== 'RETURN_PENDING') return 'RETURN_NOT_PENDING' as const
+    await tx.cancellationRequest.update({ where: { id: request.id }, data: { returnStatus: 'RETURN_RECEIVED' } })
+    await tx.orderStatusHistory.create({
+      data: { orderId: orderId.data, fromStatus: request.order.status, toStatus: request.order.status, note: 'La tienda registró la recepción física del producto devuelto. Pendiente de inspección y resolución del reintegro.', changedByAdminId: req.admin?.id || null },
+    })
+    return 'RETURN_RECEIVED' as const
+  })
+  if (result !== 'RETURN_RECEIVED' && result !== 'ALREADY_RECEIVED') {
+    const errors: Record<string, { status: number; message: string }> = {
+      REQUEST_NOT_FOUND: { status: 404, message: 'El pedido no tiene una solicitud de arrepentimiento.' },
+      RETURN_NOT_PENDING: { status: 409, message: 'La devolución no está pendiente de recepción.' },
+    }
+    const error = errors[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  res.json({ data: { returnStatus: result }, message: result === 'ALREADY_RECEIVED' ? 'La recepción ya estaba registrada.' : 'Recepción física registrada. Inspeccioná el producto antes de reingresarlo al stock.' })
+})
+
+adminOrdersRouter.post('/:id/refund/return-accepted', async (req, res) => {
+  const orderId = z.string().uuid().safeParse(req.params.id)
+  if (!orderId.success) {
+    res.status(400).json({ error: { code: 'ORDER_ID_INVALID', message: 'El pedido no es válido.' } })
+    return
+  }
+  const result = await acceptReturnedOrderStock(orderId.data, req.admin?.id || null)
+  if (result !== 'RETURN_ACCEPTED' && result !== 'ALREADY_ACCEPTED') {
+    const errors: Record<string, { status: number; message: string }> = {
+      REQUEST_NOT_FOUND: { status: 404, message: 'El pedido no tiene una solicitud de arrepentimiento.' },
+      RETURN_NOT_RECEIVED: { status: 409, message: 'Primero registrá la recepción física del producto.' },
+    }
+    const error = errors[result]
+    res.status(error.status).json({ error: { code: result, message: error.message } })
+    return
+  }
+  res.json({ data: { returnStatus: result }, message: result === 'ALREADY_ACCEPTED' ? 'La devolución ya estaba aceptada; no se modificó el stock.' : 'Devolución aceptada y stock repuesto una sola vez.' })
 })
 
 adminOrdersRouter.post('/:id/refund', async (req, res) => {
@@ -722,7 +893,8 @@ adminOrdersRouter.post('/:id/refund', async (req, res) => {
           prisma.paymentAttempt.update({ where: { id: payment.id }, data: { status: 'REFUNDED', statusDetail: 'refunded', lastError: null } }),
           prisma.orderStatusHistory.create({ data: { orderId: request.orderId, fromStatus: request.order.status, toStatus: request.order.status, note: 'Reembolso total confirmado por Mercado Pago.', changedByAdminId: req.admin?.id || null } }),
         ])
-        res.json({ data: { status: 'REFUNDED' }, message: 'Mercado Pago confirmó el reembolso.' })
+        const finalized = await finalizePreDispatchRefund(request.orderId, req.admin?.id || null, 'Reembolso total confirmado por Mercado Pago. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido Mercado Pago ya reembolsado:', error); return 'FINALIZATION_PENDING' as const })
+        res.json({ data: { status: 'REFUNDED', orderFinalization: finalized }, message: finalized === 'CANCELLED' ? 'Mercado Pago confirmó el reintegro. El pedido se canceló y el stock se repuso automáticamente.' : 'Mercado Pago confirmó el reintegro. Si el pedido ya fue despachado, corresponde gestionar la devolución física.' })
         return
       }
       res.status(202).json({ data: { status: 'PROCESSING' }, message: 'Mercado Pago todavía está procesando el reembolso. Volvé a consultar en unos minutos.' })
@@ -765,9 +937,10 @@ adminOrdersRouter.post('/:id/refund', async (req, res) => {
       await prisma.paymentAttempt.update({ where: { id: payment.id }, data: { status: 'REFUNDED', statusDetail: 'refunded', lastError: null } })
       await prisma.orderStatusHistory.create({ data: { orderId: request.orderId, fromStatus: request.order.status, toStatus: request.order.status, note: 'Reembolso total confirmado por Mercado Pago.', changedByAdminId: req.admin?.id || null } })
     }
+    const finalized = completed ? await finalizePreDispatchRefund(request.orderId, req.admin?.id || null, 'Reembolso total confirmado por Mercado Pago. Pedido cancelado y stock repuesto automáticamente.').catch((error) => { console.error('No se pudo finalizar el pedido Mercado Pago ya reembolsado:', error); return 'FINALIZATION_PENDING' as const }) : null
     res.status(completed ? 200 : 202).json({
-      data: { status: completed ? 'REFUNDED' : 'PROCESSING' },
-      message: completed ? 'Mercado Pago confirmó el reembolso.' : 'Mercado Pago recibió el reembolso y lo está procesando. Consultá nuevamente en unos minutos.',
+      data: { status: completed ? 'REFUNDED' : 'PROCESSING', orderFinalization: finalized },
+      message: completed ? (finalized === 'CANCELLED' ? 'Mercado Pago confirmó el reintegro. El pedido se canceló y el stock se repuso automáticamente.' : 'Mercado Pago confirmó el reintegro. Si el pedido ya fue despachado, corresponde gestionar la devolución física.') : 'Mercado Pago recibió el reembolso y lo está procesando. Consultá nuevamente en unos minutos.',
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo procesar el reembolso.'

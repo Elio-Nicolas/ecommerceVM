@@ -74,8 +74,9 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
 
   const prepared = await prisma.$transaction(async tx => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', orderId.data)
-    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { items: true } })
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { items: true, cancellationRequest: { select: { id: true, status: true } } } })
     if (!order) return { error: 'NOT_FOUND' as const }
+    if (order.cancellationRequest) return { error: 'REGRET_REQUEST_PENDING' as const }
     if (order.paymentMethod !== 'GOCUOTAS') return { error: 'PAYMENT_METHOD_MISMATCH' as const }
     if (!['PENDING', 'CONFIRMED'].includes(order.status) || !order.totalArs || !order.customerEmail) return { error: 'ORDER_NOT_PAYABLE' as const }
     const paid = await tx.paymentAttempt.findFirst({ where: { orderId: order.id, status: 'APPROVED' } })
@@ -113,6 +114,7 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     const errors: Record<string, { status: number; message: string }> = {
       NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
       PAYMENT_METHOD_MISMATCH: { status: 409, message: 'El pedido no está configurado para pagar con GOcuotas.' },
+      REGRET_REQUEST_PENDING: { status: 409, message: 'El pedido tiene una solicitud de arrepentimiento registrada y no puede iniciar un nuevo pago.' },
       ORDER_NOT_PAYABLE: { status: 409, message: 'El pedido todavía no está disponible para pagar.' },
       ALREADY_PAID: { status: 409, message: 'Este pedido ya tiene un pago aprobado.' },
       REQUEST_KEY_CONFLICT: { status: 409, message: 'La clave de pago ya fue utilizada para otra operación.' },
@@ -158,14 +160,29 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     if (!response.ok || !isValidPaymentCheckoutUrl(payload?.url_init)) {
       throw new Error('Respuesta de checkout no reconocida: ' + checkoutResponse.diagnostic)
     }
-    const attempt = await prisma.$transaction(async tx => {
+    const persisted = await prisma.$transaction(async tx => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', prepared.order.id)
       const current = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
+      const currentOrder = await tx.order.findUnique({ where: { id: prepared.order.id }, select: { cancellationRequest: { select: { id: true } } } })
       if (!current) throw new Error('El intento de pago dejó de existir.')
       if (providerOrderId && current.providerOrderId && current.providerOrderId !== providerOrderId) {
         throw new Error('GOcuotas devolvió un identificador distinto al asociado al intento.')
       }
-      return tx.paymentAttempt.update({
+      if (currentOrder?.cancellationRequest) {
+        await tx.paymentAttempt.update({
+          where: { id: current.id },
+          data: {
+            providerOrderId: current.providerOrderId || providerOrderId,
+            checkoutUrl: null,
+            status: current.status === 'APPROVED' ? 'APPROVED' : 'UNKNOWN',
+            statusDetail: current.status === 'APPROVED' ? current.statusDetail : 'Checkout creado mientras se registraba una solicitud de arrepentimiento',
+            responsePayload: payload as Prisma.InputJsonValue,
+            lastError: 'GOcuotas pudo crear un checkout mientras el comprador solicitaba el arrepentimiento. Conciliación manual requerida.',
+          },
+        })
+        return { blocked: true as const }
+      }
+      const attempt = await tx.paymentAttempt.update({
         where: { id: current.id },
         data: {
           providerOrderId: current.providerOrderId || providerOrderId,
@@ -177,9 +194,14 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
           lastError: null,
         },
       })
+      return { blocked: false as const, attempt }
     })
+    if (persisted.blocked) {
+      res.status(409).json({ error: { code: 'REGRET_REQUEST_PENDING', message: 'Se registró una solicitud de arrepentimiento durante la creación del pago. No se entregó el enlace y el intento quedó pendiente de conciliación con GOcuotas.' } })
+      return
+    }
     res.setHeader('Cache-Control', 'no-store')
-    res.status(201).json({ data: { checkoutUrl: attempt.checkoutUrl, status: attempt.status } })
+    res.status(201).json({ data: { checkoutUrl: persisted.attempt.checkoutUrl, status: persisted.attempt.status } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo crear el checkout.'
     if (getGoCuotasFailureDisposition(checkoutRequestStarted) === 'RELEASE_ATTEMPT') {
@@ -225,7 +247,7 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
     const providerOrderId = String(payload.id ?? id.data)
     let attempt = await prisma.paymentAttempt.findFirst({
       where: { provider: 'GOCUOTAS', providerOrderId },
-      include: { order: { select: { id: true, code: true, status: true, totalArs: true } } },
+      include: { order: { select: { id: true, code: true, status: true, totalArs: true, cancellationRequest: { select: { id: true, status: true } } } } },
     })
 
     // A webhook can arrive before the checkout request has persisted the provider ID
@@ -244,7 +266,7 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
             providerOrderId: null,
             status: { in: ['CREATING', 'UNKNOWN', 'PENDING'] },
           },
-          include: { order: { select: { id: true, code: true, status: true, totalArs: true } } },
+          include: { order: { select: { id: true, code: true, status: true, totalArs: true, cancellationRequest: { select: { id: true, status: true } } } } },
         })
       }
     }
@@ -263,7 +285,8 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
     await prisma.$transaction(async tx => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', attempt.orderId)
       const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
-      if (!current) return
+      const currentOrder = await tx.order.findUnique({ where: { id: attempt.orderId }, select: { status: true, cancellationRequest: { select: { id: true, status: true } } } })
+      if (!current || !currentOrder) return
       const effective = current.status === 'REFUNDED'
         ? 'REFUNDED'
         : current.status === 'APPROVED'
@@ -280,7 +303,9 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
         approvedAt: paymentReceivedAt,
         lastError: matches ? null : 'La orden notificada no coincide con la referencia o el importe del pedido.',
       } })
-      if (matches && effective === 'APPROVED') {
+      if (matches && effective === 'APPROVED' && currentOrder.cancellationRequest) {
+        await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: currentOrder.status, toStatus: currentOrder.status, note: 'ATENCIÓN: GOcuotas aprobó el pago mientras existe una solicitud de arrepentimiento. El pedido permanece bloqueado para fulfillment y requiere conciliación del reintegro.' } })
+      } else if (matches && effective === 'APPROVED') {
         const changed = await tx.order.updateMany({
           where: {
             id: attempt.orderId,
@@ -300,9 +325,9 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
     })
     const approved = await prisma.paymentAttempt.findUnique({
       where: { id: attempt.id },
-      select: { status: true, order: { select: { id: true, status: true } } },
+      select: { status: true, order: { select: { id: true, status: true, cancellationRequest: { select: { id: true } } } } },
     })
-    if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED') {
+    if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED' && !approved.order.cancellationRequest) {
       await sendPaidOrderConfirmationEmail(approved.order.id)
     }
     res.status(200).send('OK')

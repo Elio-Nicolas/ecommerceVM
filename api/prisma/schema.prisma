@@ -345,6 +345,7 @@ model CancellationRequest {
   providerRefundId String?
   providerStatus String?
   lastError String?
+  returnStatus String @default("NOT_REQUIRED")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([status, createdAt])

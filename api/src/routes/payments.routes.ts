@@ -10,6 +10,7 @@ import { paymentAmountsMatchCurrentOrder } from '../services/payment-order-consi
 import { verifyMercadoPagoWebhookSignature } from '../services/payment-webhook-signature'
 import { hasValidOrderAccessToken } from '../services/order-access-token'
 import { sendPaidOrderConfirmationEmail } from '../services/order-email'
+import { finalizePreDispatchRefund } from '../services/refund-finalization'
 
 export const paymentsRouter = Router()
 
@@ -144,6 +145,7 @@ async function refreshMercadoPagoOrder(providerOrderId: string) {
     total_amount?: string | number
     total_paid_amount?: string | number
     currency?: string
+    transactions?: { refunds?: Array<{ id?: string; status?: string }> }
   }
 }
 
@@ -160,7 +162,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
     const current = await tx.paymentAttempt.findUnique({ where: { id: attempt.id } })
     const currentOrder = await tx.order.findUnique({
       where: { id: attempt.orderId },
-      select: { code: true, status: true, totalArs: true },
+      select: { code: true, status: true, totalArs: true, customerEmail: true, cancellationRequest: { select: { id: true, status: true, returnStatus: true } }, shipments: { select: { status: true } } },
     })
     if (!current || !currentOrder) return
 
@@ -208,7 +210,45 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
       },
     })
 
-    if (matchesOrder && effectiveStatus === 'APPROVED' && currentOrder.status === 'PENDING') {
+    if (matchesOrder && effectiveStatus === 'REFUNDED') {
+      const returnRequired = ['SHIPPED', 'DELIVERED'].includes(currentOrder.status)
+        || currentOrder.shipments.some((shipment) => ['ADMISSION_PENDING', 'ADMITTED', 'PROCESSED', 'ADMISSION_UNKNOWN'].includes(shipment.status))
+      if (currentOrder.cancellationRequest) {
+        await tx.cancellationRequest.update({
+          where: { id: currentOrder.cancellationRequest.id },
+          data: {
+            status: 'REFUNDED',
+            providerRefundId: payload.transactions?.refunds?.[0]?.id || null,
+            providerStatus: 'REFUNDED_BY_MERCADO_PAGO',
+            lastError: null,
+            ...(returnRequired && !['RETURN_RECEIVED', 'RETURN_ACCEPTED'].includes(currentOrder.cancellationRequest.returnStatus) ? { returnStatus: 'RETURN_PENDING' } : {}),
+          },
+        })
+      } else if (currentOrder.customerEmail) {
+        await tx.cancellationRequest.create({
+          data: {
+            orderId: attempt.orderId,
+            customerEmail: currentOrder.customerEmail,
+            status: 'REFUNDED',
+            providerRefundId: payload.transactions?.refunds?.[0]?.id || null,
+            providerStatus: 'REFUNDED_BY_MERCADO_PAGO',
+            returnStatus: returnRequired ? 'RETURN_PENDING' : 'NOT_REQUIRED',
+          },
+        })
+      }
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: attempt.orderId,
+          fromStatus: currentOrder.status,
+          toStatus: currentOrder.status,
+          note: 'Mercado Pago informó un reintegro total. ecommerceVM registró el estado del proveedor y bloquea la preparación o gestiona la devolución física según el estado del envío.',
+        },
+      })
+    }
+
+    if (matchesOrder && effectiveStatus === 'APPROVED' && currentOrder.cancellationRequest) {
+      await tx.orderStatusHistory.create({ data: { orderId: attempt.orderId, fromStatus: currentOrder.status, toStatus: currentOrder.status, note: 'ATENCIÓN: Mercado Pago aprobó el pago mientras existe una solicitud de arrepentimiento. El pedido permanece bloqueado para fulfillment y requiere conciliación del reintegro.' } })
+    } else if (matchesOrder && effectiveStatus === 'APPROVED' && currentOrder.status === 'PENDING') {
       const changed = await tx.order.updateMany({
         where: { id: attempt.orderId, status: 'PENDING', totalArs: current.amountArs },
         data: { status: 'CONFIRMED' },
@@ -236,10 +276,14 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
   })
   const approved = await prisma.paymentAttempt.findUnique({
     where: { providerOrderId },
-    select: { orderId: true, status: true, order: { select: { status: true } } },
+    select: { orderId: true, status: true, order: { select: { status: true, cancellationRequest: { select: { id: true } } } } },
   })
-  if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED') {
+  if (approved?.status === 'APPROVED' && approved.order.status === 'CONFIRMED' && !approved.order.cancellationRequest) {
     await sendPaidOrderConfirmationEmail(approved.orderId)
+  } else if (approved?.status === 'REFUNDED') {
+    await finalizePreDispatchRefund(approved.orderId, null, 'Mercado Pago confirmó el reintegro total. Pedido cancelado y stock repuesto automáticamente.').catch((error) => {
+      console.error('No se pudo finalizar automáticamente un reintegro confirmado por Mercado Pago:', error)
+    })
   }
   return true
 }
@@ -270,9 +314,10 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1)) IS NULL AS locked', orderId.data)
     const order = await tx.order.findUnique({
       where: { id: orderId.data },
-      include: { items: true },
+      include: { items: true, cancellationRequest: { select: { id: true, status: true } } },
     })
     if (!order) return { error: 'NOT_FOUND' as const }
+    if (order.cancellationRequest) return { error: 'REGRET_REQUEST_PENDING' as const }
     if (order.paymentMethod !== 'MERCADO_PAGO') return { error: 'PAYMENT_METHOD_MISMATCH' as const }
     if (!['PENDING', 'CONFIRMED'].includes(order.status)) return { error: 'ORDER_NOT_PAYABLE' as const }
     if (!order.customerEmail) return { error: 'EMAIL_REQUIRED' as const }
@@ -318,6 +363,7 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
     const errors: Record<string, { status: number; message: string }> = {
       NOT_FOUND: { status: 404, message: 'Pedido no encontrado.' },
       ORDER_NOT_PAYABLE: { status: 409, message: 'El pedido ya no está disponible para iniciar un pago.' },
+      REGRET_REQUEST_PENDING: { status: 409, message: 'El pedido tiene una solicitud de arrepentimiento registrada y no puede iniciar un nuevo pago.' },
       PAYMENT_METHOD_MISMATCH: { status: 409, message: 'El medio de pago seleccionado para este pedido no es Mercado Pago.' },
       EMAIL_REQUIRED: { status: 409, message: 'Ingresá un correo electrónico válido para pagar con Mercado Pago.' },
       TOTAL_NOT_FINAL: { status: 409, message: 'El total todavía no está confirmado. Coordiná primero el costo de entrega.' },
@@ -351,19 +397,44 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
       },
       requestKey: prepared.attempt.requestKey,
     })
-    const attempt = await prisma.paymentAttempt.update({
-      where: { id: prepared.attempt.id },
-      data: {
-        providerOrderId: providerOrder.id,
-        checkoutUrl: providerOrder.checkout_url,
-        status: 'PENDING',
-        statusDetail: String(providerOrder.status_detail || providerOrder.status || 'created').slice(0, 200),
-        responsePayload: providerOrder as Prisma.InputJsonValue,
-        lastError: null,
-      },
+    const persisted = await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', prepared.order.id)
+      const currentOrder = await tx.order.findUnique({ where: { id: prepared.order.id }, select: { cancellationRequest: { select: { id: true } } } })
+      const currentAttempt = await tx.paymentAttempt.findUnique({ where: { id: prepared.attempt.id } })
+      if (!currentAttempt) throw new Error('El intento de pago dejó de existir.')
+      if (currentOrder?.cancellationRequest) {
+        await tx.paymentAttempt.update({
+          where: { id: currentAttempt.id },
+          data: {
+            providerOrderId: providerOrder.id,
+            checkoutUrl: null,
+            status: currentAttempt.status === 'APPROVED' ? 'APPROVED' : 'UNKNOWN',
+            statusDetail: currentAttempt.status === 'APPROVED' ? currentAttempt.statusDetail : 'Checkout creado mientras se registraba una solicitud de arrepentimiento',
+            responsePayload: providerOrder as Prisma.InputJsonValue,
+            lastError: 'El proveedor pudo crear una orden de pago mientras el comprador solicitaba el arrepentimiento. Conciliación manual requerida.',
+          },
+        })
+        return { blocked: true as const }
+      }
+      const attempt = await tx.paymentAttempt.update({
+        where: { id: currentAttempt.id },
+        data: {
+          providerOrderId: providerOrder.id,
+          checkoutUrl: providerOrder.checkout_url,
+          status: 'PENDING',
+          statusDetail: String(providerOrder.status_detail || providerOrder.status || 'created').slice(0, 200),
+          responsePayload: providerOrder as Prisma.InputJsonValue,
+          lastError: null,
+        },
+      })
+      return { blocked: false as const, attempt }
     })
+    if (persisted.blocked) {
+      res.status(409).json({ error: { code: 'REGRET_REQUEST_PENDING', message: 'Se registró una solicitud de arrepentimiento durante la creación del pago. No se entregó el enlace de pago y el intento quedó pendiente de conciliación con Mercado Pago.' } })
+      return
+    }
     res.setHeader('Cache-Control', 'no-store')
-    res.status(201).json({ data: { checkoutUrl: attempt.checkoutUrl, status: attempt.status } })
+    res.status(201).json({ data: { checkoutUrl: persisted.attempt.checkoutUrl, status: persisted.attempt.status } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo crear el pago.'
     await prisma.paymentAttempt.update({
