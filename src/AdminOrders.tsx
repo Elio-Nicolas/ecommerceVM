@@ -50,7 +50,8 @@ function availableNextStatuses(order: Order): OrderStatus[] {
   if (order.cancellationRequest && ['REQUESTED', 'PROCESSING', 'FAILED'].includes(order.cancellationRequest.status)) return []
   const paymentStatuses = (order.paymentAttempts || []).map((payment) => payment.status)
   if (paymentStatuses.some((status) => ['CREATING', 'PENDING', 'UNKNOWN'].includes(status))) return []
-  if (paymentStatuses.includes('APPROVED') || paymentStatuses.includes('PARTIALLY_REFUNDED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
+  if (paymentStatuses.includes('PARTIALLY_REFUNDED')) return []
+  if (paymentStatuses.includes('APPROVED')) return nextStatuses[order.status].filter((status) => status !== 'CANCELLED')
   if (paymentStatuses.includes('REFUNDED')) return nextStatuses[order.status].includes('CANCELLED') ? ['CANCELLED'] : []
   if (order.status === 'PREPARING' && (order.deliveryMethod === 'OCA' || order.deliveryMethod === 'ANDREANI') && !order.shipments?.some((shipment) => shipment.provider === order.deliveryMethod && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))) return ['CANCELLED']
   if (order.status === 'PENDING' && order.deliveryMethod === 'LOCAL_DELIVERY' && order.shippingService === 'A coordinar' && order.shippingCostArs === null) return ['CANCELLED']
