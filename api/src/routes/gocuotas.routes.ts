@@ -266,7 +266,7 @@ goCuotasRouter.post('/webhook', webhookLimiter, async (req, res) => {
             providerOrderId: null,
             status: { in: ['CREATING', 'UNKNOWN', 'PENDING'] },
           },
-          include: { order: { select: { id: true, code: true, status: true, totalArs: true } } },
+          include: { order: { select: { id: true, code: true, status: true, totalArs: true, cancellationRequest: { select: { id: true, status: true } } } } },
         })
       }
     }
