@@ -645,7 +645,7 @@ adminOrdersRouter.post('/:id/refund/request', async (req, res) => {
   }
   const result = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', orderId.data)
-    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { paymentAttempts: { orderBy: { createdAt: 'desc' } } } })
+    const order = await tx.order.findUnique({ where: { id: orderId.data }, include: { paymentAttempts: { orderBy: { createdAt: 'desc' } }, shipments: { select: { status: true } } } })
     if (!order) return { error: 'ORDER_NOT_FOUND' as const }
     const paidAttempt = order.paymentAttempts.find((attempt) => ['APPROVED', 'PARTIALLY_REFUNDED'].includes(attempt.status))
     if (!paidAttempt && order.paymentMethod !== 'CASH') return { error: 'APPROVED_PAYMENT_NOT_FOUND' as const }
@@ -657,7 +657,7 @@ adminOrdersRouter.post('/:id/refund/request', async (req, res) => {
         orderId: order.id,
         customerEmail: order.customerEmail,
         status: 'REQUESTED',
-        returnStatus: ['SHIPPED', 'DELIVERED'].includes(order.status) ? 'RETURN_PENDING' : 'NOT_REQUIRED',
+        returnStatus: (['SHIPPED', 'DELIVERED'].includes(order.status) || order.shipments.some((shipment) => ['ADMISSION_PENDING', 'ADMITTED', 'PROCESSED', 'ADMISSION_UNKNOWN'].includes(shipment.status))) ? 'RETURN_PENDING' : 'NOT_REQUIRED',
       },
     })
     await tx.orderStatusHistory.create({
@@ -766,9 +766,8 @@ adminOrdersRouter.post('/:id/refund/return-received', async (req, res) => {
       include: { order: { select: { status: true } } },
     })
     if (!request) return 'REQUEST_NOT_FOUND' as const
-    if (!['SHIPPED', 'DELIVERED'].includes(request.order.status)) return 'RETURN_NOT_REQUIRED' as const
-    if (request.returnStatus === 'RETURN_RECEIVED' || request.returnStatus === 'RETURN_ACCEPTED') return 'ALREADY_RECEIVED' as const
     if (request.returnStatus !== 'RETURN_PENDING') return 'RETURN_NOT_PENDING' as const
+    if (request.returnStatus === 'RETURN_RECEIVED' || request.returnStatus === 'RETURN_ACCEPTED') return 'ALREADY_RECEIVED' as const
     await tx.cancellationRequest.update({ where: { id: request.id }, data: { returnStatus: 'RETURN_RECEIVED' } })
     await tx.orderStatusHistory.create({
       data: { orderId: orderId.data, fromStatus: request.order.status, toStatus: request.order.status, note: 'La tienda registró la recepción física del producto devuelto. Pendiente de inspección y resolución del reintegro.', changedByAdminId: req.admin?.id || null },
