@@ -387,7 +387,7 @@ ordersRouter.post('/regret', regretRequestLimiter, async (req, res) => {
       if (!current || current.status === 'CANCELLED') throw new Error('ORDER_NO_LONGER_ACTIVE')
       return tx.cancellationRequest.upsert({
         where: { orderId: order.id },
-        create: { orderId: order.id, customerEmail: input.data.email, status: 'REQUESTED' },
+        create: { orderId: order.id, customerEmail: input.data.email, status: 'REQUESTED', returnStatus: ['SHIPPED', 'DELIVERED'].includes(current.status) ? 'RETURN_PENDING' : 'NOT_REQUIRED' },
         update: {},
         select: { id: true, status: true },
       })
