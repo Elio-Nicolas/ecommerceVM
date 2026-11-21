@@ -12,6 +12,7 @@ import { getOcaAdmissionDate, isCompleteOcaOriginBranch, isOcaOrderPaid, matches
 import { getOcaAdmissionBranches } from '../services/oca-metadata'
 import { getStoredOcaCredentials } from '../services/shipping-settings'
 import { getPaymentCancellationBlock, hasUnresolvedOnlinePayment } from '../services/payment-cancellation-policy'
+import { getCancellationFulfillmentBlockMessage, isCancellationBlockingFulfillment } from '../services/fulfillment-policy'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -86,6 +87,11 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
   const existing = await prisma.order.findUnique({ where: { id: req.params.id } })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  const cancellation = await prisma.cancellationRequest.findUnique({ where: { orderId: existing.id }, select: { status: true } })
+  if (isCancellationBlockingFulfillment(cancellation)) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
   }
   if (existing.deliveryMethod === 'LOCAL_DELIVERY') {
@@ -277,10 +283,14 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
 
   const order = await prisma.order.findUnique({
     where: { id: orderId.data },
-    include: { items: true, paymentAttempts: { select: { provider: true, status: true, approvedAt: true } } },
+    include: { items: true, paymentAttempts: { select: { provider: true, status: true, approvedAt: true } }, cancellationRequest: { select: { status: true } } },
   })
   if (!order) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (isCancellationBlockingFulfillment(order.cancellationRequest)) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
   }
   if (order.deliveryMethod !== 'OCA' || order.status !== 'PREPARING') {
@@ -341,6 +351,11 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
 
   const shipment = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', order.id)
+    const currentOrder = await tx.order.findUnique({
+      where: { id: order.id },
+      select: { status: true, cancellationRequest: { select: { status: true } } },
+    })
+    if (!currentOrder || currentOrder.status !== 'PREPARING' || isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) return { blocked: true as const }
     const existing = await tx.shippingShipment.findUnique({
       where: { orderId_provider: { orderId: order.id, provider: 'OCA' } },
     })
@@ -355,6 +370,10 @@ adminOrdersRouter.post('/:id/oca-admission', async (req, res) => {
       },
     })
   })
+  if (shipment && 'blocked' in shipment) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
+    return
+  }
   if (!shipment) {
     res.status(409).json({ error: { code: 'OCA_ADMISSION_ALREADY_ATTEMPTED', message: 'Ya existe un registro OCA para este pedido. No se repetirá la admisión automáticamente; verificá el resultado en e-Pak.' } })
     return
@@ -484,10 +503,14 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   }).parse(req.body)
   const existing = await prisma.order.findUnique({
     where: { id: req.params.id },
-    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } } },
+    include: { items: true, paymentAttempts: { select: { status: true, provider: true } }, shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } }, cancellationRequest: { select: { status: true } } },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
+    return
+  }
+  if (['PREPARING', 'SHIPPED', 'DELIVERED'].includes(input.status) && isCancellationBlockingFulfillment(existing.cancellationRequest)) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
     return
   }
   if (input.status !== existing.status && existing.paymentAttempts.some((payment) => payment.status === 'REFUNDED') && input.status !== 'CANCELLED') {
@@ -552,9 +575,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
       const currentOrder = await tx.order.findUnique({
         where: { id: existing.id },
-        include: { items: true, paymentAttempts: { select: { provider: true, status: true } } },
+        include: { items: true, paymentAttempts: { select: { provider: true, status: true } }, cancellationRequest: { select: { status: true } } },
       })
       if (!currentOrder || currentOrder.status !== existing.status) throw new Error('ORDER_STATUS_CONFLICT')
+      if (['PREPARING', 'SHIPPED', 'DELIVERED'].includes(input.status) && isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) throw new Error('CANCELLATION_REQUEST_PENDING')
       if (input.status === 'CANCELLED') {
         if (getPaymentCancellationBlock(currentOrder.paymentAttempts)) {
           throw new Error('PAYMENT_NOT_RESOLVED')
@@ -593,6 +617,10 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
   } catch (error) {
     if (error instanceof Error && error.message === 'ORDER_STATUS_CONFLICT') {
       res.status(409).json({ error: { code: 'ORDER_STATUS_CONFLICT', message: 'El pedido fue actualizado por otra sesión. Recargá e intentá nuevamente.' } })
+      return
+    }
+    if (error instanceof Error && error.message === 'CANCELLATION_REQUEST_PENDING') {
+      res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: getCancellationFulfillmentBlockMessage() } })
       return
     }
     if (error instanceof Error && error.message === 'PAYMENT_NOT_RESOLVED') {
