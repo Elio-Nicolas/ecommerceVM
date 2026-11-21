@@ -15,5 +15,5 @@ test('no bloquea por ausencia de solicitud ni después del reintegro confirmado'
 })
 
 test('explica que la operación debe quedar detenida', () => {
-  assert.match(getCancellationFulfillmentBlockMessage(), /no puede prepararse, despacharse ni entregarse/i)
+  assert.match(getCancellationFulfillmentBlockMessage(), /no puede iniciar la preparación ni el despacho/i)
 })
