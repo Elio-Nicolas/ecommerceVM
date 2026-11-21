@@ -366,8 +366,8 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
           data: {
             providerOrderId: providerOrder.id,
             checkoutUrl: null,
-            status: 'UNKNOWN',
-            statusDetail: 'Checkout creado mientras se registraba una solicitud de arrepentimiento',
+            status: currentAttempt.status === 'APPROVED' ? 'APPROVED' : 'UNKNOWN',
+            statusDetail: currentAttempt.status === 'APPROVED' ? currentAttempt.statusDetail : 'Checkout creado mientras se registraba una solicitud de arrepentimiento',
             responsePayload: providerOrder as Prisma.InputJsonValue,
             lastError: 'El proveedor pudo crear una orden de pago mientras el comprador solicitaba el arrepentimiento. Conciliación manual requerida.',
           },
