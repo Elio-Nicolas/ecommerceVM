@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { decideFiscalAutomation, type FiscalAutomationInput } from '../src/services/arca-fiscal-automation-policy'
+import { decideFiscalAutomation, resolveArcaReceiverIdentity, type FiscalAutomationInput } from '../src/services/arca-fiscal-automation-policy'
 
 const base: FiscalAutomationInput = {
   paymentStatus: 'APPROVED',
@@ -84,20 +84,20 @@ test('un reintegro superior al importe facturado queda bloqueado para conciliaci
   }), 'RECONCILE_REFUND')
 })
 
-test('una devolución física pendiente después del despacho requiere inspección antes de la nota', () => {
+test('la devolución física pendiente no bloquea documentar un reintegro ya confirmado', () => {
   assert.equal(decideFiscalAutomation({
     ...base, orderStatus: 'SHIPPED', returnStatus: 'RETURN_PENDING',
     invoiceStatus: 'AUTHORIZED', paymentStatus: 'REFUNDED',
     refundedAmountArs: 10000, refundProviderConfirmed: true,
-  }), 'HOLD_RETURN_INSPECTION')
+  }), 'ISSUE_FULL_CREDIT_NOTE')
 })
 
-test('la recepción sin aceptación de la devolución no permite reponer stock ni cerrar la nota', () => {
+test('la nota de crédito no repone stock: la aceptación física sigue siendo un flujo independiente', () => {
   assert.equal(decideFiscalAutomation({
     ...base, orderStatus: 'DELIVERED', returnStatus: 'RETURN_RECEIVED',
     invoiceStatus: 'AUTHORIZED', paymentStatus: 'REFUNDED',
     refundedAmountArs: 10000, refundProviderConfirmed: true,
-  }), 'HOLD_RETURN_INSPECTION')
+  }), 'ISSUE_FULL_CREDIT_NOTE')
 })
 
 test('una devolución aceptada permite emitir la nota de crédito tras el reintegro confirmado', () => {
@@ -138,4 +138,36 @@ test('el reintegro confirmado sin factura previa no necesita una nota de crédit
     ...base, paymentStatus: 'REFUNDED', refundedAmountArs: 10000,
     refundProviderConfirmed: true,
   }), 'NO_FISCAL_DOCUMENT_REQUIRED')
+})
+
+test('consumidor final sin identificación usa documento 99/0 por debajo de ARS 10 millones', () => {
+  assert.deepEqual(resolveArcaReceiverIdentity({ totalAmountArs: 9_999_999 }), {
+    ok: true, documentType: 99, documentNumber: '0',
+    name: 'A CONSUMIDOR FINAL', address: 'NR',
+  })
+})
+
+test('consumidor final debe identificarse desde ARS 10 millones inclusive', () => {
+  assert.deepEqual(resolveArcaReceiverIdentity({ totalAmountArs: 10_000_000 }), {
+    ok: false, code: 'RECEIVER_ID_REQUIRED',
+  })
+})
+
+test('permite identificar consumidor final con DNI o CUIT cuando el comprador lo solicita', () => {
+  assert.deepEqual(resolveArcaReceiverIdentity({
+    totalAmountArs: 10_000_000, documentType: 96, documentNumber: '12.345.678',
+    name: 'Comprador', address: 'Calle 123',
+  }), {
+    ok: true, documentType: 96, documentNumber: '12345678',
+    name: 'Comprador', address: 'Calle 123',
+  })
+})
+
+test('rechaza identidad fiscal incompleta o un importe inválido', () => {
+  assert.deepEqual(resolveArcaReceiverIdentity({ totalAmountArs: 1000, documentType: 80 }), {
+    ok: false, code: 'RECEIVER_ID_INVALID',
+  })
+  assert.deepEqual(resolveArcaReceiverIdentity({ totalAmountArs: 0 }), {
+    ok: false, code: 'RECEIVER_AMOUNT_INVALID',
+  })
 })
