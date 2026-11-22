@@ -11,6 +11,7 @@ import { verifyMercadoPagoWebhookSignature } from '../services/payment-webhook-s
 import { hasValidOrderAccessToken } from '../services/order-access-token'
 import { sendPaidOrderConfirmationEmail } from '../services/order-email'
 import { finalizePreDispatchRefund } from '../services/refund-finalization'
+import { getPaymentMethodSettings } from '../services/payment-method-settings'
 
 export const paymentsRouter = Router()
 
@@ -288,9 +289,10 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
   return true
 }
 
-paymentsRouter.get('/config', (_req, res) => {
+paymentsRouter.get('/config', async (_req, res) => {
+  const settings = await getPaymentMethodSettings()
   res.setHeader('Cache-Control', 'no-store')
-  res.json({ data: paymentConfiguration() })
+  res.json({ data: { ...paymentConfiguration(), enabled: paymentConfiguration().enabled && settings.mercadoPagoEnabled } })
 })
 
 paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) => {
@@ -305,7 +307,8 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  if (!paymentConfiguration().enabled) {
+  const paymentSettings = await getPaymentMethodSettings()
+  if (!paymentConfiguration().enabled || !paymentSettings.mercadoPagoEnabled) {
     res.status(503).json({ error: { code: 'PAYMENTS_NOT_CONFIGURED', message: 'Los pagos online todavía no están configurados.' } })
     return
   }
