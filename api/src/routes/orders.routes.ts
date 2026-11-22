@@ -11,6 +11,7 @@ import { calculateCheckoutPrice, type CheckoutPaymentMethod } from '../services/
 import { env } from '../config/env'
 import { deriveOrderAccessToken, hashOrderAccessToken, hasValidOrderAccessToken } from '../services/order-access-token'
 import { sendRegretRequestConfirmationEmail } from '../services/order-email'
+import { getPaymentMethodSettings } from '../services/payment-method-settings'
 
 export const ordersRouter = Router()
 
@@ -83,6 +84,14 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
 
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
+  if (input.paymentMethod !== 'CASH') {
+    const paymentSettings = await getPaymentMethodSettings()
+    const enabled = input.paymentMethod === 'MERCADO_PAGO' ? paymentSettings.mercadoPagoEnabled : paymentSettings.goCuotasEnabled
+    if (!enabled) {
+      res.status(409).json({ error: { code: 'PAYMENT_METHOD_DISABLED', message: 'El medio de pago seleccionado está temporalmente deshabilitado. Elegí otro medio de pago.' } })
+      return
+    }
+  }
   const checkoutFingerprint = input.checkoutRequestKey ? createCheckoutFingerprint(input) : null
   const customerAccessToken = input.checkoutRequestKey ? deriveOrderAccessToken(input.checkoutRequestKey, env.JWT_SECRET) : randomBytes(32).toString('hex')
   const customerAccessTokenHash = hashOrderAccessToken(customerAccessToken)
