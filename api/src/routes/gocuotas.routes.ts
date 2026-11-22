@@ -11,6 +11,7 @@ import { getGoCuotasAttemptDisposition, getGoCuotasFailureDisposition } from '..
 import { buildGoCuotasUrl } from '../services/gocuotas-url'
 import { readGoCuotasCheckoutResponse } from '../services/gocuotas-checkout-response'
 import { sendPaidOrderConfirmationEmail } from '../services/order-email'
+import { getPaymentMethodSettings } from '../services/payment-method-settings'
 
 export const goCuotasRouter = Router()
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false })
@@ -50,9 +51,10 @@ async function getGoOrder(id: string, token: string) {
   }
 }
 
-goCuotasRouter.get('/config', (_req, res) => {
+goCuotasRouter.get('/config', async (_req, res) => {
+  const settings = await getPaymentMethodSettings()
   res.setHeader('Cache-Control', 'no-store')
-  res.json({ data: { enabled: configured(), provider: 'GOCUOTAS' } })
+  res.json({ data: { enabled: configured() && settings.goCuotasEnabled, provider: 'GOCUOTAS' } })
 })
 
 goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
@@ -67,8 +69,9 @@ goCuotasRouter.post('/orders/:orderId', limiter, async (req, res) => {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
     return
   }
-  if (!configured()) {
-    res.status(503).json({ error: { code: 'GOCUOTAS_NOT_CONFIGURED', message: 'GOcuotas todavía no está configurado para Sandbox.' } })
+  const paymentSettings = await getPaymentMethodSettings()
+  if (!configured() || !paymentSettings.goCuotasEnabled) {
+    res.status(503).json({ error: { code: 'GOCUOTAS_NOT_CONFIGURED', message: paymentSettings.goCuotasEnabled ? 'GOcuotas todavía no está configurado para Sandbox.' : 'GOcuotas está temporalmente deshabilitado por la tienda.' } })
     return
   }
 

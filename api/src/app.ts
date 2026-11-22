@@ -14,6 +14,7 @@ import { ordersRouter } from './routes/orders.routes'
 import { adminOrdersRouter } from './routes/admin-orders.routes'
 import { adminShippingOriginsRouter } from './routes/admin-shipping-origins.routes'
 import { adminShippingSettingsRouter } from './routes/admin-shipping-settings.routes'
+import { adminPaymentSettingsRouter } from './routes/admin-payment-settings.routes'
 import { adminShippingLabelsRouter } from './routes/admin-shipping-labels.routes'
 import { shippingRouter } from './routes/shipping.routes'
 import { adminArcaRouter } from './routes/admin-arca.routes'
@@ -48,6 +49,7 @@ app.use('/api/v1/payments', paymentsRouter)
 app.use('/api/v1/payments/gocuotas', goCuotasRouter)
 app.use('/api/v1/admin/shipping-origins', adminShippingOriginsRouter)
 app.use('/api/v1/admin/shipping-settings', adminShippingSettingsRouter)
+app.use('/api/v1/admin/payment-settings', adminPaymentSettingsRouter)
 app.use('/api/v1/admin/shipping-labels', adminShippingLabelsRouter)
 app.use('/api/v1/categories', categoriesRouter)
 app.use('/api/v1/products', productsRouter)
