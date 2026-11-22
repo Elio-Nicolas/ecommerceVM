@@ -44,7 +44,7 @@ export interface NaranjaXGateway {
  */
 export class NaranjaXSimulator implements NaranjaXGateway {
   private readonly payments = new Map<string, NaranjaXPaymentSnapshot>()
-  private readonly idempotency = new Map<string, string>()
+  private readonly idempotency = new Map<string, { providerPaymentId: string; orderId: string }>()
   private sequence = 0
 
   async createCheckout(input: NaranjaXCheckoutRequest): Promise<NaranjaXCheckout> {
@@ -52,12 +52,12 @@ export class NaranjaXSimulator implements NaranjaXGateway {
     if (!Number.isSafeInteger(input.amountArs) || input.amountArs <= 0) throw new Error('El importe debe ser un entero positivo en ARS.')
     if (input.currency !== 'ARS') throw new Error('Naranja X solo admite ARS en este adaptador.')
     if (!input.idempotencyKey.trim()) throw new Error('La clave de idempotencia es obligatoria.')
-    if (!isAbsoluteHttpUrl(input.returnUrl) || !isAbsoluteHttpUrl(input.webhookUrl)) throw new Error('Las URLs de retorno y webhook deben ser absolutas.')
+    if (!isAbsoluteHttpsUrl(input.returnUrl) || !isAbsoluteHttpsUrl(input.webhookUrl)) throw new Error('Las URLs de retorno y webhook deben usar HTTPS.')
 
-    const previousId = this.idempotency.get(input.idempotencyKey)
-    if (previousId) {
-      const previous = this.payments.get(previousId)!
-      if (previous.orderReference !== input.orderReference || previous.amountArs !== input.amountArs) {
+    const previousEntry = this.idempotency.get(input.idempotencyKey)
+    if (previousEntry) {
+      const previous = this.payments.get(previousEntry.providerPaymentId)!
+      if (previousEntry.orderId !== input.orderId || previous.orderReference !== input.orderReference || previous.amountArs !== input.amountArs) {
         throw new Error('La clave de idempotencia ya fue utilizada con otros datos.')
       }
       return this.toCheckout(previous)
@@ -74,7 +74,7 @@ export class NaranjaXSimulator implements NaranjaXGateway {
       refundedAmountArs: 0,
     }
     this.payments.set(providerPaymentId, snapshot)
-    this.idempotency.set(input.idempotencyKey, providerPaymentId)
+    this.idempotency.set(input.idempotencyKey, { providerPaymentId, orderId: input.orderId })
     return this.toCheckout(snapshot)
   }
 
@@ -115,10 +115,10 @@ export class NaranjaXSimulator implements NaranjaXGateway {
   }
 }
 
-function isAbsoluteHttpUrl(value: string): boolean {
+function isAbsoluteHttpsUrl(value: string): boolean {
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' || url.protocol === 'http:'
+    return url.protocol === 'https:'
   } catch {
     return false
   }
