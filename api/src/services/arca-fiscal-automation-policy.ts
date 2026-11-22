@@ -13,7 +13,6 @@ export type FiscalAutomationAction =
   | 'NOOP_INVOICE_EXISTS'
   | 'WAIT_REFUND'
   | 'RECONCILE_REFUND'
-  | 'HOLD_RETURN_INSPECTION'
   | 'ISSUE_FULL_CREDIT_NOTE'
   | 'ISSUE_PARTIAL_CREDIT_NOTE'
   | 'NOOP_CREDIT_NOTE_EXISTS'
@@ -61,12 +60,6 @@ export function decideFiscalAutomation(input: FiscalAutomationInput): FiscalAuto
   }
 
   if (input.invoiceStatus === 'AUTHORIZED' && hasConfirmedRefund) {
-    if (input.orderStatus === 'SHIPPED' || input.orderStatus === 'DELIVERED') {
-      if (input.returnStatus === 'RETURN_PENDING' || input.returnStatus === 'RETURN_RECEIVED') {
-        return 'HOLD_RETURN_INSPECTION'
-      }
-    }
-
     const invoiceTotal = input.invoiceTotalArs ?? 0
     if (invoiceTotal <= 0 || input.refundedAmountArs > invoiceTotal) {
       return 'RECONCILE_REFUND'
@@ -88,4 +81,51 @@ export function decideFiscalAutomation(input: FiscalAutomationInput): FiscalAuto
   if (input.orderStatus === 'CANCELLED') return 'HOLD_CANCELLED_ORDER'
   if (input.cancellationStatus) return 'HOLD_CANCEL_REQUEST'
   return 'ISSUE_INVOICE'
+}
+
+export interface ArcaReceiverIdentityInput {
+  totalAmountArs: number
+  documentType?: number | null
+  documentNumber?: string | null
+  name?: string | null
+  address?: string | null
+}
+
+export type ArcaReceiverIdentityResult =
+  | { ok: true; documentType: number; documentNumber: string; name: string; address: string }
+  | { ok: false; code: 'RECEIVER_AMOUNT_INVALID' | 'RECEIVER_ID_REQUIRED' | 'RECEIVER_ID_INVALID' }
+
+/**
+ * RG 1415, Anexo II (texto vigente): a consumidor final se identifica
+ * desde ARS 10.000.000 inclusive. The caller must still obtain the current
+ * CondicionIVAReceptorId from FEParamGetCondicionIvaReceptor.
+ */
+export function resolveArcaReceiverIdentity(input: ArcaReceiverIdentityInput): ArcaReceiverIdentityResult {
+  if (!Number.isSafeInteger(input.totalAmountArs) || input.totalAmountArs <= 0) {
+    return { ok: false, code: 'RECEIVER_AMOUNT_INVALID' }
+  }
+  const documentNumber = input.documentNumber?.replace(/\D/g, '') ?? ''
+  const documentType = input.documentType ?? null
+  if (documentType !== null || documentNumber.length > 0) {
+    if (documentType === null || !documentNumber || !/^\d{1,20}$/.test(documentNumber)) {
+      return { ok: false, code: 'RECEIVER_ID_INVALID' }
+    }
+    return {
+      ok: true,
+      documentType,
+      documentNumber,
+      name: input.name?.trim() || 'NR',
+      address: input.address?.trim() || 'NR',
+    }
+  }
+  if (input.totalAmountArs >= 10_000_000) {
+    return { ok: false, code: 'RECEIVER_ID_REQUIRED' }
+  }
+  return {
+    ok: true,
+    documentType: 99,
+    documentNumber: '0',
+    name: 'A CONSUMIDOR FINAL',
+    address: 'NR',
+  }
 }
