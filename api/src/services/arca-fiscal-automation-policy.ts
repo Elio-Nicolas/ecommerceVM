@@ -45,6 +45,10 @@ export function decideFiscalAutomation(input: FiscalAutomationInput): FiscalAuto
     return 'RECONCILE_INVOICE'
   }
 
+  if ((input.paymentStatus === 'REFUNDED' || input.paymentStatus === 'PARTIALLY_REFUNDED' || input.cancellationStatus === 'REFUNDED') && input.refundedAmountArs <= 0) {
+    return 'RECONCILE_REFUND'
+  }
+
   if (input.orderStatus === 'CANCELLED' && input.refundedAmountArs <= 0) {
     return 'HOLD_CANCELLED_ORDER'
   }
@@ -66,9 +70,8 @@ export function decideFiscalAutomation(input: FiscalAutomationInput): FiscalAuto
     if (invoiceTotal <= 0 || input.refundedAmountArs > invoiceTotal) {
       return 'RECONCILE_REFUND'
     }
-    if (input.existingCreditNoteAmountArs >= input.refundedAmountArs) {
-      return 'NOOP_CREDIT_NOTE_EXISTS'
-    }
+    if (input.existingCreditNoteAmountArs > input.refundedAmountArs) return 'RECONCILE_REFUND'
+    if (input.existingCreditNoteAmountArs === input.refundedAmountArs) return 'NOOP_CREDIT_NOTE_EXISTS'
     if (input.refundedAmountArs === invoiceTotal) return 'ISSUE_FULL_CREDIT_NOTE'
     return 'ISSUE_PARTIAL_CREDIT_NOTE'
   }
