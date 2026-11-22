@@ -132,6 +132,13 @@ model ShippingSettings {
   localDeliveryCoordinate Boolean @default(false)
   updatedAt DateTime @updatedAt
 }
+model PaymentSettings {
+  id String @id @default("default")
+  mercadoPagoEnabled Boolean @default(true)
+  goCuotasEnabled Boolean @default(true)
+  naranjaXEnabled Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
 model ArcaSettings {
   id String @id @default("default")
   enabled Boolean @default(false)
