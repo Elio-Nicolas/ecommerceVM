@@ -34,6 +34,7 @@ const envSchema = z.object({
   GOCUOTAS_EMAIL: optionalTrimmedString(5),
   // GOcuotas indica usar la API Key del ambiente como valor del parámetro password.
   GOCUOTAS_API_KEY: optionalTrimmedString(8),
+  NARANJA_X_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   PUBLIC_APP_URL: optionalHttpsUrl,
   PUBLIC_API_URL: optionalHttpsUrl,
   ADMIN_EMAIL: z.string().email().optional(),
