@@ -64,13 +64,14 @@ export async function startNaranjaXPaymentAttempt(input: {
   const order = await dependencies.store.findOrder(input.orderId)
   if (!order) throw new NaranjaXAttemptError('ORDER_NOT_FOUND', 'El pedido no existe.')
   if (order.status === 'CANCELLED') throw new NaranjaXAttemptError('ORDER_CANCELLED', 'No se puede cobrar un pedido cancelado.')
-  if (!Number.isSafeInteger(order.totalArs) || (order.totalArs ?? 0) <= 0) {
+  const orderTotalArs = order.totalArs
+  if (orderTotalArs === null || !Number.isSafeInteger(orderTotalArs) || orderTotalArs <= 0) {
     throw new NaranjaXAttemptError('ORDER_TOTAL_UNAVAILABLE', 'El pedido todavía no tiene un total cobrable.')
   }
 
   let attempt = await dependencies.store.findByRequestKey(input.requestKey)
   if (attempt) {
-    if (attempt.provider !== 'NARANJA_X' || attempt.orderId !== order.id || attempt.amountArs !== order.totalArs || attempt.currencyCode !== 'ARS') {
+    if (attempt.provider !== 'NARANJA_X' || attempt.orderId !== order.id || attempt.amountArs !== orderTotalArs || attempt.currencyCode !== 'ARS') {
       throw new NaranjaXAttemptError('IDEMPOTENCY_CONFLICT', 'La clave ya fue utilizada con otros datos.')
     }
     if (attempt.checkoutUrl && attempt.providerOrderId && attempt.status === 'PENDING') {
@@ -82,14 +83,14 @@ export async function startNaranjaXPaymentAttempt(input: {
   } else {
     const active = await dependencies.store.findActiveForOrder(order.id)
     if (active) throw new NaranjaXAttemptError('ACTIVE_ATTEMPT_EXISTS', 'El pedido ya tiene un intento Naranja X en curso.')
-    attempt = await dependencies.store.create({ orderId: order.id, requestKey: input.requestKey, amountArs: order.totalArs })
+    attempt = await dependencies.store.create({ orderId: order.id, requestKey: input.requestKey, amountArs: orderTotalArs })
   }
 
   try {
     const request: NaranjaXCheckoutRequest = {
       orderId: order.id,
       orderReference: order.code,
-      amountArs: order.totalArs,
+      amountArs: orderTotalArs,
       currency: 'ARS',
       idempotencyKey: input.requestKey,
       returnUrl: input.returnUrl,
@@ -101,7 +102,7 @@ export async function startNaranjaXPaymentAttempt(input: {
       || !isHttpsUrl(checkout.checkoutUrl)
       || checkout.status !== 'PENDING'
       || checkout.orderReference !== order.code
-      || checkout.amountArs !== order.totalArs
+      || checkout.amountArs !== orderTotalArs
       || checkout.currency !== 'ARS'
     ) {
       throw new NaranjaXAttemptError('PROVIDER_RESPONSE_MISMATCH', 'Naranja X devolvió datos de checkout incompletos o inconsistentes.')
