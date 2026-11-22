@@ -200,3 +200,20 @@ test('las claves fiscales son deterministas y separan factura, nota y cada ajust
     buildArcaFiscalRequestKey('order-123', 'CREDIT_NOTE_C', 5000),
   )
 })
+
+test('un pago marcado como reintegrado sin importe conciliado nunca dispara factura', () => {
+  assert.equal(decideFiscalAutomation({
+    ...base, paymentStatus: 'REFUNDED', refundedAmountArs: 0,
+  }), 'RECONCILE_REFUND')
+  assert.equal(decideFiscalAutomation({
+    ...base, paymentStatus: 'PARTIALLY_REFUNDED', refundedAmountArs: 0,
+  }), 'RECONCILE_REFUND')
+})
+
+test('si las notas de crédito acumuladas superan el reintegro confirmado se detiene para conciliación', () => {
+  assert.equal(decideFiscalAutomation({
+    ...base, invoiceStatus: 'AUTHORIZED', paymentStatus: 'REFUNDED',
+    refundedAmountArs: 5000, existingCreditNoteAmountArs: 6000,
+    refundProviderConfirmed: true,
+  }), 'RECONCILE_REFUND')
+})
