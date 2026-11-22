@@ -32,3 +32,19 @@ No implementar contra endpoints inferidos. Antes de crear el adaptador HTTP real
 5. Integrar reintegros únicamente si la API del canal los soporta y confirma el resultado.
 
 Mercado Pago y GOcuotas permanecen sin cambios. No agregar secretos ni activar producción en esta etapa.
+
+
+## Transporte HTTP preparado (sin contrato supuesto)
+
+Se agregó `NaranjaXHttpClient` como transporte JSON aislado:
+- Solo admite una URL base HTTPS.
+- Solo acepta rutas relativas al host configurado; bloquea URLs absolutas y cambios de host.
+- Permite inyectar headers de autenticación y un `fetch` controlado, sin fijar un esquema de credenciales.
+- Aplica timeout, bloquea redirects y normaliza errores de red/HTTP/JSON sin exponer cuerpos de respuesta ni detalles internos.
+- Tiene pruebas automatizadas con respuestas simuladas; no realiza llamadas reales.
+
+Este transporte todavía **no implementa `NaranjaXGateway`**: los paths, serializadores, esquemas de respuesta, autenticación y firma webhook deben ajustarse al contrato que Naranja X confirme para este comercio. La documentación pública de Checkout Externo es una pista técnica, pero no acredita acceso del comercio ni sustituye las credenciales y el contrato de homologación.
+
+## Política de medios de pago
+
+La validación de disponibilidad del backend ahora usa una política centralizada y testeada. Solo permite CASH, MERCADO_PAGO y GOCUOTAS cuando su setting correspondiente está activo. Cualquier valor desconocido —incluido NARANJA_X mientras no esté integrado— falla cerrado. El esquema de creación de pedidos continúa rechazando métodos no habilitados en checkout.
