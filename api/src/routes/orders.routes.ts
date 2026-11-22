@@ -12,6 +12,7 @@ import { env } from '../config/env'
 import { deriveOrderAccessToken, hashOrderAccessToken, hasValidOrderAccessToken } from '../services/order-access-token'
 import { sendRegretRequestConfirmationEmail } from '../services/order-email'
 import { getPaymentMethodSettings } from '../services/payment-method-settings'
+import { isPaymentMethodEnabled } from '../services/payment-method-availability'
 
 export const ordersRouter = Router()
 
@@ -86,7 +87,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
   {
     const paymentSettings = await getPaymentMethodSettings()
-    const enabled = input.paymentMethod === 'CASH' ? paymentSettings.cashEnabled : input.paymentMethod === 'MERCADO_PAGO' ? paymentSettings.mercadoPagoEnabled : paymentSettings.goCuotasEnabled
+    const enabled = isPaymentMethodEnabled(input.paymentMethod, paymentSettings)
     if (!enabled) {
       res.status(409).json({ error: { code: 'PAYMENT_METHOD_DISABLED', message: 'El medio de pago seleccionado está temporalmente deshabilitado. Elegí otro medio de pago.' } })
       return
