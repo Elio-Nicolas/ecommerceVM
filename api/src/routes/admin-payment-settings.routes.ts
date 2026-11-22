@@ -13,6 +13,7 @@ adminPaymentSettingsRouter.get('/', async (_req, res) => {
 })
 
 const schema = z.object({
+  cashEnabled: z.boolean(),
   mercadoPagoEnabled: z.boolean(),
   goCuotasEnabled: z.boolean(),
   naranjaXEnabled: z.boolean(),
