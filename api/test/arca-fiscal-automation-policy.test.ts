@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { decideFiscalAutomation, resolveArcaReceiverIdentity, type FiscalAutomationInput } from '../src/services/arca-fiscal-automation-policy'
+import { buildArcaFiscalRequestKey, calculateCreditNoteDelta, decideFiscalAutomation, resolveArcaReceiverIdentity, type FiscalAutomationInput } from '../src/services/arca-fiscal-automation-policy'
 
 const base: FiscalAutomationInput = {
   paymentStatus: 'APPROVED',
@@ -170,4 +170,33 @@ test('rechaza identidad fiscal incompleta o un importe inválido', () => {
   assert.deepEqual(resolveArcaReceiverIdentity({ totalAmountArs: 0 }), {
     ok: false, code: 'RECEIVER_AMOUNT_INVALID',
   })
+})
+
+test('las notas de crédito parciales sucesivas emiten solamente el delta todavía no acreditado', () => {
+  assert.deepEqual(calculateCreditNoteDelta({
+    invoiceTotalArs: 10000, confirmedRefundTotalArs: 5000, alreadyCreditedArs: 2000,
+  }), { ok: true, amountArs: 3000 })
+})
+
+test('no permite notas de crédito superiores a la factura ni importes inválidos', () => {
+  assert.deepEqual(calculateCreditNoteDelta({
+    invoiceTotalArs: 10000, confirmedRefundTotalArs: 11000, alreadyCreditedArs: 0,
+  }), { ok: false, code: 'REFUND_EXCEEDS_INVOICE' })
+  assert.deepEqual(calculateCreditNoteDelta({
+    invoiceTotalArs: 10000, confirmedRefundTotalArs: 5000, alreadyCreditedArs: 6000,
+  }), { ok: false, code: 'REFUND_EXCEEDS_INVOICE' })
+  assert.deepEqual(calculateCreditNoteDelta({
+    invoiceTotalArs: 0, confirmedRefundTotalArs: 0, alreadyCreditedArs: 0,
+  }), { ok: false, code: 'INVALID_CREDIT_NOTE_AMOUNT' })
+})
+
+test('las claves fiscales son deterministas y separan factura, nota y cada ajuste acumulado', () => {
+  const invoice = buildArcaFiscalRequestKey('order-123', 'INVOICE_C', 10000)
+  assert.equal(invoice, buildArcaFiscalRequestKey('order-123', 'INVOICE_C', 10000))
+  assert.match(invoice, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+  assert.notEqual(invoice, buildArcaFiscalRequestKey('order-123', 'CREDIT_NOTE_C', 10000))
+  assert.notEqual(
+    buildArcaFiscalRequestKey('order-123', 'CREDIT_NOTE_C', 2000),
+    buildArcaFiscalRequestKey('order-123', 'CREDIT_NOTE_C', 5000),
+  )
 })
