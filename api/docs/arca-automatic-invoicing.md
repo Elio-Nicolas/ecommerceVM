@@ -29,7 +29,7 @@ La tienda debe emitir y entregar comprobantes sin intervención rutinaria del ti
 | Reintegro total confirmado con factura autorizada | Nota de Crédito C total |
 | Reintegro parcial confirmado con factura autorizada | Nota de Crédito C parcial por el importe reintegrado |
 | Reintegro confirmado antes de emitir factura | No emitir factura ni nota de crédito |
-| Devolución después del despacho | Mantener trazabilidad logística; no reingresar stock hasta recepción e inspección |
+| Devolución después del despacho | La Nota de Crédito sigue al reintegro confirmado; el stock permanece bloqueado hasta recepción e inspección física |
 | Nota de crédito ya emitida | No duplicar |
 | GOcuotas | El sistema registra el reintegro sólo después de confirmación manual en el panel del proveedor; no puede automatizar una API que el proveedor no ofrece |
 | Mercado Pago | Reintegro automático sólo si el endpoint confirma el resultado; estado incierto se consulta antes de repetir |
@@ -37,7 +37,7 @@ La tienda debe emitir y entregar comprobantes sin intervención rutinaria del ti
 
 ## Datos de receptor
 
-Para que la emisión sea automática, checkout debe capturar o permitir completar los datos fiscales mínimos del receptor, con validación de tipo y número de documento y condición frente al IVA. El sistema debe consultar a ARCA la tabla vigente de condiciones IVA del receptor y no fijar IDs numéricos sin verificar la tabla del servicio. Debe definirse un perfil de Consumidor Final para compradores que no soliciten identificación, respetando los umbrales de identificación vigentes al momento de emitir.
+Para que la emisión sea automática, checkout debe capturar o permitir completar los datos fiscales mínimos del receptor, con validación de tipo y número de documento y condición frente al IVA. El sistema debe consultar a ARCA la tabla vigente de condiciones IVA del receptor y no fijar IDs numéricos sin verificar la tabla del servicio. Para consumidor final, la identificación del receptor es obligatoria desde ARS 10.000.000 inclusive según el texto vigente consultado de RG 1415; por debajo se puede usar el receptor sin identificar (tipo 99, número 0) si el comprador no solicita identificación. El umbral debe ser una constante fiscal versionada y revisable, no un número disperso en el código.
 
 ## Reintentos y observabilidad
 
