@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
-type Settings = { mercadoPagoEnabled: boolean; goCuotasEnabled: boolean; naranjaXEnabled: boolean }
+type Settings = { cashEnabled: boolean; mercadoPagoEnabled: boolean; goCuotasEnabled: boolean; naranjaXEnabled: boolean }
 
-const defaults: Settings = { mercadoPagoEnabled: true, goCuotasEnabled: true, naranjaXEnabled: false }
+const defaults: Settings = { cashEnabled: true, mercadoPagoEnabled: true, goCuotasEnabled: true, naranjaXEnabled: false }
 
 export default function PaymentMethodsPanel({ token }: { token: string }) {
   const [settings, setSettings] = useState<Settings>(defaults)
@@ -58,6 +58,10 @@ export default function PaymentMethodsPanel({ token }: { token: string }) {
       </div>
       {loading ? <p>Cargando configuración...</p> : (
         <div className="admin-category-list">
+          <label className="admin-category-row payment-method-toggle">
+            <span><strong>Efectivo / transferencia coordinada</strong><small>Pago coordinado directamente con la tienda.</small></span>
+            <input type="checkbox" checked={settings.cashEnabled} disabled={saving} onChange={(event) => void toggle("cashEnabled", event.target.checked)} />
+          </label>
           <label className="admin-category-row payment-method-toggle">
             <span><strong>Mercado Pago</strong><small>Checkout y nuevos intentos de pago.</small></span>
             <input type="checkbox" checked={settings.mercadoPagoEnabled} disabled={saving} onChange={(event) => void toggle('mercadoPagoEnabled', event.target.checked)} />
