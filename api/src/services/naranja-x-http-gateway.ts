@@ -41,9 +41,10 @@ export class NaranjaXHttpGateway implements NaranjaXGateway {
   async createCheckout(input: NaranjaXCheckoutRequest): Promise<NaranjaXCheckout> {
     const request = this.codec.buildCreateCheckoutRequest(input)
     const payload = await this.http.request<unknown>(request)
-    const checkout = this.codec.parseCreateCheckoutResponse(payload, input)
+    const checkout: unknown = this.codec.parseCreateCheckoutResponse(payload, input)
 
-    if (!checkout.providerPaymentId.trim()
+    if (!isRecord(checkout)
+      || !isNonEmptyString(checkout.providerPaymentId)
       || !isAbsoluteHttpsUrl(checkout.checkoutUrl)
       || checkout.orderReference !== input.orderReference
       || checkout.amountArs !== input.amountArs
@@ -51,7 +52,7 @@ export class NaranjaXHttpGateway implements NaranjaXGateway {
       || !isPaymentStatus(checkout.status)) {
       throw new NaranjaXGatewayProtocolError('La respuesta normalizada de checkout no coincide con el pedido.')
     }
-    return checkout
+    return checkout as unknown as NaranjaXCheckout
   }
 
   async getPayment(providerPaymentId: string): Promise<NaranjaXPaymentSnapshot> {
@@ -61,43 +62,56 @@ export class NaranjaXHttpGateway implements NaranjaXGateway {
 
     const request = this.codec.buildGetPaymentRequest(providerPaymentId)
     const payload = await this.http.request<unknown>(request)
-    const snapshot = this.codec.parseGetPaymentResponse(payload, providerPaymentId)
+    const snapshot: unknown = this.codec.parseGetPaymentResponse(payload, providerPaymentId)
 
-    if (snapshot.providerPaymentId !== providerPaymentId
-      || !snapshot.orderReference.trim()
+    if (!isRecord(snapshot)
+      || snapshot.providerPaymentId !== providerPaymentId
+      || !isNonEmptyString(snapshot.orderReference)
       || !Number.isSafeInteger(snapshot.amountArs)
-      || snapshot.amountArs <= 0
+      || (snapshot.amountArs as number) <= 0
       || snapshot.currency !== 'ARS'
       || !isPaymentStatus(snapshot.status)
       || !Number.isSafeInteger(snapshot.refundedAmountArs)
-      || snapshot.refundedAmountArs < 0
-      || snapshot.refundedAmountArs > snapshot.amountArs) {
+      || (snapshot.refundedAmountArs as number) < 0
+      || (snapshot.refundedAmountArs as number) > (snapshot.amountArs as number)) {
       throw new NaranjaXGatewayProtocolError('La respuesta normalizada de consulta de pago no es válida.')
     }
 
-    if (snapshot.status === 'REFUNDED' && snapshot.refundedAmountArs !== snapshot.amountArs) {
+    const normalized = snapshot as unknown as NaranjaXPaymentSnapshot
+    if (normalized.status === 'REFUNDED' && normalized.refundedAmountArs !== normalized.amountArs) {
       throw new NaranjaXGatewayProtocolError('El reintegro total no coincide con el importe pagado.')
     }
-    if (snapshot.status === 'PARTIALLY_REFUNDED'
-      && (snapshot.refundedAmountArs <= 0 || snapshot.refundedAmountArs >= snapshot.amountArs)) {
+    if (normalized.status === 'PARTIALLY_REFUNDED'
+      && (normalized.refundedAmountArs <= 0 || normalized.refundedAmountArs >= normalized.amountArs)) {
       throw new NaranjaXGatewayProtocolError('El reintegro parcial informado no es válido.')
     }
-    if (!['REFUNDED', 'PARTIALLY_REFUNDED'].includes(snapshot.status) && snapshot.refundedAmountArs !== 0) {
+    if (!['REFUNDED', 'PARTIALLY_REFUNDED'].includes(normalized.status) && normalized.refundedAmountArs !== 0) {
       throw new NaranjaXGatewayProtocolError('El estado informado no admite importes reintegrados.')
     }
 
-    return snapshot
+    return normalized
   }
 }
 
-function isAbsoluteHttpsUrl(value: string): boolean {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isAbsoluteHttpsUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false
   try {
-    return new URL(value).protocol === 'https:'
+    const url = new URL(value)
+    return url.protocol === 'https:' && Boolean(url.hostname)
   } catch {
     return false
   }
 }
 
-function isPaymentStatus(value: string): value is NaranjaXPaymentSnapshot['status'] {
-  return ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'UNKNOWN'].includes(value)
+function isPaymentStatus(value: unknown): value is NaranjaXPaymentSnapshot['status'] {
+  return typeof value === 'string'
+    && ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'UNKNOWN'].includes(value)
 }
