@@ -8,7 +8,7 @@ Esta etapa implementa:
 
 - Configuración independiente de Andreani (QA / Producción).
 - Almacenamiento cifrado de usuario, contraseña, código de cliente y contrato.
-- Prueba administrativa de autenticación contra Andreani.
+- Prueba administrativa de autenticación contra Andreani, limitada a QA.
 - Cotización nacional Andreani desde el checkout.
 - Persistencia de cotizaciones con el mismo fingerprint de carrito y vencimiento de 10 minutos que el flujo existente.
 - Validación de cotización al crear el pedido.
@@ -49,7 +49,11 @@ No subir credenciales a Git, issues, logs ni chats. No cambiar a Producción has
 - Body: `{ "usuario": "...", "password": "..." }`
 - Se espera un token en la respuesta y se cachea en memoria por hasta 23 horas para evitar depender de un vencimiento exacto de 24 horas.
 
-La acción **Probar conexión Andreani** invoca la autenticación desde el backend. No expone el token al navegador.
+La acción **Probar conexión Andreani (solo QA)** invoca la autenticación desde el backend. No expone el token al navegador. El endpoint administrativo:
+- Rechaza la prueba si el ambiente guardado no es QA, con HTTP 409 y código `ANDREANI_QA_REQUIRED`.
+- Devuelve HTTP 503 si faltan credenciales.
+- Usa la misma instantánea de credenciales QA que validó antes de autenticar. Un cambio concurrente de configuración no puede redirigir la prueba a Producción.
+- No crea envíos ni modifica pedidos o stock.
 
 ### Cotización
 
@@ -70,7 +74,7 @@ Para el importe al comprador se prioriza `tarifaConIva.total`; si no está prese
 - `GET /api/v1/shipping/methods`: agrega `andreani.enabled` y `andreani.environment`.
 - `POST /api/v1/shipping/quotes`: acepta `provider: "ANDREANI"` junto con provincia, CP y artículos.
 - `GET/PUT /api/v1/admin/shipping-settings`: configuración sin secretos.
-- `POST /api/v1/admin/shipping-settings/andreani/test`: valida autenticación con las credenciales guardadas.
+- `POST /api/v1/admin/shipping-settings/andreani/test`: valida autenticación solo en QA.
 
 ## Modelo de paquetes
 
@@ -107,9 +111,9 @@ El pipeline de Render también ejecuta migraciones y generación Prisma según l
 - No se incluyen secretos ni credenciales de ejemplo reales.
 - No se envían órdenes reales desde esta etapa.
 - Producción no se selecciona automáticamente.
+- La prueba administrativa de conexión nunca usa Producción.
 - Si la tarifa no devuelve un importe reconocible, se falla la cotización; no se inventan precios.
 - La admisión y el cambio a `SHIPPED` quedan bloqueados hasta tener confirmación del proveedor y tracking persistido.
-
 
 ## Registro de revisión técnica — 16/11/2026
 

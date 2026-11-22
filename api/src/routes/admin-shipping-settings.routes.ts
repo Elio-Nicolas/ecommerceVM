@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAdmin } from '../middleware/require-admin'
-import { getShippingSettings, saveShippingSettings } from '../services/shipping-settings'
+import { getShippingSettings, getStoredAndreaniCredentials, saveShippingSettings } from '../services/shipping-settings'
 import { testAndreaniConnection, AndreaniError } from '../services/andreani'
 import { getOcaCostCenters, getOcaAdmissionBranches, OcaMetadataError } from '../services/oca-metadata'
 
@@ -51,10 +51,21 @@ adminShippingSettingsRouter.get('/oca/cost-centers', async (_req, res) => {
 
 adminShippingSettingsRouter.post('/andreani/test', async (_req, res) => {
   try {
-    res.json({ data: await testAndreaniConnection(), message: 'Conexión con Andreani verificada.' })
+    const credentials = await getStoredAndreaniCredentials()
+    if (!credentials) {
+      res.status(503).json({ error: { code: 'ANDREANI_NOT_CONFIGURED', message: 'Completá usuario, contraseña, código de cliente y contrato de Andreani antes de probar la conexión.' } })
+      return
+    }
+    if (credentials.environment !== 'QA') {
+      res.status(409).json({ error: { code: 'ANDREANI_QA_REQUIRED', message: 'La prueba de conexión está limitada a QA. No se ejecutó ninguna llamada a producción.' } })
+      return
+    }
+    // Pass the exact QA credential snapshot validated above; a concurrent settings
+    // change cannot redirect this diagnostic request to the production endpoint.
+    res.json({ data: await testAndreaniConnection(credentials), message: 'Conexión con Andreani verificada en QA.' })
   } catch (error) {
     res.status(error instanceof AndreaniError ? error.statusCode : 502).json({
-      error: { code: 'ANDREANI_CONNECTION_ERROR', message: error instanceof Error ? error.message : 'No se pudo validar Andreani.' },
+      error: { code: 'ANDREANI_CONNECTION_ERROR', message: error instanceof Error ? error.message : 'No se pudo validar Andreani en QA.' },
     })
   }
 })
