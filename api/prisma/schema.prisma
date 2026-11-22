@@ -134,6 +134,7 @@ model ShippingSettings {
 }
 model PaymentSettings {
   id String @id @default("default")
+  cashEnabled Boolean @default(true)
   mercadoPagoEnabled Boolean @default(true)
   goCuotasEnabled Boolean @default(true)
   naranjaXEnabled Boolean @default(false)
