@@ -83,6 +83,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const [error, setError] = useState('')
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null)
   const [coverageNoticeOpen, setCoverageNoticeOpen] = useState(false)
+  const [cashEnabled, setCashEnabled] = useState(true)
   const [paymentsEnabled, setPaymentsEnabled] = useState(false)
   const [goCuotasEnabled, setGoCuotasEnabled] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'MERCADO_PAGO' | 'GOCUOTAS'>('CASH')
@@ -112,6 +113,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
   const estimatedPaymentSurcharge = Math.round((displayedSubtotal + selectedShippingPrice) * paymentSurchargeMilliPercent / 100000)
   const estimatedPaymentTotal = displayedSubtotal + selectedShippingPrice + estimatedPaymentSurcharge
   const canSubmit = deliveryMethod === 'PICKUP' ? Boolean(deliveryMethods?.pickup.enabled) : deliveryMethod === 'LOCAL_DELIVERY' ? localDeliveryAvailable : Boolean(quote && selectedOption && !quoteExpired)
+  const paymentMethodsAvailable = cashEnabled || paymentsEnabled || goCuotasEnabled
 
   useEffect(() => {
     if (!createdOrder || createdOrder.shippingCostArs !== null) return
@@ -160,11 +162,13 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
       fetch(`${API_URL}/api/v1/payments/config`).then((response) => response.json()),
       fetch(`${API_URL}/api/v1/payments/gocuotas/config`).then((response) => response.json()),
     ]).then(([mp, go]) => {
+      setCashEnabled(mp.data?.cashEnabled !== false)
       setPaymentsEnabled(Boolean(mp.data?.enabled))
       setGoCuotasEnabled(Boolean(go.data?.enabled))
       setMpSurchargeMilliPercent(Number.isSafeInteger(mp.data?.surchargeRateMilliPercent) ? Math.max(0, mp.data.surchargeRateMilliPercent) : 0)
-      if (!mp.data?.enabled && go.data?.enabled) setPaymentMethod('GOCUOTAS')
-    }).catch(() => { setPaymentsEnabled(false); setGoCuotasEnabled(false) })
+      if (mp.data?.cashEnabled === false && mp.data?.enabled) setPaymentMethod('MERCADO_PAGO')
+      else if (mp.data?.cashEnabled === false && !mp.data?.enabled && go.data?.enabled) setPaymentMethod('GOCUOTAS')
+    }).catch(() => { setPaymentsEnabled(false); setGoCuotasEnabled(false); setCashEnabled(true) })
       .finally(() => setPaymentsConfigLoaded(true))
   }, [])
 
@@ -443,9 +447,9 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             </section>
           )}
           {deliveryMethod === '' && <p className="checkout-shipping-hint">Elegí primero cómo querés recibir tu pedido para completar los datos que correspondan.</p>}
-          <section className="checkout-card"><h2>Medio de pago</h2><div className="checkout-shipping-options"><label className={paymentMethod === 'CASH' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'CASH'} onChange={() => setPaymentMethod('CASH')} /><span className="checkout-shipping-option-copy"><strong>Efectivo / transferencia coordinada</strong><small>Sin recargo. Se mantiene el precio publicado.</small></span></label>{paymentsEnabled && <label className={paymentMethod === 'MERCADO_PAGO' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'MERCADO_PAGO'} onChange={() => setPaymentMethod('MERCADO_PAGO')} /><span className="checkout-shipping-option-copy"><strong>Mercado Pago</strong><small>{mpSurchargeMilliPercent > 0 ? `Recargo configurado: ${(mpSurchargeMilliPercent / 1000).toFixed(3)}%.` : 'Pagá de forma segura. Sin recargo configurado.'}</small></span></label>}{goCuotasEnabled && <label className={paymentMethod === 'GOCUOTAS' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'GOCUOTAS'} onChange={() => setPaymentMethod('GOCUOTAS')} /><span className="checkout-shipping-option-copy"><strong>GOcuotas</strong><small>Cuotas con tarjeta de débito. Recargo 13,609%.</small></span></label>}</div></section>
+          <section className="checkout-card"><h2>Medio de pago</h2><div className="checkout-shipping-options">{!paymentMethodsAvailable && <p>No hay medios de pago habilitados temporalmente. Contactanos para coordinar tu compra.</p>}{cashEnabled && <label className={paymentMethod === 'CASH' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'CASH'} onChange={() => setPaymentMethod('CASH')} /><span className="checkout-shipping-option-copy"><strong>Efectivo / transferencia coordinada</strong><small>Sin recargo. Se mantiene el precio publicado.</small></span></label>}{paymentsEnabled && <label className={paymentMethod === 'MERCADO_PAGO' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'MERCADO_PAGO'} onChange={() => setPaymentMethod('MERCADO_PAGO')} /><span className="checkout-shipping-option-copy"><strong>Mercado Pago</strong><small>{mpSurchargeMilliPercent > 0 ? `Recargo configurado: ${(mpSurchargeMilliPercent / 1000).toFixed(3)}%.` : 'Pagá de forma segura. Sin recargo configurado.'}</small></span></label>}{goCuotasEnabled && <label className={paymentMethod === 'GOCUOTAS' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}><input type="radio" name="paymentMethod" checked={paymentMethod === 'GOCUOTAS'} onChange={() => setPaymentMethod('GOCUOTAS')} /><span className="checkout-shipping-option-copy"><strong>GOcuotas</strong><small>Cuotas con tarjeta de débito. Recargo 13,609%.</small></span></label>}</div></section>
           {error && <div className="checkout-error" role="alert">{error}</div>}
-          <button className="checkout-submit" type="submit" disabled={!paymentsConfigLoaded || submitting || cart.length === 0 || !canSubmit}>
+          <button className="checkout-submit" type="submit" disabled={!paymentsConfigLoaded || !paymentMethodsAvailable || submitting || cart.length === 0 || !canSubmit}>
             {submitting ? 'Registrando pedido...' : 'Confirmar pedido'}
           </button>
           <p className="checkout-disclaimer">El pedido se registra luego de validar la modalidad de entrega y el stock. {paymentMethod === 'CASH' ? 'El pago se coordinará directamente con la tienda.' : 'El pago se completa de forma segura en la plataforma seleccionada.'}</p>

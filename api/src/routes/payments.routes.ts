@@ -292,7 +292,7 @@ async function applyMercadoPagoStatus(providerOrderId: string, payload: Awaited<
 paymentsRouter.get('/config', async (_req, res) => {
   const settings = await getPaymentMethodSettings()
   res.setHeader('Cache-Control', 'no-store')
-  res.json({ data: { ...paymentConfiguration(), enabled: paymentConfiguration().enabled && settings.mercadoPagoEnabled } })
+  res.json({ data: { ...paymentConfiguration(), enabled: paymentConfiguration().enabled && settings.mercadoPagoEnabled, cashEnabled: settings.cashEnabled } })
 })
 
 paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) => {
