@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+
 export type FiscalPaymentStatus = 'CREATING' | 'PENDING' | 'UNKNOWN' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'REFUNDED' | 'PARTIALLY_REFUNDED'
 export type FiscalOrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
 export type FiscalInvoiceStatus = 'PENDING' | 'ISSUING' | 'AUTHORIZED' | 'REJECTED' | 'UNKNOWN'
@@ -128,4 +130,32 @@ export function resolveArcaReceiverIdentity(input: ArcaReceiverIdentityInput): A
     name: 'A CONSUMIDOR FINAL',
     address: 'NR',
   }
+}
+
+export function calculateCreditNoteDelta(input: {
+  invoiceTotalArs: number
+  confirmedRefundTotalArs: number
+  alreadyCreditedArs: number
+}): { ok: true; amountArs: number } | { ok: false; code: 'INVALID_CREDIT_NOTE_AMOUNT' | 'REFUND_EXCEEDS_INVOICE' } {
+  const values = [input.invoiceTotalArs, input.confirmedRefundTotalArs, input.alreadyCreditedArs]
+  if (values.some((value) => !Number.isSafeInteger(value) || value < 0) || input.invoiceTotalArs <= 0) {
+    return { ok: false, code: 'INVALID_CREDIT_NOTE_AMOUNT' }
+  }
+  if (input.confirmedRefundTotalArs > input.invoiceTotalArs || input.alreadyCreditedArs > input.confirmedRefundTotalArs) {
+    return { ok: false, code: 'REFUND_EXCEEDS_INVOICE' }
+  }
+  return { ok: true, amountArs: input.confirmedRefundTotalArs - input.alreadyCreditedArs }
+}
+
+/** Stable UUID accepted by FiscalDocument.requestKey and the current admin schema. */
+export function buildArcaFiscalRequestKey(orderId: string, type: 'INVOICE_C' | 'CREDIT_NOTE_C', cumulativeAmountArs: number): string {
+  const digest = createHash('sha256')
+    .update(['ecommercevm-arca-v1', orderId, type, String(cumulativeAmountArs)].join(':'))
+    .digest('hex')
+    .slice(0, 32)
+    .split('')
+  digest[12] = '5'
+  digest[16] = ((parseInt(digest[16], 16) & 0x3) | 0x8).toString(16)
+  const hex = digest.join('')
+  return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20)
 }
