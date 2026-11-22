@@ -11,6 +11,7 @@ export async function getPaymentMethodSettings() {
 }
 
 export async function savePaymentMethodSettings(input: {
+  cashEnabled: boolean
   mercadoPagoEnabled: boolean
   goCuotasEnabled: boolean
   naranjaXEnabled: boolean
