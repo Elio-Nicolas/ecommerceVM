@@ -15,6 +15,7 @@ import { getPaymentCancellationBlock, hasUnresolvedOnlinePayment } from '../serv
 import { getCancellationFulfillmentBlockMessage, isCancellationBlockingFulfillment } from '../services/fulfillment-policy'
 import { finalizePreDispatchRefund } from '../services/refund-finalization'
 import { acceptReturnedOrderStock } from '../services/return-acceptance'
+import { getShippingDispatchBlock } from '../services/shipping-dispatch-policy'
 
 export const adminOrdersRouter = Router()
 adminOrdersRouter.use(requireAdmin)
@@ -544,23 +545,12 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Primero registrá el costo acordado de entrega local. Después podrás confirmar el costo y continuar con el pedido.' } })
     return
   }
-  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'OCA') {
-    const admittedShipment = existing.shipments.some((shipment) => shipment.provider === 'OCA' && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))
-    if (!admittedShipment) {
-      res.status(409).json({ error: { code: 'OCA_SHIPMENT_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando OCA confirme la admisión y exista un número de seguimiento.' } })
+  if (input.status === 'SHIPPED') {
+    const block = getShippingDispatchBlock(existing)
+    if (block) {
+      res.status(409).json({ error: { code: block.code, message: block.message } })
       return
     }
-  }
-  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'ANDREANI') {
-    const admittedShipment = existing.shipments.some((shipment) => shipment.provider === 'ANDREANI' && shipment.status === 'PROCESSED' && Boolean(shipment.trackingNumber))
-    if (!admittedShipment) {
-      res.status(409).json({ error: { code: 'ANDREANI_SHIPMENT_NOT_PROCESSED', message: 'El pedido solo puede marcarse como enviado cuando Andreani confirme la admisión y exista un número de seguimiento.' } })
-      return
-    }
-  }
-  if (input.status === 'SHIPPED' && existing.deliveryMethod === 'LOCAL_DELIVERY' && existing.shippingService === 'A coordinar' && existing.shippingCostArs === null) {
-    res.status(409).json({ error: { code: 'LOCAL_DELIVERY_COST_REQUIRED', message: 'Antes de despachar el pedido, registrá el costo de entrega local acordado con el comprador.' } })
-    return
   }
   const allowedTransitions = existing.status === 'PREPARING' && existing.deliveryMethod === 'PICKUP'
     ? ['DELIVERED', 'CANCELLED']
@@ -577,9 +567,18 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
       await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
       const currentOrder = await tx.order.findUnique({
         where: { id: existing.id },
-        include: { items: true, paymentAttempts: { select: { provider: true, status: true } }, cancellationRequest: { select: { status: true, returnStatus: true } } },
+        include: {
+          items: true,
+          paymentAttempts: { select: { provider: true, status: true } },
+          shipments: { where: { provider: { in: ['OCA', 'ANDREANI'] } }, select: { provider: true, status: true, trackingNumber: true } },
+          cancellationRequest: { select: { status: true, returnStatus: true } },
+        },
       })
       if (!currentOrder || currentOrder.status !== existing.status) throw new Error('ORDER_STATUS_CONFLICT')
+      if (input.status === 'SHIPPED') {
+        const dispatchBlock = getShippingDispatchBlock(currentOrder)
+        if (dispatchBlock) throw new Error(dispatchBlock.code)
+      }
       if ((['PREPARING', 'SHIPPED'].includes(input.status) || (input.status === 'DELIVERED' && currentOrder.status !== 'SHIPPED')) && isCancellationBlockingFulfillment(currentOrder.cancellationRequest)) throw new Error('CANCELLATION_REQUEST_PENDING')
       if (input.status === 'CANCELLED') {
         if (getPaymentCancellationBlock(currentOrder.paymentAttempts)) {
@@ -627,6 +626,15 @@ adminOrdersRouter.patch('/:id/status', async (req, res) => {
     }
     if (error instanceof Error && error.message === 'PAYMENT_NOT_RESOLVED') {
       res.status(409).json({ error: { code: 'PAYMENT_NOT_RESOLVED', message: 'El estado del pago cambió o sigue sin resolverse. No se canceló el pedido ni se modificó el stock.' } })
+      return
+    }
+    if (error instanceof Error && ['OCA_SHIPMENT_NOT_PROCESSED', 'ANDREANI_SHIPMENT_NOT_PROCESSED', 'LOCAL_DELIVERY_COST_REQUIRED'].includes(error.message)) {
+      const messages: Record<string, string> = {
+        OCA_SHIPMENT_NOT_PROCESSED: 'El pedido solo puede marcarse como enviado cuando OCA confirme la admisión y exista un número de seguimiento.',
+        ANDREANI_SHIPMENT_NOT_PROCESSED: 'El pedido solo puede marcarse como enviado cuando Andreani confirme la admisión y exista un número de seguimiento.',
+        LOCAL_DELIVERY_COST_REQUIRED: 'Antes de despachar el pedido, registrá el costo de entrega local acordado con el comprador.',
+      }
+      res.status(409).json({ error: { code: error.message, message: messages[error.message] } })
       return
     }
     if (error instanceof Error && error.message === 'TEST_CANCELLATION_NOT_ALLOWED') {
