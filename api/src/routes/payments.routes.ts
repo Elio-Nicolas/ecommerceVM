@@ -419,13 +419,18 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
         })
         return { blocked: true as const }
       }
+      const alreadyFinalized = ['APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED', 'CANCELLED', 'REJECTED'].includes(currentAttempt.status)
       const attempt = await tx.paymentAttempt.update({
         where: { id: currentAttempt.id },
         data: {
           providerOrderId: providerOrder.id,
           checkoutUrl: providerOrder.checkout_url,
-          status: 'PENDING',
-          statusDetail: String(providerOrder.status_detail || providerOrder.status || 'created').slice(0, 200),
+          // A webhook/status refresh may have finalized the attempt while checkout creation was in flight.
+          // Never overwrite that newer state with the older checkout response.
+          status: alreadyFinalized ? currentAttempt.status : 'PENDING',
+          statusDetail: alreadyFinalized
+            ? currentAttempt.statusDetail
+            : String(providerOrder.status_detail || providerOrder.status || 'created').slice(0, 200),
           responsePayload: providerOrder as Prisma.InputJsonValue,
           lastError: null,
         },
@@ -440,8 +445,13 @@ paymentsRouter.post('/orders/:orderId', createPaymentLimiter, async (req, res) =
     res.status(201).json({ data: { checkoutUrl: persisted.attempt.checkoutUrl, status: persisted.attempt.status } })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo crear el pago.'
-    await prisma.paymentAttempt.update({
-      where: { id: prepared.attempt.id },
+    // A webhook can approve/refund/reject the payment while the checkout request
+    // is still returning or timing out. Only unresolved attempts may become UNKNOWN.
+    await prisma.paymentAttempt.updateMany({
+      where: {
+        id: prepared.attempt.id,
+        status: { in: ['CREATING', 'PENDING', 'UNKNOWN'] },
+      },
       data: { status: 'UNKNOWN', lastError: message.slice(0, 500) },
     })
     res.status(502).json({
