@@ -48,3 +48,16 @@ Este transporte todavía **no implementa `NaranjaXGateway`**: los paths, seriali
 ## Política de medios de pago
 
 La validación de disponibilidad del backend ahora usa una política centralizada y testeada. Solo permite CASH, MERCADO_PAGO y GOCUOTAS cuando su setting correspondiente está activo. Cualquier valor desconocido —incluido NARANJA_X mientras no esté integrado— falla cerrado. El esquema de creación de pedidos continúa rechazando métodos no habilitados en checkout.
+
+
+## Adaptador HTTP implementado por contrato inyectable
+
+Se agregó `NaranjaXHttpGateway`, que implementa el contrato interno `NaranjaXGateway` y utiliza el transporte HTTP aislado. El protocolo específico se inyecta mediante `NaranjaXProtocolCodec`, responsable de:
+- construir requests de creación y consulta;
+- aportar autenticación y headers requeridos;
+- definir paths y payloads oficiales;
+- parsear respuestas reales y mapear estados al modelo interno.
+
+El adaptador valida antes de devolver resultados: URL de checkout HTTPS, coincidencia de referencia/importe/moneda, ID del pago consultado, estados conocidos y consistencia de importes reintegrados. Tiene pruebas automatizadas con codec y servidor simulados.
+
+**Esto completa el esqueleto ejecutable de integración, no la integración comercial real.** Aún falta escribir el codec concreto cuando Naranja X confirme la API habilitada para este comercio. No se incluye firma de webhook porque el algoritmo, canonicalización y headers deben salir de la documentación oficial; inventarlos sería inseguro.
