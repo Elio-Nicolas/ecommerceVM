@@ -114,3 +114,41 @@ test('rejects empty provider payment IDs before making a network request', async
   )
   assert.equal(calls.length, 0)
 })
+
+
+test('normalizes null and malformed codec outputs as protocol errors instead of TypeErrors', async () => {
+  const malformedCheckouts: unknown[] = [
+    null,
+    {},
+    { ...checkout, providerPaymentId: 42 },
+    { ...checkout, checkoutUrl: null },
+    { ...checkout, status: 'NOT_A_STATUS' },
+  ]
+  for (const malformed of malformedCheckouts) {
+    const { instance } = gateway(codec({
+      parseCreateCheckoutResponse: () => malformed as NaranjaXCheckout,
+    }))
+    await assert.rejects(
+      instance.createCheckout(checkoutInput),
+      (error: unknown) => error instanceof NaranjaXGatewayProtocolError,
+    )
+  }
+
+  const malformedSnapshots: unknown[] = [
+    null,
+    {},
+    { ...snapshot, orderReference: null },
+    { ...snapshot, amountArs: '125000' },
+    { ...snapshot, refundedAmountArs: null },
+    { ...snapshot, status: 'NOT_A_STATUS' },
+  ]
+  for (const malformed of malformedSnapshots) {
+    const { instance } = gateway(codec({
+      parseGetPaymentResponse: () => malformed as NaranjaXPaymentSnapshot,
+    }))
+    await assert.rejects(
+      instance.getPayment('nx-payment-100'),
+      (error: unknown) => error instanceof NaranjaXGatewayProtocolError,
+    )
+  }
+})
