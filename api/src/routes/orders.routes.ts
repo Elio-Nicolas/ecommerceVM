@@ -84,9 +84,9 @@ ordersRouter.get('/:id/receipt', receiptRefreshLimiter, async (req, res) => {
 
 ordersRouter.post('/', createOrderLimiter, async (req, res) => {
   const input = createOrderSchema.parse(req.body)
-  if (input.paymentMethod !== 'CASH') {
+  {
     const paymentSettings = await getPaymentMethodSettings()
-    const enabled = input.paymentMethod === 'MERCADO_PAGO' ? paymentSettings.mercadoPagoEnabled : paymentSettings.goCuotasEnabled
+    const enabled = input.paymentMethod === 'CASH' ? paymentSettings.cashEnabled : input.paymentMethod === 'MERCADO_PAGO' ? paymentSettings.mercadoPagoEnabled : paymentSettings.goCuotasEnabled
     if (!enabled) {
       res.status(409).json({ error: { code: 'PAYMENT_METHOD_DISABLED', message: 'El medio de pago seleccionado está temporalmente deshabilitado. Elegí otro medio de pago.' } })
       return
