@@ -24,3 +24,10 @@ test('permite cancelar cuando no hay cobro o el intento terminó sin cobrar', ()
   assert.equal(getPaymentCancellationBlock([{ provider: 'GOCUOTAS', status: 'REFUNDED' }]), null)
   assert.equal(hasUnresolvedOnlinePayment([{ provider: 'GOCUOTAS', status: 'REJECTED' }]), false)
 })
+
+test('bloquea el registro de cobro manual cuando existe una solicitud de arrepentimiento', async () => {
+  const { isManualPaymentBlockedByCancellation } = await import('../src/services/payment-cancellation-policy')
+  assert.equal(isManualPaymentBlockedByCancellation(null), false)
+  assert.equal(isManualPaymentBlockedByCancellation(undefined), false)
+  assert.equal(isManualPaymentBlockedByCancellation({ id: 'request-1' }), true)
+})
