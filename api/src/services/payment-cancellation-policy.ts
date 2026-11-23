@@ -12,3 +12,7 @@ export function getPaymentCancellationBlock(attempts: PaymentStateForCancellatio
 export function hasUnresolvedOnlinePayment(attempts: PaymentStateForCancellation[]): boolean {
   return attempts.some((attempt) => unresolvedStatuses.has(attempt.status))
 }
+
+export function isManualPaymentBlockedByCancellation(request: { id: string } | null | undefined): boolean {
+  return Boolean(request)
+}
