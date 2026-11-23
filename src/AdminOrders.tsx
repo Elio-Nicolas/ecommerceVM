@@ -7,7 +7,7 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replac
 const TOKEN_KEY = 'ecommercevm_admin_token'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
-type OrderItem = { id: string; productName: string; productSku: string; unitPriceArs: number; quantity: number; lineTotalArs: number }
+type OrderItem = { id: string; productName: string; productSku: string; unitPriceArs: number; unitCostArs: number | null; quantity: number; lineTotalArs: number }
 type OrderHistory = { id: string; fromStatus: OrderStatus | null; toStatus: OrderStatus; note: string | null; createdAt: string; changedByAdmin?: { email: string } | null }
 type Order = {
   id: string; code: string; status: OrderStatus; paymentMethod: 'CASH' | 'MERCADO_PAGO' | 'GOCUOTAS'; paymentSurchargeMilliPercent: number; paymentSurchargeArs: number; customerName: string; customerEmail: string | null
@@ -350,6 +350,13 @@ export default function AdminOrders() {
     const rawShippingCost = formData.get('shippingCostArs')
     const hasShippingCost = rawShippingCost !== null && String(rawShippingCost).trim() !== ''
     const shippingCostArs = hasShippingCost ? Number(rawShippingCost) : undefined
+    const rawInternalCost = formData.get('shippingInternalCostArs')
+    const hasInternalCost = rawInternalCost !== null && String(rawInternalCost).trim() !== ''
+    const shippingInternalCostArs = hasInternalCost ? Number(rawInternalCost) : undefined
+    if (hasInternalCost && (!Number.isSafeInteger(shippingInternalCostArs as number) || (shippingInternalCostArs as number) < 0)) {
+      setError('Ingresá un costo logístico interno válido.')
+      return
+    }
     if (hasShippingCost && (!Number.isSafeInteger(shippingCostArs as number) || (shippingCostArs as number) < 0)) {
       setError('Ingresá un costo de envío válido.')
       return
@@ -357,7 +364,7 @@ export default function AdminOrders() {
     const shippingCarrier = String(formData.get('shippingCarrier') || '').trim() || null
     const trackingCode = String(formData.get('trackingCode') || '').trim() || null
     const deliveryNote = String(formData.get('deliveryNote') || '').trim() || undefined
-    if (!hasShippingCost && !shippingCarrier && !trackingCode && !deliveryNote) {
+    if (!hasShippingCost && !hasInternalCost && !shippingCarrier && !trackingCode && !deliveryNote) {
       setError('Ingresá al menos un dato de entrega para guardar.')
       return
     }
@@ -369,14 +376,15 @@ export default function AdminOrders() {
         method: 'PATCH',
         body: JSON.stringify({
           ...(hasShippingCost ? { shippingCostArs } : {}),
+          ...(hasInternalCost ? { shippingInternalCostArs } : {}),
           ...(formData.has('shippingCarrier') ? { shippingCarrier } : {}),
           ...(formData.has('trackingCode') ? { trackingCode } : {}),
           note: deliveryNote,
         }),
       })
       setNotice(hasShippingCost
-        ? `Costo de entrega del pedido ${order.code} registrado. Total actualizado: ${formatPrice(order.subtotalArs + (shippingCostArs as number))}. Ahora confirmá el costo para continuar.`
-        : `Datos de entrega del pedido ${order.code} actualizados.`)
+        ? `Costo de entrega del pedido ${order.code} registrado. Total actualizado: ${formatPrice(order.subtotalArs + (shippingCostArs as number))}.`
+        : hasInternalCost ? `Costo real de logística del pedido ${order.code} registrado.` : `Datos de entrega del pedido ${order.code} actualizados.`)
       await loadOrders(token)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el envío.')
@@ -662,6 +670,7 @@ export default function AdminOrders() {
               <div><span className="admin-kicker">LOGÍSTICA NACIONAL</span><h3>Cotizar envío y seguimiento</h3><p>Este importe es el que se suma al total del comprador. El costo de OCA se gestionará por separado del importe cobrado al comprador.</p></div>
               <div className="order-shipping-fields">
                 <label>Precio de envío cobrado al cliente (ARS)<input name="shippingCostArs" type="number" min="0" max="2000000000" step="1" required defaultValue={activeOrder.shippingCostArs ?? ''} placeholder="Ej. 8500" /></label>
+                <label>Costo real pagado al transporte (ARS)<input name="shippingInternalCostArs" type="number" min="0" max="2000000000" step="1" defaultValue={activeOrder.shippingInternalCostArs ?? ''} placeholder="Lo que te cobró el correo" /></label>
                 <label>Correo / transporte<input name="shippingCarrier" maxLength={100} defaultValue={activeOrder.shippingCarrier ?? ''} placeholder="Ej. Correo Argentino" /></label>
                 <label className="tracking-field">Código de seguimiento<input name="trackingCode" maxLength={120} defaultValue={activeOrder.trackingCode ?? ''} placeholder="Código de envío" /></label>
               </div>
@@ -671,6 +680,7 @@ export default function AdminOrders() {
               <div><span className="admin-kicker">ENTREGA LOCAL</span><h3>Datos de entrega (todos opcionales)</h3><p>Si la entrega la hacés vos, no necesitás completar nada. Registrá cadetería, Uber o una referencia solo cuando te resulte útil.</p></div>
               <div className="order-shipping-fields">
                 <label>Medio de entrega<input name="shippingCarrier" maxLength={100} defaultValue={activeOrder.shippingCarrier ?? ''} placeholder="Ej. Propia, cadetería, Uber..." /></label>
+                <label>Costo real de entrega (ARS)<input name="shippingInternalCostArs" type="number" min="0" max="2000000000" step="1" defaultValue={activeOrder.shippingInternalCostArs ?? ''} placeholder="Costo que pagaste" /></label>
                 <label className="tracking-field">Referencia / identificación<input name="trackingCode" maxLength={120} defaultValue={activeOrder.trackingCode ?? ''} placeholder="Ej. nombre del cadete o referencia" /></label>
                 <label className="tracking-field">Observación (opcional)<input name="deliveryNote" maxLength={500} placeholder="Ej. Entrega coordinada para la tarde" /></label>
               </div>
