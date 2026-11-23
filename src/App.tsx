@@ -230,10 +230,10 @@ export default function App() {
             <p>Una selección de productos reales de nuestra tienda, para descubrir algo nuevo.</p>
           </div>
           <div className="category-showcase-grid">
-            {categories.filter((item) => item !== 'Todos').map((item) => ({
-              name: item,
-              product: products.find((product) => product.category === item && product.image),
-            })).filter((item) => item.product).slice(0, 4).map(({ name, product }, index) => (
+            {categories.filter((item) => item !== 'Todos').flatMap((name) => {
+              const product = products.find((item) => item.category === name && item.image)
+              return product ? [{ name, product }] : []
+            }).slice(0, 4).map(({ name, product }, index) => (
                 <button
                   className={`category-showcase-card category-showcase-card-${index + 1}`}
                   key={name}
