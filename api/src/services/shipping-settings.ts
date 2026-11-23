@@ -54,12 +54,20 @@ export async function getStoredAndreaniCredentials() {
   }
 }
 
+export function toPublicPickupSettings(settings: { pickupEnabled: boolean }) {
+  return {
+    enabled: settings.pickupEnabled,
+    instructions: 'La dirección y el horario se coordinarán después de confirmar la compra.',
+    priceArs: 0,
+  }
+}
+
 export async function getShippingSettingsPublic() {
   const settings = await getShippingSettings()
   const ocaConfigured = Boolean(settings.ocaUsernameEncrypted && settings.ocaPasswordEncrypted && settings.ocaCuitEncrypted && settings.ocaOperativeEncrypted)
   const andreaniConfigured = Boolean(settings.andreaniUsernameEncrypted && settings.andreaniPasswordEncrypted && settings.andreaniClientCodeEncrypted && settings.andreaniContractEncrypted)
   return {
-    pickup: { enabled: settings.pickupEnabled, instructions: 'La dirección y el horario se coordinarán después de confirmar la compra.', priceArs: 0 },
+    pickup: toPublicPickupSettings(settings),
     localDelivery: {
       enabled: settings.localDeliveryEnabled,
       postalCodes: settings.localDeliveryPostalCodes,
