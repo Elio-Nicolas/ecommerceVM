@@ -73,3 +73,12 @@
 .sales-pending-action{display:inline-block;margin-top:12px;padding:8px 11px;background:#26394c;color:#fff;text-decoration:none;font-size:9px;font-weight:800;border-radius:2px}
 .sales-pending-empty{padding:22px;color:#8b969f;font-size:10px}
 @media(max-width:850px){.sales-pending-list{grid-template-columns:1fr}}
+
+.sales-coverage{display:flex;flex-direction:column;gap:12px;padding:16px 18px;margin:0 0 20px;background:#f5f7f9;border:1px solid #e4e9ed}
+.sales-coverage>div:first-child{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sales-coverage strong{font:800 11px Manrope;color:#273542}
+.sales-coverage span{font-size:9px;color:#75818b}
+.sales-coverage-track{height:8px;background:#e1e6ea;border-radius:2px;overflow:hidden}
+.sales-coverage-track i{display:block;height:100%;background:#5b9a83}
+.sales-cost-missing{display:inline-block;padding:4px 7px;background:#fff1d4;color:#8a641d;font-size:8px;font-weight:800;border-radius:2px}
+.sales-method-table td small{display:block;font-size:8px;color:#909aa3;margin-top:4px}
