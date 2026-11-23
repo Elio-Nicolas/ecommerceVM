@@ -388,7 +388,7 @@ export default function CheckoutPage({ cart, subtotal, onBack, onFinish, onOrder
             {!deliveryMethods ? <p className="checkout-shipping-hint">Consultando modalidades disponibles...</p> : <div className="checkout-shipping-options">
               {deliveryMethods.pickup.enabled && <label className={deliveryMethod === 'PICKUP' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
                 <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'PICKUP'} onClick={(event) => { if (deliveryMethod === 'PICKUP') { event.preventDefault(); setDeliveryMethod('') } }} onChange={() => setDeliveryMethod('PICKUP')} />
-                <span className="checkout-shipping-option-copy"><strong>Retirar por domicilio del vendedor</strong><small>{deliveryMethods.pickup.instructions}</small></span><strong className="checkout-shipping-price">Sin cargo</strong>
+                <span className="checkout-shipping-option-copy"><strong>Retiro coordinado</strong><small>{deliveryMethods.pickup.instructions}</small></span><strong className="checkout-shipping-price">Sin cargo</strong>
               </label>}
               {deliveryMethods.localDelivery.enabled && <label className={deliveryMethod === 'LOCAL_DELIVERY' ? 'checkout-shipping-option selected' : 'checkout-shipping-option'}>
                 <input type="radio" name="deliveryMethod" checked={deliveryMethod === 'LOCAL_DELIVERY'} onClick={(event) => { if (deliveryMethod === 'LOCAL_DELIVERY') { event.preventDefault(); setDeliveryMethod('') } }} onChange={() => setDeliveryMethod('LOCAL_DELIVERY')} />
