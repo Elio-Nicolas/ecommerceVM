@@ -105,6 +105,53 @@ adminSalesRouter.get('/', async (req, res) => {
     }
   }
 
+  // Unpaid orders stay visible for operational follow-up; they never enter sales totals.
+  const pendingOrders = await prisma.order.findMany({
+    where: {
+      status: { not: 'CANCELLED' },
+      paymentReceivedAt: null,
+      paymentAttempts: { none: { status: { in: [...paidStatuses] } } },
+    },
+    select: {
+      id: true,
+      code: true,
+      customerName: true,
+      customerPhone: true,
+      paymentMethod: true,
+      subtotalArs: true,
+      totalArs: true,
+      status: true,
+      createdAt: true,
+      paymentAttempts: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        select: { provider: true, status: true, statusDetail: true, amountArs: true, createdAt: true, lastError: true },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 200,
+  })
+
   const report = buildSalesReport(transactions)
-  res.json({ data: { period: { from: range.from, to: range.to, days: range.days }, ...report } })
+  res.json({ data: {
+    period: { from: range.from, to: range.to, days: range.days },
+    ...report,
+    pendingPayments: pendingOrders.map((order) => {
+      const attempt = order.paymentAttempts[0] || null
+      return {
+        orderId: order.id,
+        orderCode: order.code,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        paymentMethod: attempt?.provider || order.paymentMethod,
+        amountArs: attempt?.amountArs ?? order.totalArs ?? order.subtotalArs,
+        orderStatus: order.status,
+        paymentStatus: attempt?.status || 'WAITING_FOR_PAYMENT',
+        statusDetail: attempt?.statusDetail || null,
+        lastError: attempt?.lastError || null,
+        createdAt: order.createdAt,
+        lastAttemptAt: attempt?.createdAt || null,
+      }
+    }),
+  } })
 })
