@@ -238,6 +238,9 @@ export default function AdminSales() {
                 })}
                 <div className="sales-chart-legend"><span><i className="sales-bar-mp" /> Mercado Pago</span><span><i className="sales-bar-gc" /> GOcuotas</span><span><i className="sales-bar-cash" /> Efectivo / a coordinar</span></div>
               </div>}
+              {report.byDay.length > 0 && <div className="admin-table-scroll"><table className="admin-table sales-daily-table"><thead><tr><th>DÍA</th><th>MERCADO PAGO</th><th>GOCUOTAS</th><th>EFECTIVO / A COORDINAR</th><th>TOTAL</th></tr></thead><tbody>
+                {report.byDay.map((day) => <tr key={day.date}><td>{formatDate(`${day.date}T12:00:00-03:00`)}</td><td>{formatPrice(day.MERCADO_PAGO)}</td><td>{formatPrice(day.GOCUOTAS)}</td><td>{formatPrice(day.CASH)}</td><td className="admin-price">{formatPrice(day.totalArs)}</td></tr>)}
+              </tbody></table></div>}
             </section>
 
             <section className="sales-section-card">
@@ -249,7 +252,7 @@ export default function AdminSales() {
               {visibleTransactions.length === 0 ? <div className="admin-table-empty">No hay operaciones que coincidan con los filtros.</div> : <div className="admin-table-scroll"><table className="admin-table sales-detail-table"><thead><tr><th>FECHA DE COBRO</th><th>PEDIDO / CLIENTE</th><th>MEDIO</th><th>ARTÍCULOS</th><th>IMPORTE</th><th>REINTEGRO</th><th>ESTADO PEDIDO</th></tr></thead><tbody>
                 {visibleTransactions.map((item) => <tr key={item.id}>
                   <td>{formatDate(item.paidAt, true)}</td>
-                  <td><strong>{item.orderCode}</strong><small>{item.customerName} · {item.customerPhone}</small></td>
+                  <td><strong>{item.orderCode}</strong><small>{item.customerName} · {item.customerPhone}</small><button type="button" className="sales-open-order" onClick={() => window.location.assign(`/admin/pedidos?q=${encodeURIComponent(item.orderCode)}`)}>Ver pedido</button></td>
                   <td>{methodLabels[item.paymentMethod]}<small>{item.providerReference ? `Ref. ${item.providerReference}` : item.paymentStatus === 'RECEIVED' ? 'Cobro registrado por administración' : item.paymentStatus}</small></td>
                   <td><div className="sales-item-list">{item.items.map((line, index) => <span key={`${item.id}-${index}`}>{line.quantity} × {line.productName}</span>)}</div></td>
                   <td className="admin-price">{formatPrice(item.amountArs)}</td>
