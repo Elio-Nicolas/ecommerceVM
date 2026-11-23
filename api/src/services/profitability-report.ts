@@ -32,7 +32,7 @@ export function buildProfitabilityReport(orders: ProfitabilityOrder[]) {
     sum + (order.deliveryMethod === 'PICKUP' ? 0 : order.shippingInternalCostArs ?? 0), 0)
   const completeRevenueArs = completeOrders.reduce((sum, order) => sum + order.subtotalArs + (order.shippingCostArs ?? 0), 0)
   const products = new Map<string, { productName: string; productSku: string; quantity: number; revenueArs: number; costArs: number | null }>()
-  for (const order of active) {
+  for (const order of active.filter((item) => !item.partiallyRefunded)) {
     for (const item of order.items) {
       const key = item.productSku
       const current = products.get(key) || { productName: item.productName, productSku: item.productSku, quantity: 0, revenueArs: 0, costArs: 0 }
