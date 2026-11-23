@@ -76,6 +76,7 @@ model Product {
   name String
   description String
   priceArs Int
+  costPriceArs Int?
   compareAtArs Int?
   stock Int @default(0)
   weightGrams Int?
@@ -321,6 +322,7 @@ model OrderItem {
   productName String
   productSku String
   unitPriceArs Int
+  unitCostArs Int?
   quantity Int
   lineTotalArs Int
   weightGrams Int?
