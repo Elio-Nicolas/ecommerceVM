@@ -13,6 +13,7 @@ const productSchema = z.object({
   name: z.string().trim().min(2).max(160),
   description: z.string().trim().min(5).max(5000),
   priceArs: z.number().int().min(1).max(2000000000),
+  costPriceArs: z.number().int().min(0).max(2000000000).nullable().optional(),
   compareAtArs: z.number().int().min(1).max(2000000000).nullable().optional(),
   stock: z.number().int().min(0).max(1000000),
   weightGrams: z.number().int().min(1).max(1000000).nullable().optional(),

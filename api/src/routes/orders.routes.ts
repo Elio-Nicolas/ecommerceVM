@@ -124,7 +124,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           paymentSurchargeMilliPercent: previousOrder.paymentSurchargeMilliPercent,
           paymentSurchargeArs: previousOrder.paymentSurchargeArs,
           createdAt: previousOrder.createdAt,
-          items: previousOrder.items,
+          items: previousOrder.items.map(({ unitCostArs: _privateCost, ...item }) => item),
         },
         deliveryMethod: previousOrder.deliveryMethod,
         message: 'El pedido ya estaba registrado. No se creó un duplicado.',
@@ -195,7 +195,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
 
       const products = await tx.product.findMany({
         where: { id: { in: input.items.map((item) => item.productId) }, status: 'ACTIVE' },
-        select: { id: true, sku: true, name: true, priceArs: true, stock: true, weightGrams: true, packageLengthCm: true, packageWidthCm: true, packageHeightCm: true },
+        select: { id: true, sku: true, name: true, priceArs: true, costPriceArs: true, stock: true, weightGrams: true, packageLengthCm: true, packageWidthCm: true, packageHeightCm: true },
       })
       if (products.length !== input.items.length) {
         throw new OrderConflictError('Uno o más productos ya no están disponibles. Actualizá el carrito.')
@@ -216,6 +216,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           productName: product.name,
           productSku: product.sku,
           unitPriceArs: product.priceArs,
+          unitCostArs: product.costPriceArs,
           quantity: item.quantity,
           lineTotalArs: product.priceArs * item.quantity,
           weightGrams: product.weightGrams,
@@ -302,7 +303,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         paymentSurchargeMilliPercent: order.paymentSurchargeMilliPercent,
         paymentSurchargeArs: order.paymentSurchargeArs,
         createdAt: order.createdAt,
-        items: order.items,
+        items: order.items.map(({ unitCostArs: _privateCost, ...item }) => item),
       },
       deliveryMethod: order.deliveryMethod,
       message: 'Pedido registrado correctamente.'
@@ -336,7 +337,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
             shippingCostArs: previousOrder.shippingCostArs,
             totalArs: previousOrder.totalArs,
             createdAt: previousOrder.createdAt,
-            items: previousOrder.items,
+            items: previousOrder.items.map(({ unitCostArs: _privateCost, ...item }) => item),
           },
           deliveryMethod: previousOrder.deliveryMethod,
           message: 'El pedido ya estaba registrado. No se creó un duplicado.',

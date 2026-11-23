@@ -45,7 +45,7 @@ productsRouter.get('/', async (req, res) => {
   ])
 
   res.json({
-    data: items,
+    data: items.map(({ costPriceArs: _privateCost, ...item }) => item),
     pagination: {
       page: query.page,
       limit: query.limit,
@@ -66,5 +66,6 @@ productsRouter.get('/:slug', async (req, res) => {
     return
   }
 
-  res.json({ data: product })
+  const { costPriceArs: _privateCost, ...publicProduct } = product
+  res.json({ data: publicProduct })
 })

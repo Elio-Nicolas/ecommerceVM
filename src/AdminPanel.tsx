@@ -12,19 +12,19 @@ type Category = { id: string; name: string; slug: string; description?: string |
 type ProductStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED'
 type Product = {
   id: string; sku: string; slug: string; name: string; description: string
-  priceArs: number; compareAtArs: number | null; stock: number
+  priceArs: number; costPriceArs: number | null; compareAtArs: number | null; stock: number
   weightGrams: number | null; packageLengthCm: number | null; packageWidthCm: number | null; packageHeightCm: number | null; status: ProductStatus
   featured: boolean; badge: string | null; imageUrl: string | null; specs: string[]
   categoryId: string; category: { id: string; name: string }
 }
 type ProductForm = {
   sku: string; slug: string; name: string; description: string
-  priceArs: string; compareAtArs: string; stock: string
+  priceArs: string; costPriceArs: string; compareAtArs: string; stock: string
   weightGrams: string; packageLengthCm: string; packageWidthCm: string; packageHeightCm: string; status: ProductStatus
   featured: boolean; badge: string; imageUrl: string; specs: string; categoryId: string
 }
 const emptyForm: ProductForm = {
-  sku: '', slug: '', name: '', description: '', priceArs: '', compareAtArs: '',
+  sku: '', slug: '', name: '', description: '', priceArs: '', costPriceArs: '', compareAtArs: '',
   stock: '0', weightGrams: '', packageLengthCm: '', packageWidthCm: '', packageHeightCm: '', status: 'DRAFT', featured: false, badge: '', imageUrl: '', specs: '', categoryId: '',
 }
 
@@ -45,7 +45,7 @@ async function request<T>(path: string, token?: string, init?: RequestInit): Pro
 function toForm(product: Product): ProductForm {
   return {
     sku: product.sku, slug: product.slug, name: product.name, description: product.description,
-    priceArs: String(product.priceArs), compareAtArs: product.compareAtArs == null ? '' : String(product.compareAtArs),
+    priceArs: String(product.priceArs), costPriceArs: product.costPriceArs == null ? '' : String(product.costPriceArs), compareAtArs: product.compareAtArs == null ? '' : String(product.compareAtArs),
     stock: String(product.stock), weightGrams: product.weightGrams == null ? '' : String(product.weightGrams),
     packageLengthCm: product.packageLengthCm == null ? '' : String(product.packageLengthCm),
     packageWidthCm: product.packageWidthCm == null ? '' : String(product.packageWidthCm),
@@ -193,6 +193,7 @@ export default function AdminPanel() {
     const payload = {
       sku: form.sku.trim(), slug: form.slug.trim(), name: form.name.trim(),
       description: form.description.trim(), priceArs: Number(form.priceArs),
+      costPriceArs: form.costPriceArs.trim() ? Number(form.costPriceArs) : null,
       compareAtArs: form.compareAtArs.trim() ? Number(form.compareAtArs) : null,
       stock: Number(form.stock),
       weightGrams: form.weightGrams.trim() ? Number(form.weightGrams) : null,
@@ -319,6 +320,7 @@ export default function AdminPanel() {
         <a className="admin-nav-item active" href="/admin"><span className="admin-nav-icon">▦</span> Productos</a>
         <a className="admin-nav-item" href="/admin/pedidos"><span className="admin-nav-icon">▤</span> Pedidos</a>
         <a className="admin-nav-item" href="/admin/ventas"><span className="admin-nav-icon">▥</span> Ventas</a>
+        <a className="admin-nav-item" href="/admin/rentabilidad"><span className="admin-nav-icon">▧</span> Rentabilidad</a>
         <div className="admin-sidebar-bottom"><span className="admin-avatar">{adminEmail.slice(0, 1).toUpperCase()}</span><div><strong>{adminEmail}</strong><small>Administrador</small></div><button onClick={logout} title="Cerrar sesión">↗</button></div>
       </aside>
 
@@ -357,6 +359,7 @@ export default function AdminPanel() {
                 <label>Slug / URL<input value={form.slug} onChange={(event) => updateField('slug', slugify(event.target.value))} required /></label>
                 <label>Categoría<select value={form.categoryId} onChange={(event) => updateField('categoryId', event.target.value)} required><option value="">Seleccionar categoría</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
                 <label>Precio (ARS)<input type="number" min="1" step="1" value={form.priceArs} onChange={(event) => updateField('priceArs', event.target.value)} required /></label>
+                <label>Costo de compra (ARS)<input type="number" min="0" step="1" value={form.costPriceArs} onChange={(event) => updateField('costPriceArs', event.target.value)} placeholder="Lo que pagaste al proveedor" /><small>Se usa para calcular rentabilidad. No se muestra en la tienda.</small></label>
                 <label>Precio anterior (ARS)<input type="number" min="1" step="1" value={form.compareAtArs} onChange={(event) => updateField('compareAtArs', event.target.value)} /></label>
                 <label>Stock disponible<input type="number" min="0" step="1" value={form.stock} onChange={(event) => updateField('stock', event.target.value)} required /></label>
                 {editing && form.status === 'ACTIVE' && form.stock === '0' && <div className="admin-full-field"><small>El producto seguirá publicado, pero no podrá agregarse al carrito. Para reponerlo, ingresá la nueva cantidad disponible.</small></div>}
