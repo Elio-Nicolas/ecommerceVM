@@ -230,20 +230,20 @@ export default function App() {
             <p>Una selección de productos reales de nuestra tienda, para descubrir algo nuevo.</p>
           </div>
           <div className="category-showcase-grid">
-            {categories.filter((item) => item !== 'Todos').slice(0, 4).map((item, index) => {
-              const sample = products.find((product) => product.category === item && product.image) ?? products.find((product) => product.image)
-              return (
+            {categories.filter((item) => item !== 'Todos').map((item) => ({
+              name: item,
+              product: products.find((product) => product.category === item && product.image),
+            })).filter((item) => item.product).slice(0, 4).map(({ name, product }, index) => (
                 <button
                   className={`category-showcase-card category-showcase-card-${index + 1}`}
-                  key={item}
-                  onClick={() => { setCategory(item); document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' }) }}
+                  key={name}
+                  onClick={() => { setCategory(name); document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' }) }}
                 >
-                  {sample && <img src={sample.image} alt="" loading="lazy" />}
+                  <img src={product.image} alt={product.name} loading="lazy" />
                   <span className="category-showcase-overlay" />
-                  <span className="category-showcase-copy"><small>DESCUBRÍ</small><strong>{item}</strong><span>Ver productos <ArrowIcon /></span></span>
+                  <span className="category-showcase-copy"><small>DESCUBRÍ</small><strong>{name}</strong><span>Ver productos <ArrowIcon /></span></span>
                 </button>
-              )
-            })}
+            ))}
           </div>
         </section>
 
