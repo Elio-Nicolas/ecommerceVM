@@ -30,7 +30,7 @@ adminProfitabilityRouter.get('/', async (req, res) => {
       ],
     },
     select: {
-      id: true, code: true, subtotalArs: true, shippingCostArs: true, shippingInternalCostArs: true,
+      id: true, code: true, paymentMethod: true, subtotalArs: true, shippingCostArs: true, shippingInternalCostArs: true,
       deliveryMethod: true, paymentReceivedAt: true,
       items: { select: { productName: true, productSku: true, quantity: true, lineTotalArs: true, unitCostArs: true } },
       cancellationRequest: { select: { status: true, providerStatus: true } },
