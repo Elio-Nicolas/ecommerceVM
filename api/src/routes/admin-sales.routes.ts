@@ -83,7 +83,7 @@ adminSalesRouter.get('/', async (req, res) => {
       }
     }
     for (const attempt of order.paymentAttempts) {
-      if (!attempt.approvedAt) continue
+      if (!attempt.approvedAt || !['MERCADO_PAGO', 'GOCUOTAS'].includes(attempt.provider)) continue
       const method: SalesPaymentMethod = attempt.provider === 'GOCUOTAS' ? 'GOCUOTAS' : 'MERCADO_PAGO'
       transactions.push({
         id: attempt.id,
