@@ -129,7 +129,6 @@ adminSalesRouter.get('/', async (req, res) => {
       },
     },
     orderBy: { createdAt: 'asc' },
-    take: 200,
   })
 
   const report = buildSalesReport(transactions)
