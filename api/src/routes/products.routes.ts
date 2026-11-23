@@ -40,12 +40,12 @@ productsRouter.get('/', async (req, res) => {
       skip,
       take: query.limit,
       include: { category: true },
-    }).then((items) => items.map(({ costPriceArs: _privateCost, ...item }) => item)),
+    }),
     prisma.product.count({ where }),
   ])
 
   res.json({
-    data: items,
+    data: items.map(({ costPriceArs: _privateCost, ...item }) => item),
     pagination: {
       page: query.page,
       limit: query.limit,
