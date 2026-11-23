@@ -547,6 +547,7 @@ export default function AdminOrders() {
         <a className="admin-nav-item" href="/admin"><span className="admin-nav-icon">▦</span> Productos</a>
         <a className="admin-nav-item active" href="/admin/pedidos"><span className="admin-nav-icon">▤</span> Pedidos</a>
         <a className="admin-nav-item" href="/admin/ventas"><span className="admin-nav-icon">▥</span> Ventas</a>
+        <a className="admin-nav-item" href="/admin/rentabilidad"><span className="admin-nav-icon">▧</span> Rentabilidad</a>
         <div className="admin-sidebar-bottom"><span className="admin-avatar">A</span><div><strong>Sesión administrativa</strong><small>Administrador</small></div><button onClick={() => { setToken(''); localStorage.removeItem(TOKEN_KEY); window.location.replace('/admin') }} title="Cerrar sesión">↗</button></div>
       </aside>
 
