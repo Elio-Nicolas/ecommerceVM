@@ -690,6 +690,7 @@ export default function AdminOrders() {
               <div><span className="admin-kicker">ENTREGA LOCAL</span><h3>Registrar costo acordado</h3><p>Ingresá el importe que se coordinó con el comprador. Se sumará al total final del pedido; no requiere transportista ni seguimiento.</p></div>
               <div className="order-shipping-fields">
                 <label>Precio de entrega acordado (ARS)<input name="shippingCostArs" type="number" min="0" max="2000000000" step="1" required placeholder="Ej. 2500" /></label>
+                <label>Costo real de entrega (ARS)<input name="shippingInternalCostArs" type="number" min="0" max="2000000000" step="1" defaultValue={activeOrder.shippingInternalCostArs ?? ''} placeholder="Lo que pagaste al cadete" /></label>
               </div>
               <button className="admin-primary" type="submit" disabled={shippingSaving}>{shippingSaving ? 'Guardando costo...' : 'Guardar costo acordado'}</button>
             </form>}
