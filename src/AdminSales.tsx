@@ -40,6 +40,7 @@ type PendingPayment = {
   customerPhone: string
   paymentMethod: string
   amountArs: number
+  amountEstimated: boolean
   orderStatus: string
   paymentStatus: string
   statusDetail: string | null
@@ -231,7 +232,7 @@ export default function AdminSales() {
                   const statusLabel: Record<string, string> = { CREATING: 'Iniciando pago', PENDING: 'Esperando confirmación', UNKNOWN: 'Estado incierto · verificar', REJECTED: 'Pago rechazado', CANCELLED: 'Intento cancelado', WAITING_FOR_PAYMENT: 'Sin pago iniciado' }
                   return <article className="sales-pending-row" key={item.orderId}>
                     <div className="sales-pending-main"><div><strong>{item.orderCode}</strong><span>{item.customerName} · {item.customerPhone}</span></div><span className="sales-pending-status">{statusLabel[item.paymentStatus] || item.paymentStatus}</span></div>
-                    <div className="sales-pending-meta"><span>{paymentLabel}</span><strong>{formatPrice(item.amountArs)}</strong><small>Pedido {formatDate(item.createdAt, true)} · {orderStatusLabels[item.orderStatus] || item.orderStatus}</small>{item.statusDetail && <small>Detalle: {item.statusDetail}</small>}{item.lastError && <small className="sales-pending-error">Último error: {item.lastError}</small>}</div>
+                    <div className="sales-pending-meta"><span>{paymentLabel}</span><strong>{formatPrice(item.amountArs)}</strong><small>{item.amountEstimated ? 'Subtotal provisional; falta coordinar el envío' : 'Importe del pedido'}</small><small>Pedido {formatDate(item.createdAt, true)} · {orderStatusLabels[item.orderStatus] || item.orderStatus}</small>{item.statusDetail && <small>Detalle: {item.statusDetail}</small>}{item.lastError && <small className="sales-pending-error">Último error: {item.lastError}</small>}</div>
                     <a className="sales-pending-action" href={`/admin/pedidos?q=${encodeURIComponent(item.orderCode)}`}>Revisar pedido ↗</a>
                   </article>
                 })}
