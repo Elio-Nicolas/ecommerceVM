@@ -33,7 +33,23 @@ type MethodSummary = {
   netAfterFullRefundsArs: number
   partialRefunds: number
 }
+type PendingPayment = {
+  orderId: string
+  orderCode: string
+  customerName: string
+  customerPhone: string
+  paymentMethod: string
+  amountArs: number
+  amountEstimated: boolean
+  orderStatus: string
+  paymentStatus: string
+  statusDetail: string | null
+  lastError: string | null
+  createdAt: string
+  lastAttemptAt: string | null
+}
 type Report = {
+  pendingPayments: PendingPayment[]
   period: { from: string; to: string; days: number }
   summary: {
     grossCollectedArs: number
@@ -207,6 +223,21 @@ export default function AdminSales() {
           {error && <div className="admin-alert error">{error}</div>}
           {loading && !report ? <div className="admin-table-empty">Consultando operaciones...</div> : report && <>
             <div className="sales-report-meta"><span>PERÍODO ANALIZADO</span><strong>{formatDate(`${report.period.from}T12:00:00-03:00`)} {report.period.from !== report.period.to ? `— ${formatDate(`${report.period.to}T12:00:00-03:00`)}` : ''}</strong><small>{report.period.days} día(s) · importes en pesos argentinos</small></div>
+
+            <section className="sales-section-card sales-pending-card">
+              <div className="sales-section-heading"><div><h2>Pagos pendientes de resolución</h2><p>Pedidos sin cobro confirmado. Revisalos y actuá desde el pedido; no se suman a las ventas cobradas.</p></div><span className="sales-pending-count">{report.pendingPayments.length} pendientes</span></div>
+              {report.pendingPayments.length === 0 ? <div className="sales-pending-empty">No hay pedidos pendientes de cobro.</div> : <div className="sales-pending-list">
+                {report.pendingPayments.map((item) => {
+                  const paymentLabel = item.paymentMethod === 'MERCADO_PAGO' ? 'Mercado Pago' : item.paymentMethod === 'GOCUOTAS' ? 'GOcuotas' : item.paymentMethod === 'CASH' ? 'Efectivo / a coordinar' : item.paymentMethod
+                  const statusLabel: Record<string, string> = { CREATING: 'Iniciando pago', PENDING: 'Esperando confirmación', UNKNOWN: 'Estado incierto · verificar', REJECTED: 'Pago rechazado', CANCELLED: 'Intento cancelado', WAITING_FOR_PAYMENT: 'Sin pago iniciado' }
+                  return <article className="sales-pending-row" key={item.orderId}>
+                    <div className="sales-pending-main"><div><strong>{item.orderCode}</strong><span>{item.customerName} · {item.customerPhone}</span></div><span className="sales-pending-status">{statusLabel[item.paymentStatus] || item.paymentStatus}</span></div>
+                    <div className="sales-pending-meta"><span>{paymentLabel}</span><strong>{formatPrice(item.amountArs)}</strong><small>{item.amountEstimated ? 'Subtotal provisional; falta coordinar el envío' : 'Importe del pedido'}</small><small>Pedido {formatDate(item.createdAt, true)} · {orderStatusLabels[item.orderStatus] || item.orderStatus}</small>{item.statusDetail && <small>Detalle: {item.statusDetail}</small>}{item.lastError && <small className="sales-pending-error">Último error: {item.lastError}</small>}</div>
+                    <a className="sales-pending-action" href={`/admin/pedidos?q=${encodeURIComponent(item.orderCode)}`}>Revisar pedido ↗</a>
+                  </article>
+                })}
+              </div>}
+            </section>
 
             <div className="sales-kpis">
               <article><span>COBRADO BRUTO</span><strong>{formatPrice(report.summary.grossCollectedArs)}</strong><small>{report.summary.transactions} operaciones cobradas</small></article>
