@@ -79,7 +79,7 @@ export default function AdminOrders() {
   const [checking, setChecking] = useState(true)
   const [orders, setOrders] = useState<Order[]>([])
   const [status, setStatus] = useState('ALL')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get('q') || '')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
