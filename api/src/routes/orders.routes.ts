@@ -124,7 +124,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           paymentSurchargeMilliPercent: previousOrder.paymentSurchargeMilliPercent,
           paymentSurchargeArs: previousOrder.paymentSurchargeArs,
           createdAt: previousOrder.createdAt,
-          items: previousOrder.items,
+          items: previousOrder.items.map(({ unitCostArs: _privateCost, ...item }) => item),
         },
         deliveryMethod: previousOrder.deliveryMethod,
         message: 'El pedido ya estaba registrado. No se creó un duplicado.',
@@ -303,7 +303,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
         paymentSurchargeMilliPercent: order.paymentSurchargeMilliPercent,
         paymentSurchargeArs: order.paymentSurchargeArs,
         createdAt: order.createdAt,
-        items: order.items,
+        items: order.items.map(({ unitCostArs: _privateCost, ...item }) => item),
       },
       deliveryMethod: order.deliveryMethod,
       message: 'Pedido registrado correctamente.'
