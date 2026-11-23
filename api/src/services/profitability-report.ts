@@ -21,7 +21,7 @@ export function buildProfitabilityReport(orders: ProfitabilityOrder[]) {
   const completeOrders = active.filter((order) =>
     !order.partiallyRefunded
     && order.items.every((item) => item.unitCostArs !== null)
-    && (order.deliveryMethod === 'PICKUP' || order.shippingInternalCostArs !== null),
+    && (order.deliveryMethod === 'PICKUP' || (order.shippingCostArs !== null && order.shippingInternalCostArs !== null)),
   )
   const completeIds = new Set(completeOrders.map((order) => order.orderId))
   const knownProductCostArs = active.reduce((sum, order) => sum + order.items.reduce((lineSum, item) =>
