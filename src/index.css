@@ -463,10 +463,10 @@
 .category-showcase-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}
 .category-showcase-card{
   position:relative;isolation:isolate;display:block;overflow:hidden;min-width:0;height:245px;padding:0;
-  border:0;border-radius:12px;background:#142130;text-align:left;color:#fff;cursor:pointer
+  border:0;border-radius:12px;background:#f1f4f6;text-align:left;color:#fff;cursor:pointer
 }
-.category-showcase-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .55s cubic-bezier(.2,.7,.2,1),filter .4s}
-.category-showcase-card:hover img{transform:scale(1.07);filter:saturate(1.08)}
+.category-showcase-card img{position:absolute;inset:0;width:100%;height:100%;padding:20px 18px 54px;object-fit:contain;transition:transform .55s cubic-bezier(.2,.7,.2,1),filter .4s}
+.category-showcase-card:hover img{transform:scale(1.045);filter:saturate(1.08)}
 .category-showcase-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,20,34,.02) 15%,rgba(7,20,34,.78) 100%);transition:background .25s}
 .category-showcase-card:hover .category-showcase-overlay{background:linear-gradient(180deg,rgba(7,20,34,.08) 5%,rgba(7,20,34,.88) 100%)}
 .category-showcase-copy{position:absolute;left:19px;right:15px;bottom:18px;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
@@ -495,6 +495,12 @@
   .category-showcase-card{height:220px}
 }
 @media(max-width:650px){
+  .site-shell .hero{padding:28px 18px 34px;gap:22px}
+  .site-shell .hero h1{font-size:clamp(39px,11vw,49px);letter-spacing:-2.6px}
+  .site-shell .hero-visual{height:265px;border-radius:12px}
+  .site-shell .hero-visual .floating-tag{right:13px;bottom:13px;padding:11px 14px}
+  .site-shell .hero-visual .floating-tag strong{font-size:13px}
+  .site-shell .catalog-section{padding-top:58px}
   .hero{padding:28px 18px 34px;gap:22px}
   .hero h1{font-size:clamp(39px,11vw,49px);letter-spacing:-2.6px}
   .hero-visual{height:265px;border-radius:12px}
@@ -506,6 +512,7 @@
   .category-showcase-heading>p{margin-top:10px}
   .category-showcase-grid{gap:10px}
   .category-showcase-card{height:clamp(150px,48vw,205px);border-radius:9px}
+  .category-showcase-card img{padding:14px 10px 48px}
   .category-showcase-copy{left:12px;bottom:12px;right:9px}
   .category-showcase-copy strong{font-size:13px}
   .catalog-section{padding-top:58px}
