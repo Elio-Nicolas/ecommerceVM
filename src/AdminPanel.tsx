@@ -318,6 +318,7 @@ export default function AdminPanel() {
         <div className="admin-nav-label">GESTIÓN</div>
         <a className="admin-nav-item active" href="/admin"><span className="admin-nav-icon">▦</span> Productos</a>
         <a className="admin-nav-item" href="/admin/pedidos"><span className="admin-nav-icon">▤</span> Pedidos</a>
+        <a className="admin-nav-item" href="/admin/ventas"><span className="admin-nav-icon">▥</span> Ventas</a>
         <div className="admin-sidebar-bottom"><span className="admin-avatar">{adminEmail.slice(0, 1).toUpperCase()}</span><div><strong>{adminEmail}</strong><small>Administrador</small></div><button onClick={logout} title="Cerrar sesión">↗</button></div>
       </aside>
 
