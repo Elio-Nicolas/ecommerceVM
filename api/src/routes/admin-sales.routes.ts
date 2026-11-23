@@ -144,6 +144,7 @@ adminSalesRouter.get('/', async (req, res) => {
         customerPhone: order.customerPhone,
         paymentMethod: attempt?.provider || order.paymentMethod,
         amountArs: attempt?.amountArs ?? order.totalArs ?? order.subtotalArs,
+        amountEstimated: !attempt && order.totalArs === null,
         orderStatus: order.status,
         paymentStatus: attempt?.status || 'WAITING_FOR_PAYMENT',
         statusDetail: attempt?.statusDetail || null,
