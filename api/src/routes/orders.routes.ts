@@ -337,7 +337,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
             shippingCostArs: previousOrder.shippingCostArs,
             totalArs: previousOrder.totalArs,
             createdAt: previousOrder.createdAt,
-            items: previousOrder.items,
+            items: previousOrder.items.map(({ unitCostArs: _privateCost, ...item }) => item),
           },
           deliveryMethod: previousOrder.deliveryMethod,
           message: 'El pedido ya estaba registrado. No se creó un duplicado.',
