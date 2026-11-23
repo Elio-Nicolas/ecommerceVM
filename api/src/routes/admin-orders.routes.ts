@@ -82,6 +82,7 @@ adminOrdersRouter.get('/:id', async (req, res) => {
 adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
   const input = z.object({
     shippingCostArs: z.number().int().min(0).max(2_000_000_000).optional(),
+    shippingInternalCostArs: z.number().int().min(0).max(2_000_000_000).nullable().optional(),
     shippingCarrier: z.string().trim().max(100).nullable().optional().transform((value) => value || null),
     trackingCode: z.string().trim().max(120).nullable().optional().transform((value) => value || null),
     note: z.string().trim().max(500).optional(),
@@ -107,6 +108,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
         input.shippingCarrier ? `Medio de entrega: ${input.shippingCarrier}` : null,
         input.trackingCode ? `Referencia: ${input.trackingCode}` : null,
         input.note ? `Observación: ${input.note}` : null,
+        input.shippingInternalCostArs !== undefined ? `Costo logístico interno: ${input.shippingInternalCostArs === null ? 'sin informar' : input.shippingInternalCostArs.toLocaleString('es-AR')}` : null,
       ].filter(Boolean).join(' · ')
       if (!trackingDetails) {
         res.status(400).json({ error: { code: 'EMPTY_DELIVERY_UPDATE', message: 'Ingresá al menos un dato para guardar.' } })
@@ -116,7 +118,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
         await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
         await tx.order.update({
           where: { id: existing.id },
-          data: { shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode },
+          data: { shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode, ...(input.shippingInternalCostArs !== undefined ? { shippingInternalCostArs: input.shippingInternalCostArs } : {}) },
         })
         await tx.orderStatusHistory.create({
           data: {
@@ -168,7 +170,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       }
       await tx.order.update({
         where: { id: existing.id },
-        data: { shippingCostArs, totalArs: nextTotalArs, paymentSurchargeMilliPercent: pricing.surchargeRateMilliPercent, paymentSurchargeArs: pricing.surchargeArs, shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode },
+        data: { shippingCostArs, totalArs: nextTotalArs, paymentSurchargeMilliPercent: pricing.surchargeRateMilliPercent, paymentSurchargeArs: pricing.surchargeArs, shippingCarrier: input.shippingCarrier, trackingCode: input.trackingCode, ...(input.shippingInternalCostArs !== undefined ? { shippingInternalCostArs: input.shippingInternalCostArs } : {}) },
       })
       await tx.orderStatusHistory.create({
         data: {
@@ -228,6 +230,7 @@ adminOrdersRouter.patch('/:id/shipping', async (req, res) => {
       where: { id: existing.id },
       data: {
         shippingCostArs,
+        ...(input.shippingInternalCostArs !== undefined ? { shippingInternalCostArs: input.shippingInternalCostArs } : {}),
         totalArs: nextTotalArs,
         paymentSurchargeMilliPercent: pricing.surchargeRateMilliPercent,
         paymentSurchargeArs: pricing.surchargeArs,
