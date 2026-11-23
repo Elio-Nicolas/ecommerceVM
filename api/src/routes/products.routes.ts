@@ -40,7 +40,7 @@ productsRouter.get('/', async (req, res) => {
       skip,
       take: query.limit,
       include: { category: true },
-    }),
+    }).then((items) => items.map(({ costPriceArs: _privateCost, ...item }) => item)),
     prisma.product.count({ where }),
   ])
 
@@ -66,5 +66,6 @@ productsRouter.get('/:slug', async (req, res) => {
     return
   }
 
-  res.json({ data: product })
+  const { costPriceArs: _privateCost, ...publicProduct } = product
+  res.json({ data: publicProduct })
 })
