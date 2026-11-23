@@ -198,12 +198,22 @@ export default function App() {
             <a className="primary-button" href="#catalogo">Explorar productos <ArrowIcon /></a>
             <div className="hero-note"><span className="note-dot" /> Selección de productos prácticos y funcionales</div>
           </div>
-          <div className="hero-visual">
-            <div className="hero-orbit orbit-one" />
-            <div className="hero-orbit orbit-two" />
-            <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1100&q=90" alt="Dispositivos y tecnología retro" />
-            <div className="floating-tag"><span>IDEAS QUE</span><strong>INSPIRAN</strong></div>
-            <div className="hero-index">01 <span>/</span> 04</div>
+          <div className="hero-visual hero-video-visual">
+            <video
+              className="hero-video"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              poster="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1100&q=85"
+              aria-label="Tecnología y gadgets en un espacio de trabajo moderno"
+            >
+              <source src="https://videos.pexels.com/video-files/7661516/7661516-hd_1920_1080_25fps.mp4" type="video/mp4" />
+            </video>
+            <div className="hero-video-shade" />
+            <div className="floating-tag"><span>TECNOLOGÍA QUE</span><strong>TE ACOMPAÑA</strong></div>
+            <div className="hero-index">TU <span>/</span> VM</div>
           </div>
           <div className="hero-side-label">CURATED TECH · ARGENTINA</div>
         </section>
@@ -212,6 +222,29 @@ export default function App() {
           <div><span className="benefit-icon">01</span><p><strong>Elegidos con criterio</strong><small>Productos útiles, sin vueltas</small></p></div>
           <div><span className="benefit-icon">02</span><p><strong>Comprá desde donde estés</strong><small>Opciones de entrega según tu zona</small></p></div>
           <div><span className="benefit-icon">03</span><p><strong>Atención cercana</strong><small>Te ayudamos a elegir</small></p></div>
+        </section>
+
+        <section className="category-showcase" aria-label="Explorar categorías">
+          <div className="category-showcase-heading">
+            <div><div className="eyebrow"><span className="eyebrow-line" /> EXPLORÁ A TU MANERA</div><h2>Encontrá tu próximo <em>favorito.</em></h2></div>
+            <p>Una selección de productos reales de nuestra tienda, para descubrir algo nuevo.</p>
+          </div>
+          <div className="category-showcase-grid">
+            {categories.filter((item) => item !== 'Todos').slice(0, 4).map((item, index) => {
+              const sample = products.find((product) => product.category === item && product.image) ?? products.find((product) => product.image)
+              return (
+                <button
+                  className={`category-showcase-card category-showcase-card-${index + 1}`}
+                  key={item}
+                  onClick={() => { setCategory(item); document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' }) }}
+                >
+                  {sample && <img src={sample.image} alt="" loading="lazy" />}
+                  <span className="category-showcase-overlay" />
+                  <span className="category-showcase-copy"><small>DESCUBRÍ</small><strong>{item}</strong><span>Ver productos <ArrowIcon /></span></span>
+                </button>
+              )
+            })}
+          </div>
         </section>
 
         <section className="catalog-section" id="catalogo">
