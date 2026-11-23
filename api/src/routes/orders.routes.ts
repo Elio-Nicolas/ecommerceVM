@@ -195,7 +195,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
 
       const products = await tx.product.findMany({
         where: { id: { in: input.items.map((item) => item.productId) }, status: 'ACTIVE' },
-        select: { id: true, sku: true, name: true, priceArs: true, stock: true, weightGrams: true, packageLengthCm: true, packageWidthCm: true, packageHeightCm: true },
+        select: { id: true, sku: true, name: true, priceArs: true, costPriceArs: true, stock: true, weightGrams: true, packageLengthCm: true, packageWidthCm: true, packageHeightCm: true },
       })
       if (products.length !== input.items.length) {
         throw new OrderConflictError('Uno o más productos ya no están disponibles. Actualizá el carrito.')
@@ -216,6 +216,7 @@ ordersRouter.post('/', createOrderLimiter, async (req, res) => {
           productName: product.name,
           productSku: product.sku,
           unitPriceArs: product.priceArs,
+          unitCostArs: product.costPriceArs,
           quantity: item.quantity,
           lineTotalArs: product.priceArs * item.quantity,
           weightGrams: product.weightGrams,
