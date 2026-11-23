@@ -13,6 +13,7 @@ import { adminStorageRouter } from './routes/admin-storage.routes'
 import { ordersRouter } from './routes/orders.routes'
 import { adminOrdersRouter } from './routes/admin-orders.routes'
 import { adminSalesRouter } from './routes/admin-sales.routes'
+import { adminProfitabilityRouter } from './routes/admin-profitability.routes'
 import { adminShippingOriginsRouter } from './routes/admin-shipping-origins.routes'
 import { adminShippingSettingsRouter } from './routes/admin-shipping-settings.routes'
 import { adminPaymentSettingsRouter } from './routes/admin-payment-settings.routes'
@@ -46,6 +47,7 @@ app.use('/api/v1/admin/categories', adminCategoriesRouter)
 app.use('/api/v1/admin/storage', adminStorageRouter)
 app.use('/api/v1/admin/orders', adminOrdersRouter)
 app.use('/api/v1/admin/sales', adminSalesRouter)
+app.use('/api/v1/admin/profitability', adminProfitabilityRouter)
 app.use('/api/v1/admin/arca', adminArcaRouter)
 app.use('/api/v1/payments', paymentsRouter)
 app.use('/api/v1/payments/gocuotas', goCuotasRouter)
