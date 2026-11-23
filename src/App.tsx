@@ -291,9 +291,9 @@ export default function App() {
 
       <footer className="footer">
         <div className="footer-trust">
-          <div className="footer-trust-item"><span className="footer-trust-icon">✓</span><div><strong>Pagá con confianza</strong><small>El pago se procesa en Mercado Pago</small></div></div>
-          <div className="footer-trust-item"><span className="footer-trust-icon">⌖</span><div><strong>Somos de Villa Mercedes</strong><small>Atención y operación local</small></div></div>
-          <div className="footer-trust-item"><span className="footer-trust-icon">↗</span><div><strong>Elegí cómo recibirlo</strong><small>Retiro o entrega según tu zona</small></div></div>
+          <div className="footer-trust-item"><span className="footer-trust-icon">✓</span><div><strong>Comprá con confianza</strong><small>Pago online procesado de forma segura</small></div></div>
+          <div className="footer-trust-item"><span className="footer-trust-icon">⌖</span><div><strong>Estamos en Villa Mercedes</strong><small>Atención cercana y operación local</small></div></div>
+          <div className="footer-trust-item"><span className="footer-trust-icon">↗</span><div><strong>Elegí cómo recibir tu pedido</strong><small>Retiro o entrega según tu zona</small></div></div>
         </div>
         <div className="footer-main">
           <div className="footer-about">
@@ -301,37 +301,35 @@ export default function App() {
             <p>Tecnología práctica, accesorios y gadgets elegidos para hacer más simple tu día. Una tienda online nacida en Villa Mercedes.</p>
             <span className="footer-location"><span className="footer-location-dot" /> Villa Mercedes · San Luis · Argentina</span>
           </div>
-          <div className="footer-column">
-            <h3>Explorá</h3>
+          <nav className="footer-column" aria-label="Explorar tienda">
+            <h3>La tienda</h3>
             <a href="/#catalogo">Todos los productos</a>
-            <a href="/#catalogo">Categorías</a>
-            <a href="/#catalogo">Productos destacados</a>
-          </div>
+            <a href="/#catalogo">Nuestra selección</a>
+            <a href="/#catalogo">Explorar categorías</a>
+          </nav>
+          <nav className="footer-column" aria-label="Ayuda y atención">
+            <h3>Ayuda</h3>
+            <a href={WHATSAPP_URL} target="_blank" rel="noreferrer">Contactanos por WhatsApp</a>
+            <a href="/derecho-de-arrepentimiento">Derecho de arrepentimiento</a>
+            <a href="/arrepentimiento">Iniciar una solicitud</a>
+          </nav>
           <div className="footer-column">
             <h3>Tu compra</h3>
-            <a href="/#catalogo">Cómo comprar</a>
             <span>Pago online con Mercado Pago</span>
-            <span>Retiro o entrega local</span>
-            <span>Disponibilidad y costo informados al comprar</span>
-          </div>
-          <div className="footer-column">
-            <h3>Ayuda e información</h3>
-            <a href="/arrepentimiento">Botón de arrepentimiento</a>
-            <a href="/derecho-de-arrepentimiento">Derecho de arrepentimiento</a>
-            <a href={WHATSAPP_URL} target="_blank" rel="noreferrer">Contactanos por WhatsApp</a>
+            <span>Opciones de retiro y entrega</span>
+            <span>Costos informados antes de confirmar</span>
           </div>
         </div>
-        <div className="footer-note">
-          <span>Comprá online, elegí cómo recibir tu pedido y consultanos si necesitás ayuda.</span>
-          <span>Tu TiendaVM · Tecnología para tu día a día</span>
+        <div className="footer-legal">
+          <span>Defensa de las y los consumidores. Para reclamos, <a href="https://www.argentina.gob.ar/produccion/defensadelconsumidor/formulario" target="_blank" rel="noreferrer">ingresá acá</a>.</span>
+          <a className="footer-regret-link" href="/arrepentimiento">Botón de arrepentimiento <ArrowIcon /></a>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 IORed Software {'\uD83C\uDDE6\uD83C\uDDF7'}. Todos los derechos reservados.</span>
-          <span>Villa Mercedes, San Luis · Argentina</span>
+          <span>© 2026 IORed Software. Todos los derechos reservados.</span>
+          <span>Tu TiendaVM · Villa Mercedes, San Luis · Argentina</span>
         </div>
         <div className="floating-actions">
           <a className="whatsapp-floating-link" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Contactar a Tu TiendaVM por WhatsApp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.7a8.5 8.5 0 0 1-12.6 7.4L3 20.5l1.4-4.7A8.5 8.5 0 1 1 20.5 11.7Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/><path d="M8.2 7.8c-.3.4-.6.8-.5 1.4.2 1.1 1.4 3 3.1 4.2 1.2.9 2.5 1.4 3.1 1.2.5-.2 1-.8 1.1-1.2l-1.8-.9-.8.9c-.9-.4-1.8-1.2-2.3-2.1l.7-.9-.9-1.8c-.5-.2-1.3-.2-1.7.2Z" fill="currentColor"/></svg></a>
-          <a className="regret-floating-link" href="/arrepentimiento" aria-label="Botón de arrepentimiento de compra">Iniciar solicitud</a>
         </div>
       </footer>
 
