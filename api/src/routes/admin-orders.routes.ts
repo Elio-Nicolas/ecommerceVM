@@ -11,7 +11,7 @@ import { buildOcaAdmissionXml, OcaAdmissionXmlError } from '../services/oca-admi
 import { getOcaAdmissionDate, isCompleteOcaOriginBranch, isOcaOrderPaid, matchesOcaRecipient } from '../services/oca-admission-validation'
 import { getOcaAdmissionBranches } from '../services/oca-metadata'
 import { getStoredOcaCredentials } from '../services/shipping-settings'
-import { getPaymentCancellationBlock, hasUnresolvedOnlinePayment } from '../services/payment-cancellation-policy'
+import { getPaymentCancellationBlock, hasUnresolvedOnlinePayment, isManualPaymentBlockedByCancellation } from '../services/payment-cancellation-policy'
 import { getCancellationFulfillmentBlockMessage, isCancellationBlockingFulfillment } from '../services/fulfillment-policy'
 import { finalizePreDispatchRefund } from '../services/refund-finalization'
 import { acceptReturnedOrderStock } from '../services/return-acceptance'
@@ -448,7 +448,7 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
   }
   const existing = await prisma.order.findUnique({
     where: { id: orderId.data },
-    select: { id: true, paymentMethod: true, status: true, paymentReceivedAt: true, totalArs: true },
+    select: { id: true, paymentMethod: true, status: true, paymentReceivedAt: true, totalArs: true, cancellationRequest: { select: { id: true } } },
   })
   if (!existing) {
     res.status(404).json({ error: { code: 'ORDER_NOT_FOUND', message: 'Pedido no encontrado.' } })
@@ -460,6 +460,10 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
   }
   if (existing.status === 'CANCELLED') {
     res.status(409).json({ error: { code: 'ORDER_CANCELLED', message: 'No se puede registrar un cobro para un pedido cancelado.' } })
+    return
+  }
+  if (isManualPaymentBlockedByCancellation(existing.cancellationRequest)) {
+    res.status(409).json({ error: { code: 'CANCELLATION_REQUEST_PENDING', message: 'El pedido tiene una solicitud de arrepentimiento o reintegro. No se puede registrar un nuevo cobro.' } })
     return
   }
   if (existing.totalArs === null) {
@@ -474,8 +478,8 @@ adminOrdersRouter.post('/:id/payment-received', async (req, res) => {
   const receivedAt = new Date()
   const updated = await prisma.$transaction(async (tx) => {
     await tx.$queryRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 1))::text AS locked', existing.id)
-    const current = await tx.order.findUnique({ where: { id: existing.id }, select: { status: true, paymentMethod: true, paymentReceivedAt: true, totalArs: true } })
-    if (!current || current.status === 'CANCELLED' || current.paymentMethod !== 'CASH' || current.totalArs === null) return null
+    const current = await tx.order.findUnique({ where: { id: existing.id }, select: { status: true, paymentMethod: true, paymentReceivedAt: true, totalArs: true, cancellationRequest: { select: { id: true } } } })
+    if (!current || current.status === 'CANCELLED' || current.paymentMethod !== 'CASH' || current.totalArs === null || isManualPaymentBlockedByCancellation(current.cancellationRequest)) return null
     if (current.paymentReceivedAt) return current.paymentReceivedAt
     const nextStatus = current.status === 'PENDING' ? 'CONFIRMED' : current.status
     await tx.order.update({ where: { id: existing.id }, data: { paymentReceivedAt: receivedAt, status: nextStatus } })
