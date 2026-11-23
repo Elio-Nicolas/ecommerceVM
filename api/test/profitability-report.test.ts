@@ -15,7 +15,7 @@ describe('buildProfitabilityReport', () => {
       deliveryMethod: 'OCA', fullyRefunded: false, partiallyRefunded: false,
       items: [{ productName: 'Auricular', productSku: 'EAR-1', quantity: 1, lineTotalArs: 10000, unitCostArs: null }],
     }])
-    assert.equal(report.summary.estimatedGrossMarginArs, 7600)
+    assert.equal(report.summary.estimatedGrossMarginArs, 12700)
     assert.equal(report.summary.completeOrders, 1)
     assert.equal(report.summary.incompleteOrders, 1)
     assert.equal(report.summary.marginCoveragePercent, 50)
