@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatPrice } from './products'
 import './sales-report.css'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const TOKEN_KEY = 'ecommercevm_admin_token'
 type ProductProfit = { productName: string; productSku: string; quantity: number; revenueArs: number; costArs: number | null }
 type ProfitOrder = { orderId: string; orderCode: string; paidAt: string; productRevenueArs: number; shippingChargedArs: number; productCostArs: number; logisticsCostArs: number | null; estimatedMarginArs: number | null; hasPartialRefund: boolean }
