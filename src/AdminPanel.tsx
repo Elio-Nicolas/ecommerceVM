@@ -5,7 +5,7 @@ import ShippingSettingsPanel from './ShippingSettingsPanel'
 import ArcaSettingsPanel from './ArcaSettingsPanel'
 import PaymentMethodsPanel from './PaymentMethodsPanel'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const TOKEN_KEY = 'ecommercevm_admin_token'
 
 type Category = { id: string; name: string; slug: string; description?: string | null; _count?: { products: number } }
