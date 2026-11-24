@@ -46,7 +46,7 @@ type Props = {
   onOrderCreated: () => void
 }
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const PROVINCES = [
   ['A', 'Salta'], ['B', 'Buenos Aires'], ['C', 'Ciudad Autónoma de Buenos Aires'],
   ['D', 'San Luis'], ['E', 'Entre Ríos'], ['F', 'La Rioja'], ['G', 'Santiago del Estero'],
