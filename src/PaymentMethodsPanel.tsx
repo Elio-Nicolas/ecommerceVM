@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 type Settings = { cashEnabled: boolean; mercadoPagoEnabled: boolean; goCuotasEnabled: boolean; naranjaXEnabled: boolean }
 
 const defaults: Settings = { cashEnabled: true, mercadoPagoEnabled: true, goCuotasEnabled: true, naranjaXEnabled: false }
