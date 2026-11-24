@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 
 type ArcaSettings = {
   enabled: boolean
