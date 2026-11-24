@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { formatPrice } from './products'
 import './sales-report.css'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const TOKEN_KEY = 'ecommercevm_admin_token'
 
 type PaymentMethod = 'CASH' | 'MERCADO_PAGO' | 'GOCUOTAS'

@@ -1,6 +1,6 @@
 import type { Product } from './products'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 
 type ApiProduct = {
   id: string
