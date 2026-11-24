@@ -258,7 +258,7 @@ export default function App() {
             </div>
             <label className="sort-control"><span>Ordenar:</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option value="featured">Destacados</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option><option value="name">Nombre</option></select></label>
           </div>
-          <div className="results-line"><span>{visibleProducts.length} productos</span><span>Precios de muestra · Valores editables</span></div>
+          <div className="results-line"><span>{visibleProducts.length} productos</span><span>Precios en pesos argentinos · Stock actualizado</span></div>
           {catalogLoading ? <div className="empty-results"><strong>Cargando catálogo...</strong></div> : catalogError ? <div className="empty-results"><strong>No se pudo cargar el catálogo.</strong><span>{catalogError}</span></div> : visibleProducts.length ? (
             <div className="product-grid">
               {visibleProducts.map((product) => (
@@ -291,7 +291,7 @@ export default function App() {
 
       <footer className="footer">
         <div className="footer-trust">
-          <div className="footer-trust-item"><span className="footer-trust-icon">✓</span><div><strong>Comprá con confianza</strong><small>Pago online procesado de forma segura</small></div></div>
+          <div className="footer-trust-item"><span className="footer-trust-icon">✓</span><div><strong>Comprá con confianza</strong><small>Medios de pago disponibles al finalizar la compra</small></div></div>
           <div className="footer-trust-item"><span className="footer-trust-icon">⌖</span><div><strong>Estamos en Villa Mercedes</strong><small>Atención cercana y operación local</small></div></div>
           <div className="footer-trust-item"><span className="footer-trust-icon">↗</span><div><strong>Elegí cómo recibir tu pedido</strong><small>Retiro o entrega según tu zona</small></div></div>
         </div>
@@ -315,7 +315,7 @@ export default function App() {
           </nav>
           <div className="footer-column">
             <h3>Tu compra</h3>
-            <span>Pago online con Mercado Pago</span>
+            <span>Medios de pago habilitados en el checkout</span>
             <span>Opciones de retiro y entrega</span>
             <span>Costos informados antes de confirmar</span>
           </div>
