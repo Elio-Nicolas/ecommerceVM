@@ -3,7 +3,7 @@ import { formatPrice } from './products'
 import OcaAdmissionPanel from './OcaAdmissionPanel'
 import './order-logistics.css'
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
+const API_URL = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:7381').replace(/\/$/, '')
 const TOKEN_KEY = 'ecommercevm_admin_token'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
